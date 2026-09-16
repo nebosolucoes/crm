@@ -5,7 +5,7 @@ import { beforeAll, afterAll, it, expect, vi } from "vitest";
 import { seedGov } from "./gov-helpers";
 import { replyFixture } from "../support/autonomia-fixture";
 import { loadAgentVersionConfig } from "@/lib/agent-engine/agent/agent-config";
-import { runAgentPreview } from "@/lib/agent-engine/agent/inbound-turn";
+import { CHECKPOINT_INSTRUCTION, runAgentPreview } from "@/lib/agent-engine/agent/inbound-turn";
 import { generateReplyDraft } from "@/lib/agent-engine/agent/reply-drafts";
 import {
   scenarioContext,
@@ -250,4 +250,5 @@ it("assistência sob demanda instala fronteira original antes de ler checkpoint"
   });
   expect(JSON.stringify(prompts)).toContain("RESUMO DO ATENDIMENTO ATUAL");
   expect(JSON.stringify(prompts)).not.toContain("SENTINELA DE ATENDIMENTO ANTERIOR");
+  expect(prompts.some((prompt) => prompt.includes(CHECKPOINT_INSTRUCTION))).toBe(false);
 });

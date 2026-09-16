@@ -47,4 +47,5 @@ export type {
   OutboundKind,
   OutboundMedia,
   RecipientInput,
+  ChannelGroup,
 } from "./types";

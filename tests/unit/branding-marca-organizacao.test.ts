@@ -87,28 +87,27 @@ describe("camadaDaOrganizacao — o que a fábrica declara e o que ela cala", ()
 });
 
 describe("precedência entre os três andares", () => {
-  it("a cor da ORGANIZAÇÃO vence a da instalação", () => {
+  it("marca antiga da organização NÃO vence a instalação", () => {
     const marca = resolverMarcaDaOrganizacao(
-      { branding: { accent_hex: "#b3261e" } },
+      { branding: { app_name: "Loja da Ana", accent_hex: "#b3261e" } },
       INSTALACAO,
       AMBIENTE,
     );
-    expect(marca.origens.cor).toBe("organizacao");
-    expect(marca.cor?.semente).toBe("#b3261e");
-    // E o resto continua vindo de baixo — precedência é POR CAMPO.
+    expect(marca.origens).toEqual({ nome: "banco", logoUrl: "banco", cor: "banco" });
     expect(marca.name).toBe("Revenda XPTO");
     expect(marca.logoUrl).toBe("https://cdn.exemplo.com/revenda.svg");
-    expect(marca.origens.logoUrl).toBe("banco");
+    expect(marca.cor?.semente).toBe("#2563eb");
+    expect(marca.motivos.filter((m) => m.origem === "organizacao")).toEqual([]);
   });
 
-  it("o nome da ORGANIZAÇÃO vence sem arrastar a cor junto", () => {
+  it("o nome antigo da organização também é ignorado", () => {
     const marca = resolverMarcaDaOrganizacao(
       { branding: { app_name: "Loja da Ana" } },
       INSTALACAO,
       AMBIENTE,
     );
-    expect(marca.name).toBe("Loja da Ana");
-    expect(marca.origens.nome).toBe("organizacao");
+    expect(marca.name).toBe("Revenda XPTO");
+    expect(marca.origens.nome).toBe("banco");
     expect(marca.origens.cor).toBe("banco");
     expect(marca.cor?.semente).toBe("#2563eb");
   });
@@ -133,12 +132,7 @@ describe("precedência entre os três andares", () => {
     }
   });
 
-  it("organização com hex INVÁLIDO cai na instalação e EMITE motivo", () => {
-    // Mesmo desfecho visual do caso acima, comportamento oposto: aqui alguém
-    // digitou algo e precisa descobrir por que não pintou — é o laço de retorno
-    // da feature. Cair na cor do REVENDEDOR (e não na do produto) também é a
-    // decisão certa: numa instalação de revendedor, trocar para a nossa cor
-    // trocaria o dono da tela.
+  it("organização com hex INVÁLIDO também é ignorada sem aviso visual", () => {
     const marca = resolverMarcaDaOrganizacao(
       { branding: { accent_hex: "vermelho" } },
       INSTALACAO,
@@ -147,9 +141,7 @@ describe("precedência entre os três andares", () => {
     expect(marca.origens.cor).toBe("banco");
     expect(marca.cor?.semente).toBe("#2563eb");
     const daOrg = marca.motivos.filter((m) => m.origem === "organizacao");
-    expect(daOrg.map((m) => m.codigo)).toEqual(["semente_invalida"]);
-    // E o diagnóstico não carrega identidade: nenhum hex de ninguém no texto.
-    for (const m of daOrg) expect(m.detalhe).not.toContain("#2563eb");
+    expect(daOrg).toEqual([]);
   });
 
   it("sem organização e sem instalação, sobra o `.env` — a pilha inteira desce", () => {
@@ -158,18 +150,15 @@ describe("precedência entre os três andares", () => {
     expect(marca.cor?.semente).toBe("#123456");
   });
 
-  it("com os TRÊS andares falando ao mesmo tempo, a ordem é org > instalação > env", () => {
-    // Testar caminhos não é testar a ORDEM: os casos acima exercitam um andar de
-    // cada vez, e passariam iguais com duas camadas trocadas de lugar. Este liga
-    // as três condições juntas, que é a única forma de a precedência aparecer.
+  it("com os TRÊS andares falando ao mesmo tempo, a ordem é instalação > env", () => {
     const tudo = resolverMarcaDaOrganizacao(
       { branding: { app_name: "Loja da Ana", accent_hex: "#b3261e" } },
       INSTALACAO,
       AMBIENTE,
     );
-    expect(tudo.origens).toEqual({ nome: "organizacao", logoUrl: "banco", cor: "organizacao" });
-    expect(tudo.name).toBe("Loja da Ana");
-    expect(tudo.cor?.semente).toBe("#b3261e");
+    expect(tudo.origens).toEqual({ nome: "banco", logoUrl: "banco", cor: "banco" });
+    expect(tudo.name).toBe("Revenda XPTO");
+    expect(tudo.cor?.semente).toBe("#2563eb");
 
     // Tirando o andar de cima, quem assume é o do meio — e não o de baixo.
     const semOrg = resolverMarcaDaOrganizacao(null, INSTALACAO, AMBIENTE);

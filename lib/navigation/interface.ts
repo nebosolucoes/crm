@@ -20,6 +20,10 @@ export const INTERFACE_COMPLETA: InterfaceSettings = { preset: "completa" };
 const SIMPLIFICADA: readonly NavDestinationId[] = [
   "/app/inbox",
   "/app/agenda",
+  "/app/disparo/lista",
+  "/app/disparo/agendar",
+  "/app/disparo/grupos",
+  "/app/disparo/historico",
   "/app/kanban",
   "/app/contacts",
   "/app/tasks",

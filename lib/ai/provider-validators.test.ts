@@ -73,6 +73,23 @@ describe("validateOpenRouterKey", () => {
     expect(r.ok === true && r.models).toEqual([]);
   });
 
+  it("timeout ou erro de rede no catálogo não invalida a chave autenticada", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        chamadas.push(url);
+        if (url.includes("/api/v1/key")) {
+          return new Response(JSON.stringify({ data: { label: "x" } }), { status: 200 });
+        }
+        throw new TypeError("fetch failed");
+      }),
+    );
+
+    const r = await validateOpenRouterKey("sk-or-v1-boa");
+    expect(r).toEqual({ ok: true, models: [] });
+    expect(chamadas).toHaveLength(2);
+  });
+
   it("a PROVA é o endpoint autenticado, e é o primeiro a ser chamado", async () => {
     vi.stubGlobal(
       "fetch",

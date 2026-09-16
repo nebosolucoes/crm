@@ -57,15 +57,13 @@ import { z } from "zod";
 
 import { fail, ok } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
-import { loadAuthUser, mfaEmDivida, resolveActiveOrg } from "@/lib/auth/server";
-import { roleAtLeast } from "@/lib/auth/types";
+import { loadAuthUser, mfaEmDivida } from "@/lib/auth/server";
 import { checkRateLimit } from "@/lib/ai/dispatcher/rate-limit";
 import { invalidarMarcaDaInstalacao } from "@/lib/branding/instalacao";
 import {
   BUCKET_DE_LOGOS,
   caminhoNovoDoLogo,
   PREFIXO_DA_INSTALACAO,
-  prefixoDaOrganizacao,
   TAMANHO_MAXIMO_DO_LOGO,
   urlPublicaDoLogo,
   baseDoStorage,
@@ -155,35 +153,14 @@ async function abrirContexto(escopo: Escopo): Promise<{ ctx: Contexto } | { recu
     return { ctx: { escopo, userId: user.id, prefixo: PREFIXO_DA_INSTALACAO } };
   }
 
-  const org = await resolveActiveOrg(user);
-  if (!org) {
-    return {
-      recusa: { codigo: "forbidden_tenant", mensagem: "Sem organização ativa.", status: 403 },
-    };
-  }
-  if (!user.is_platform_admin && !roleAtLeast(org.role, "admin")) {
-    return {
-      recusa: {
-        codigo: "forbidden_role",
-        mensagem: "Só quem administra a empresa pode trocar o logo dela.",
-        status: 403,
-      },
-    };
-  }
-  // DEPOIS do papel, de propósito — mesma ordem de `updateMarcaDaOrganizacao.ts`:
-  // quem nem tem o papel recebe `forbidden_role`, que é a verdade sobre ele.
-  if (await mfaEmDivida()) {
-    return {
-      recusa: {
-        codigo: "mfa_required",
-        mensagem: "Confirme o segundo fator nesta sessão para trocar o logo.",
-        status: 403,
-      },
-    };
-  }
   return {
-    ctx: { escopo, userId: user.id, orgId: org.orgId, prefixo: prefixoDaOrganizacao(org.orgId) },
+    recusa: {
+      codigo: "forbidden_role",
+      mensagem: "A marca visual é global da instalação e só pode ser alterada em /admin/marca.",
+      status: 403,
+    },
   };
+
 }
 
 /** O caminho HOJE gravado, lido do BANCO. Nunca do cliente. */

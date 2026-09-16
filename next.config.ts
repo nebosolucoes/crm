@@ -1,6 +1,22 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
+function devOriginsPermitidas(): string[] {
+  const declaradas: string[] = [];
+
+  try {
+    const urlPublica = process.env.NEXT_PUBLIC_APP_URL ? new URL(process.env.NEXT_PUBLIC_APP_URL) : null;
+    if (urlPublica && !["localhost", "127.0.0.1"].includes(urlPublica.hostname)) {
+      declaradas.push(urlPublica.hostname);
+    }
+  } catch {
+    // Config inválida já é recusada por lib/env.ts; aqui só não deixamos o
+    // next.config cair antes do diagnóstico aparecer no lugar certo.
+  }
+
+  return [...new Set(["192.168.4.158", ...declaradas])];
+}
+
 /** Performance budget (EPIC-12 §S-12.05):
  *  - LCP < 2.5s p75
  *  - CLS < 0.1 p75
@@ -55,6 +71,7 @@ const nextConfig: NextConfig = {
   },
   reactStrictMode: true,
   poweredByHeader: false,
+  allowedDevOrigins: devOriginsPermitidas(),
   // typedRoutes moved out of experimental in Next 15.5+
   typedRoutes: true,
   experimental: {

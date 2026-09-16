@@ -155,15 +155,28 @@ export async function validateOpenRouterKey(apiKey: string): Promise<ValidationR
       return { ok: false, error: `provider_status_${auth.status}` };
     }
 
-    const res = await timedFetch("https://openrouter.ai/api/v1/models", {
-      method: "GET",
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    if (!res.ok) return { ok: true, models: [] };
+    // A chave já foi autenticada. O catálogo é uma dependência de informação
+    // da tela, não da prova da credencial: é uma resposta grande e pode sofrer
+    // timeout/queda independentemente do endpoint `/key`. Se essa segunda
+    // chamada escapar para o `catch` externo, uma chave válida vira erro de
+    // rede — exatamente o sintoma que o operador vê como "não foi possível
+    // falar com o provedor".
+    try {
+      const res = await timedFetch("https://openrouter.ai/api/v1/models", {
+        method: "GET",
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!res.ok) return { ok: true, models: [] };
 
-    const json = (await res.json()) as { data?: { id?: string }[] };
-    const models = (json.data ?? []).map((m) => m.id ?? "").filter(Boolean);
-    return { ok: true, models };
+      const json = (await res.json()) as { data?: { id?: string }[] };
+      const models = (json.data ?? []).map((m) => m.id ?? "").filter(Boolean);
+      return { ok: true, models };
+    } catch {
+      // A prova de autenticação já passou; a sincronização do catálogo tem
+      // caminho próprio e não pode transformar disponibilidade em credencial
+      // inválida. O próximo cron/painel pode preencher a lista depois.
+      return { ok: true, models: [] };
+    }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.name : "network_error" };
   }

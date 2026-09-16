@@ -290,6 +290,9 @@ export interface ChannelAdapter {
    */
   checkHealth?(input: ChannelTenantScope & { sessionRef: string }): Promise<ChannelHealth>;
 
+  /** Grupos disponíveis no transporte para a conexão selecionada. */
+  fetchGroups?(input: ChannelTenantScope & { sessionRef: string }): Promise<ChannelGroup[]>;
+
   /**
    * Envia uma DEFINIÇÃO APROVADA — o único caminho de volta quando a janela de
    * 24h fechou.
@@ -354,6 +357,13 @@ export interface ChannelHealth {
   status: string | null;
   /** Detalhe do erro, para o corpo do aviso. Nunca credencial. */
   detail: string | null;
+}
+
+export interface ChannelGroup {
+  externalId: string;
+  name: string;
+  groupKind: "group" | "community" | "announcement";
+  participantCount: number | null;
 }
 
 /** Definição aprovada, na forma NEUTRA — sem o vocabulário de nenhum provider. */

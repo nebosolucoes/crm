@@ -136,7 +136,7 @@ describe("marcaDaSaida — as duas classes", () => {
     expect(marca.accent).not.toBe(ACCENT_DO_PRODUTO);
   });
 
-  it("classe A (com organização) põe a marca da ORGANIZAÇÃO acima da instalação", async () => {
+  it("classe A (com organização) ignora marca antiga da organização", async () => {
     const { marcaDaSaida } = await carregar();
     linhaDaInstalacao = { app_name: "Vendas Turbo", accent_hex: "#2563eb" };
     respostaDaOrganizacao = {
@@ -145,11 +145,8 @@ describe("marcaDaSaida — as duas classes", () => {
     };
 
     const marca = await marcaDaSaida("11111111-1111-4111-8111-111111111111");
-    // Precedência POR CAMPO: a organização definiu só o nome, então a COR
-    // continua sendo a do revendedor. Um resolvedor que trocasse a camada
-    // inteira apagaria a cor de quem só quis trocar o nome.
-    expect(marca.nome).toBe("Clínica Bem Viver");
-    expect(marca.origens.nome).toBe("organizacao");
+    expect(marca.nome).toBe("Vendas Turbo");
+    expect(marca.origens.nome).toBe("banco");
     expect(marca.origens.cor).toBe("banco");
   });
 
@@ -218,7 +215,7 @@ describe("marcaDaSaida — NUNCA LANÇA", () => {
     }
   });
 
-  it("hex inválido gravado no banco não lança, e a cor cai para a do produto", async () => {
+  it("hex inválido gravado na organização não lança e é ignorado", async () => {
     const { marcaDaSaida } = await carregar();
     respostaDaOrganizacao = {
       data: { settings: { branding: { app_name: "Acme", accent_hex: "azul-piscina" } } },
@@ -226,9 +223,7 @@ describe("marcaDaSaida — NUNCA LANÇA", () => {
     };
 
     const marca = await marcaDaSaida("11111111-1111-4111-8111-111111111111");
-    // Falhar fechado na AÇÃO (não pintar com lixo) e aberto na INFORMAÇÃO: o
-    // nome, que é válido, continua valendo.
-    expect(marca.nome).toBe("Acme");
+    expect(marca.nome).toBe("DeskcommCRM");
     expect(marca.accent).toBe(ACCENT_DO_PRODUTO);
     expect(marca.origens.cor).toBe("padrao");
   });

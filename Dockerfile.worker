@@ -20,8 +20,11 @@ COPY patches ./patches
 RUN pnpm install --frozen-lockfile
 
 COPY . .
+RUN chmod 755 docker/worker/entrypoint.sh
 
 # Healthz do worker (bind 0.0.0.0 dentro do container).
 EXPOSE 8787
+
+ENTRYPOINT ["/app/docker/worker/entrypoint.sh"]
 
 CMD ["pnpm", "exec", "tsx", "workers/agent-worker/main.ts"]

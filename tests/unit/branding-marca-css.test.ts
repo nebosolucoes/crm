@@ -330,9 +330,9 @@ describe("guardas de mecanismo", () => {
       }
     }
     // Controle positivo: uma varredura que não achasse chamada nenhuma passaria
-    // no `toEqual([])` acima sem medir nada. Quatro é o que existe hoje — o
-    // layout raiz, o layout de `/app` e as duas telas de marca.
-    expect(chamadas.length, chamadas.join("\n")).toBeGreaterThanOrEqual(4);
+    // no `toEqual([])` acima sem medir nada. A marca por organização não é mais
+    // aplicada no layout do tenant; seguem o layout raiz e telas de marca.
+    expect(chamadas.length, chamadas.join("\n")).toBeGreaterThanOrEqual(3);
     expect(forasteiros).toEqual([]);
   });
 
@@ -350,36 +350,16 @@ describe("guardas de mecanismo", () => {
     expect(estilo).toBeLessThan(tema);
   });
 
-  it("o layout de /app envolve a árvore inteira no marcador do escopo", () => {
-    // POR QUE ESTE TESTE EXISTE: o seletor é `body:has([data-marca-org])`. Sem o
-    // marcador no DOM a regra não casa NADA — a cor é resolvida, o bloco vai
-    // para a página, e nenhum pixel muda. Falha sem sintoma, do tipo que se
-    // descobre pelo cliente reclamando que "a cor não funciona".
+  it("o layout de /app não emite escopo visual de organização", () => {
     const layout = fs.readFileSync(path.join(RAIZ, "app/app/layout.tsx"), "utf8");
-    expect(layout).toMatch(/<div data-marca-org="" className="contents">/);
-    // `contents` porque o elemento não pode gerar caixa: com uma div normal, o
-    // shell (`flex min-h-screen`) passaria a ter um ancestral a mais no box tree
-    // e a altura de tela inteira deixaria de valer.
-    const marcador = layout.indexOf("data-marca-org");
-    // ENVOLVE TUDO, e não só o shell: a div do `AppShell` é irmã dos banners e é
-    // SUBSTITUÍDA quando o `MfaEnrollGate` bloqueia. O admin de tenant veria a
-    // tela de cadastro de MFA — a primeira dele — com a cor da instalação.
-    expect(marcador).toBeGreaterThan(-1);
-    expect(marcador).toBeLessThan(layout.indexOf("<ImpersonateBanner"));
-    expect(marcador).toBeLessThan(layout.indexOf("MfaEnrollGate enrolled"));
+    expect(layout).not.toContain("data-marca-org");
+    expect(layout).not.toContain("EstiloDaMarcaDaOrganizacao");
+    expect(layout).not.toContain("ESCOPO_DA_ORGANIZACAO");
   });
 
-  it("o bloco da organização é emitido DENTRO da subárvore, não na raiz", () => {
+  it("o bloco da organização não é emitido pelo layout do tenant", () => {
     const layout = fs.readFileSync(path.join(RAIZ, "app/app/layout.tsx"), "utf8");
-    const marcador = layout.indexOf('<div data-marca-org=""');
-    const estilo = layout.indexOf("<EstiloDaMarcaDaOrganizacao");
-    // Vacuidade: sem o marcador, `-1 < estilo` seria verde e este caso passaria
-    // a não ordenar coisa nenhuma.
-    expect(marcador).toBeGreaterThan(-1);
-    expect(estilo).toBeGreaterThan(marcador);
-    // E o layout RAIZ não conhece o escopo da organização: emitir o bloco lá o
-    // faria sobreviver ao logout, que é Server Action + `redirect` — navegação
-    // client-side, sem full reload, sem o `<head>` desmontar.
+    expect(layout).not.toContain("<EstiloDaMarcaDaOrganizacao");
     const raiz = fs.readFileSync(path.join(RAIZ, "app/layout.tsx"), "utf8");
     expect(raiz).not.toContain("ESCOPO_DA_ORGANIZACAO");
   });

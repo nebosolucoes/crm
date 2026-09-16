@@ -42,6 +42,10 @@ const NAV_ALLOWLIST: Record<string, string> = {
     "redirect para /app/connections?aba=oficial&sub=templates — template da Meta só existe por causa do canal oficial, e vive como sub-aba dele",
   "/app/settings/atualizacao":
     "porta é o rodapé de versão (VersionFooter), que aparece justamente quando há versão nova — melhor que um card fixo. Além disso é só do dono do servidor (is_platform_admin), papel que o registro não modela",
+  "/app/settings/marca":
+    "rota legada bloqueada para tenant: marca visual é configuração global exclusiva de /admin/marca, e o app herda a marca da instalação",
+  "/app/agendamentos":
+    "redirect legado para /app/disparo/lista — Disparo agora é o grupo do menu, com Lista, Agendar, Grupos e Histórico como portas reais",
 };
 
 /** Deriva as rotas estáticas a partir dos arquivos de página que existem. */

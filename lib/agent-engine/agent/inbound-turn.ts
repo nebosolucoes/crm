@@ -149,7 +149,7 @@ import {
 } from './skills';
 import { readSkillReference, skillHasReferences } from './skill-references';
 import { READ_ONLY_TOOLS, wrapToolsWithBreaker, type ToolBreakerThresholds } from './tool-breaker';
-import { loadChannelProvider, runBeforeSend } from '../guardrails/before-send';
+import { evaluateBeforeSend, loadChannelProvider, runBeforeSend } from '../guardrails/before-send';
 import { isStatusSendable } from '../../channels/meta/template-binding';
 import { capabilitiesOf } from '@/lib/channels/capabilities';
 import { renderTemplateBody } from '@/lib/channels/meta/render-template';
@@ -1623,6 +1623,15 @@ async function executarTurnoDoAgente(
     tenant_id: tenantId,
     lead_id: leadId,
   });
+  const previewStartedAt = Date.now();
+  const markPreviewStage = (stage: string, extra?: Record<string, unknown>) => {
+    if (!preview) return;
+    runLog.info(`ai.preview.${stage}`, {
+      elapsed_ms: Date.now() - previewStartedAt,
+      ...extra,
+    });
+  };
+  markPreviewStage('request_start');
 
   // AS DUAS CAMADAS QUE CUSTAM DINHEIRO, resolvidas UMA vez por turno.
   //
@@ -1636,11 +1645,13 @@ async function executarTurnoDoAgente(
   // linhas de distância um do outro, e duas queries para a mesma pergunta viram,
   // com o tempo, duas respostas.
   const camadas = await lerCamadasDaOrg(pool, tenantId);
+  markPreviewStage('guardrail_layers_loaded');
   // O fuso da ORGANIZAÇÃO — o que o bloco `## Agora` usa lá embaixo, na montagem
   // da abertura. Lido aqui pela mesma razão da linha acima: uma query por turno,
   // longe do ponto de uso, para não virar duas respostas para a mesma pergunta.
   // Nunca lança e nunca vem vazio (ver `fuso-da-org.ts`).
   const fusoDaOrg = await fusoDaOrganizacao(pool, tenantId, runLog);
+  markPreviewStage('organization_context_loaded');
 
   // F4-06 (acceptance 2): lead em handoff humano → NO-OP no INÍCIO do turno, antes de
   // qualquer chamada de modelo/CRM. O bot silenciou (bot_silenced_until='infinity', cache
@@ -1979,6 +1990,9 @@ async function executarTurnoDoAgente(
     // sumiu) — ambos re-tentam pela fila e morrem em 'dead' se persistirem.
     throw new Error(`abertura do turno falhou em get_lead_context (${openingContext.error.code})`);
   }
+  markPreviewStage('context_loaded', {
+    message_count: openingContext.context.messages.length,
+  });
   const currentInboundText =
     input.inboundMessageId === undefined
       ? null
@@ -3649,6 +3663,11 @@ async function executarTurnoDoAgente(
       },
       { registry: deps.registry, log: runLog },
     );
+    markPreviewStage('model_response_received', {
+      text_length: turn.result.text.length,
+      tool_call_count: turn.result.toolCalls.length,
+      latency_ms: turn.latencyMs,
+    });
 
     // F4-04: correlação dos dois sinais do MESMO turno — jailbreak ALTO + tentativa de
     // promessa fora de tabela (F4-01). Ambos estão determinados aqui (o jailbreak rodou na
@@ -3689,6 +3708,53 @@ async function executarTurnoDoAgente(
       deps.knobs.prune !== undefined
         ? pruneToolResults(turn.result.response.messages, deps.knobs.prune)
         : turn.result.response.messages;
+
+    // A prévia testa a resposta do agente; o checkpoint interno só é necessário
+    // no turno real para alimentar a próxima interação. Um rascunho assistido
+    // também não o persiste nem o devolve à tela: pagá-lo fazia cada sugestão
+    // esperar uma chamada inteira de IA que ninguém consome.
+    if (preview?.kind === 'sandbox') {
+      if (preview.result.candidates.length === 0 && turn.result.text.trim() !== '') {
+        const directText = turn.result.text.trim();
+        const direct = evaluateBeforeSend({
+          ...previewContext!,
+          body: directText,
+          semanticPromise: semanticClassifier ? await semanticClassifier(directText) : null,
+        });
+        if (direct.veto) {
+          preview.result.impediments.push({ code: direct.veto.code, message: direct.veto.message });
+        } else {
+          preview.result.candidates.push({
+            body: direct.body,
+            citations: pendingCitations,
+            trace: direct.trace,
+          });
+        }
+      }
+      if (preview.result.candidates.length === 0 && preview.result.impediments.length === 0)
+        preview.result.impediments.push({
+          code: 'no_candidate',
+          message: 'O agente não propôs uma resposta. Revise o cenário ou a configuração.',
+        });
+      markPreviewStage('request_finished', {
+        candidate_count: preview.result.candidates.length,
+        impediment_count: preview.result.impediments.length,
+      });
+      return;
+    }
+
+    if (preview?.kind === 'assisted') {
+      if (preview.result.candidates.length === 0 && preview.result.impediments.length === 0)
+        preview.result.impediments.push({
+          code: 'no_candidate',
+          message: 'O agente não propôs uma resposta. Revise o cenário ou a configuração.',
+        });
+      markPreviewStage('request_finished', {
+        candidate_count: preview.result.candidates.length,
+        impediment_count: preview.result.impediments.length,
+      });
+      return;
+    }
 
     // Fechamento imposto pelo runtime: 2ª chamada, mesma conversa, só o checkpoint.
     //

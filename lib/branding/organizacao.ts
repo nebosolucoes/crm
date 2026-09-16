@@ -37,7 +37,6 @@
 import { REGUA_DO_PRODUTO } from "./regua-do-produto";
 import {
   camadaDaInstalacao,
-  camadaDaOrganizacao,
   camadaDoAmbiente,
   resolverMarca,
   type LinhaDaInstalacao,
@@ -96,13 +95,12 @@ export function marcaDaOrganizacaoDeSettings(settings: unknown): MarcaDaOrganiza
  * campo: `logo_path` ausente desce para a instalação, não a apaga.
  */
 export function resolverMarcaDaOrganizacao(
-  settings: unknown,
+  _settings: unknown,
   linha: LinhaDaInstalacao | null,
   ambiente: AmbienteDaMarca,
 ): MarcaResolvida {
   return resolverMarca(
     [
-      camadaDaOrganizacao(marcaDaOrganizacaoDeSettings(settings)),
       camadaDaInstalacao(linha),
       camadaDoAmbiente(ambiente),
     ],

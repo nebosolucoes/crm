@@ -82,37 +82,12 @@ export function SidebarContent({
   }
 
   const brand = useMarcaDaInstalacao();
-  /**
-   * O CONSUMIDOR do nome por organização.
-   *
-   * Sem ele, `settings.branding.app_name` seria campo decorativo: medido, o nome
-   * da org não aparece em lugar nenhum da casca para o cliente típico de um
-   * revendedor — o único leitor é o `TenantSwitcher`, e ele devolve `null` com
-   * uma organização só.
-   *
-   * A marca da INSTALAÇÃO continua embaixo: a organização que não definiu nome
-   * vê exatamente o que via antes. O que mudou é POR ONDE ela chega — era
-   * `branding()`, que no navegador lê `window.__PUBLIC_ENV__` e no servidor lê
-   * `process.env`, e essas duas fontes passaram a divergir quando o layout raiz
-   * começou a injetar a marca do BANCO. Divergência entre SSR e cliente aqui não
-   * é detalhe: com logo no banco e `APP_LOGO_URL` vazio, o servidor desenhava o
-   * `<span>` de baixo e o cliente desenhava o `<img>` — React #418 em toda tela.
-   * Hoje a marca vem por PROP do servidor (`useMarcaDaInstalacao`), pela mesma
-   * rota de `activeOrg`, e os dois lados leem o mesmo objeto por construção.
-   */
-  const nome = activeOrg?.marca?.nome ?? brand.name;
-  /**
-   * O mesmo desenho para o LOGO — e é este par de linhas que fecha o caminho do
-   * `logo_url` gravado até a tela.
-   *
-   * `||` e não `??`: vazio é AUSÊNCIA de logo, não "logo em branco". É a regra
-   * que `resolveBranding` e `primeiroDefinido` já aplicam nas camadas de baixo, e
-   * com `??` um `""` vindo de cima apagaria o logo do revendedor em vez de
-   * descer para ele — que é o contrário do que a precedência por campo promete.
-   */
-  const logo = activeOrg?.marca?.logoUrl || brand.logoUrl;
-  // Só quando NINGUÉM — nem a instalação, nem a organização — pôs marca própria:
-  // é a condição de `lib/branding.ts`, avaliada sobre o que a barra vai mostrar.
+  // Marca visual é global da instalação. `activeOrg.marca` pode existir no tipo
+  // por compatibilidade com sessões antigas, mas a casca do tenant não a usa.
+  const nome = brand.name;
+  const logo = brand.logoUrl;
+  // Só quando a instalação não pôs marca própria: é a condição de
+  // `lib/branding.ts`, avaliada sobre o que a barra vai mostrar.
   const marcaDoProduto = marcaEhADoProduto({ name: nome, logoUrl: logo ?? null });
 
   return (

@@ -191,6 +191,14 @@ echo -n "7a3f9b2c1d4e5f..." | shasum -a 512 | awk '{print $1}'
 # → cola algo tipo (longão, ~128 chars): 9f8e7d6c...
 ```
 
+No PowerShell, com a chave plaintext disponível em `$env:WAHA_API_KEY`:
+
+```powershell
+$sha=[Security.Cryptography.SHA512]::Create(); $hash=[BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($env:WAHA_API_KEY))).Replace('-','').ToLowerInvariant(); $sha.Dispose(); "sha512:$hash"
+```
+
+Cole o resultado completo, começando por `sha512:`, em `WAHA_API_KEY_SHA512`.
+
 > ⚠️ **Erro #1 de quem clona o projeto:** confundir plaintext com hash. Memoriza:
 > - O **container WAHA** recebe o **HASH** → vai em `WAHA_API_KEY_SHA512`.
 > - O **app Next.js** envia o **PLAINTEXT** no header `X-Api-Key` → vai em `WAHA_API_KEY`.
@@ -251,7 +259,7 @@ WAHA_WEBHOOK_BASE_URL=https://abc-123-456.ngrok-free.app
 ### Passo 5 — subir o WAHA
 
 ```bash
-docker compose up -d
+docker compose --env-file .env.local up -d
 ```
 
 Confira em <http://localhost:3030/dashboard/> que o WAHA está respondendo (painel do WAHA). Pra criar sessão e escanear QR, veja a doc oficial: <https://waha.devlikeapro.com/docs/overview/quick-start/>.

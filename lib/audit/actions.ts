@@ -489,6 +489,19 @@ export const AUDIT_ACTIONS = [
   "agenda.meet_action_requested",
   "agenda.google_resolution_requested",
 
+  // Agendamentos de envio para grupos do WhatsApp. Estes grupos continuam fora
+  // do inbox; a auditoria cobre só a intenção humana de salvar, programar,
+  // pausar, retomar ou cancelar um disparo outbound.
+  "scheduled_group.group_saved",
+  "scheduled_group.groups_synced",
+  "scheduled_group.group_updated",
+  "scheduled_group.message_created",
+  "scheduled_group.message_updated",
+  "scheduled_group.message_paused",
+  "scheduled_group.message_resumed",
+  "scheduled_group.message_cancelled",
+  "scheduled_group.worker_run",
+
   // ── O compromisso em si (frentes 1 e 5 do Calendário Vivo) ──────────────
   // Marcar, remarcar e cancelar são mutações de um compromisso com hora e
   // pessoa. Cancelar em especial: é a única das três que alguém pode querer

@@ -143,7 +143,41 @@ describe("POST .../versions/:vid/test — core compartilhado", () => {
     // que lê o CHECK do `baseline.sql` em vez de confiar num mock.
     expect(atualizacoes).toContainEqual(expect.objectContaining({
       status: "failed",
-      error_code: "preview_failed",
+      error_code: "erro_desconhecido",
+    }));
+  });
+
+  it("explica quando o provedor recusou por limite ou saldo", async () => {
+    vi.mocked(testAgentVersion).mockRejectedValueOnce(
+      Object.assign(new Error("Insufficient credits"), { statusCode: 429 }),
+    );
+    const { POST } = await import("./route");
+    const req = new NextRequest("http://localhost/x", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sample_message: "oi" }),
+    });
+
+    const res = await POST(req, { params: Promise.resolve({ id: AGENT, vid: VERSION }) });
+    const body = (await res.json()) as {
+      error?: { code?: string; message?: string; details?: Record<string, unknown> };
+    };
+
+    expect(res.status).toBe(422);
+    expect(body.error).toMatchObject({
+      code: "preview_failed",
+      message: "O provedor recusou a chamada por limite ou saldo. Modelos gratuitos podem atingir limites; tente novamente ou escolha outro modelo.",
+      details: {
+        reason: "limite_ou_saldo",
+        http_status: 429,
+        provider: "anthropic",
+        model: "claude-sonnet-4-6",
+      },
+    });
+    expect(atualizacoes).toContainEqual(expect.objectContaining({
+      status: "failed",
+      error_code: "limite_ou_saldo",
+      error_message: "Insufficient credits",
     }));
   });
 });

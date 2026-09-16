@@ -35,6 +35,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { testRunSchema } from "@/lib/ai/agents/validation";
 import { avaliarRespostaDeTeste } from "@/lib/ai/agents/avaliar-resposta-de-teste";
 import { testAgentVersion } from "@/lib/agent-engine/agent/sandbox";
+import { normalizarErro } from "@/lib/agent-engine/edge/llm/run-model-call";
 import { requestTurnDeps } from "@/lib/agent-engine/agent/request-deps";
 import { getRequestPool } from "@/lib/agent-engine/db/request-pool";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -45,6 +46,28 @@ export const dynamic = "force-dynamic";
 const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Ctx = { params: Promise<{ id: string; vid: string }> };
+
+function orientarFalhaDoTeste(codigo: string, t: (texto: string) => string): string {
+  const orientacoes: Record<string, string> = {
+    credencial_recusada:
+      "A credencial do provedor foi recusada. Revalide o token e tente novamente.",
+    modelo_inexistente:
+      "O modelo selecionado não está disponível no provedor. Atualize o catálogo ou escolha outro modelo.",
+    limite_ou_saldo:
+      "O provedor recusou a chamada por limite ou saldo. Modelos gratuitos podem atingir limites; tente novamente ou escolha outro modelo.",
+    provedor_indisponivel:
+      "O servidor não conseguiu alcançar o provedor. Verifique rede, DNS e certificado TLS do servidor e tente novamente.",
+    modelo_sem_ferramentas:
+      "Este modelo não oferece as ferramentas necessárias ao agente. Escolha um modelo compatível com tools.",
+    orcamento_esgotado:
+      "O orçamento de IA da organização foi atingido. Ajuste o orçamento em Uso de IA e tente novamente.",
+  };
+
+  return t(
+    orientacoes[codigo] ??
+      "Não foi possível executar o teste. Confira modelo, credencial e materiais do agente.",
+  );
+}
 
 /**
  * Fecha a linha do run — e RECLAMA se não conseguir.
@@ -193,29 +216,39 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
     // problema INDIAGNOSTICÁVEL: o teste falhava, a tela dizia uma frase
     // genérica sobre modelo e credencial, e a causa real não existia em lugar
     // nenhum — nem no log, nem na linha do run, nem na resposta.
-    const mensagem = err instanceof Error ? err.message : String(err);
+    const diagnostico = normalizarErro(err);
     logger.error("[ai.test] o teste do agente falhou", {
       request_id: requestId,
       run_id: runRow.id,
       agent_id: id,
       version_id: vid,
       organization_id: activeOrg.orgId,
-      error: mensagem,
+      error_code: diagnostico.error_code,
+      error_message: diagnostico.error_message,
+      http_status: diagnostico.http_status,
     });
     await atualizarRun(admin, activeOrg.orgId, runRow.id, requestId, {
       status: "failed",
       completed_at: new Date().toISOString(),
       latency_ms: Date.now() - startedAt.getTime(),
-      error_code: "preview_failed",
-      // Guardado na linha para quem for diagnosticar depois; a resposta ao
-      // operador segue genérica, porque o texto do erro é técnico.
-      error_message: mensagem.slice(0, 2000),
+      error_code: diagnostico.error_code,
+      // Guardado redigido para permitir diagnóstico posterior sem persistir
+      // chave, prompt ou qualquer outro detalhe devolvido pelo provedor.
+      error_message: diagnostico.error_message,
     });
     return fail(
       "preview_failed",
-      t("Não foi possível executar o teste. Confira modelo, credencial e materiais do agente."),
+      orientarFalhaDoTeste(diagnostico.error_code, t),
       422,
-      { requestId },
+      {
+        requestId,
+        details: {
+          reason: diagnostico.error_code,
+          http_status: diagnostico.http_status,
+          provider: version.provider,
+          model: version.model,
+        },
+      },
     );
   }
 

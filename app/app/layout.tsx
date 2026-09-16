@@ -5,12 +5,7 @@ import { isMfaEnrolled, loadAuthUser, requiresMfa, resolveActiveOrg } from "@/li
 import { DEFAULT_VISIBILITY_MODE, type VisibilityMode } from "@/lib/auth/types";
 import { AuthProvider } from "@/hooks/auth/AuthProvider";
 import { AppShell } from "./_components/AppShell";
-import { EstiloDaMarcaDaOrganizacao } from "./_components/EstiloDaMarcaDaOrganizacao";
 import { MfaEnrollGate } from "@/components/auth/MfaEnrollGate";
-import { cssDaMarca, ESCOPO_DA_ORGANIZACAO } from "@/lib/branding/css";
-import { marcaDaInstalacao } from "@/lib/branding/instalacao";
-import { resolverMarcaDaOrganizacao } from "@/lib/branding/organizacao";
-import { env } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   ImpersonateBanner,
@@ -41,16 +36,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!activeOrg && !user.support && (await acessoFoiRevogado(user.id))) {
     redirect("/acesso-revogado");
   }
-
-  /**
-   * A cor desta organização, serializada, ou `null` quando ela não tem uma.
-   *
-   * Resolvida no MESMO `settings` que o gate de onboarding logo abaixo já lê —
-   * zero consulta nova. A ordem das camadas (organização acima, instalação no
-   * meio, arquivo de instalação embaixo) mora em `lib/branding/organizacao.ts`,
-   * e não aqui: a precedência é regra do produto, não detalhe deste layout.
-   */
-  let cssDaOrganizacao: string | null = null;
 
   // EPIC-02: gate /app/* on completed onboarding.
   // EPIC-11: gate /app/* on org not being suspended (S-11.08).
@@ -113,56 +98,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ?.visibility_mode;
     activeOrg = { ...activeOrg, visibility_mode: mode ?? DEFAULT_VISIBILITY_MODE };
 
-    // `marcaDaInstalacao()` é memoizada por TTL no PROCESSO (`lib/branding/
-    // instalacao.ts`), e a derivação da cor é cacheada por régua+semente em
-    // `resolve.ts` — a marca custa uma consulta a cada 30s e um lookup de Map
-    // por render, não uma derivação de rampa por requisição.
-    const marca = resolverMarcaDaOrganizacao(
-      orgRow?.settings ?? null,
-      await marcaDaInstalacao(),
-      env,
-    );
-
-    // SÓ quando a cor veio mesmo da organização. Se ela não configurou nada, a
-    // resolução devolve a cor da instalação — e reemiti-la aqui, escopada no
-    // `<body>`, seria repetir no documento um bloco que já vale pela raiz. Além
-    // de bytes, custaria a única pergunta que a presença do bloco responde.
-    if (marca.origens.cor === "organizacao") {
-      // Os `motivos` de uma cor recusada NÃO são registrados aqui de propósito:
-      // este caminho roda para todo tenant a cada render, e um aviso por
-      // organização no log da instalação é como um alarme deixa de ser lido. O
-      // laço de retorno desta feature é a tela `/app/settings/marca`, que mostra
-      // os motivos para quem pode consertá-los — o admin daquela organização.
-      cssDaOrganizacao = cssDaMarca(marca.cor, ESCOPO_DA_ORGANIZACAO).css;
-    }
-
-    // Desce para o menu CAMPO A CAMPO, e só o campo que a organização definiu.
-    // Sem a condição por campo, `marca.name` seria o nome da instalação (ou o
-    // padrão do produto) e o menu passaria a ler um caminho novo para exibir
-    // exatamente o que já exibia — trocando a fonte sem trocar o valor, que é
-    // como se cria uma regressão invisível. E, com o logo no mesmo objeto, uma
-    // condição só (a do nome) faria a organização que definiu apenas a cor
-    // arrastar junto um `logoUrl` que ela não escolheu.
-    //
-    // `origens` é a resposta de `primeiroDefinido` (`lib/branding/resolve.ts`),
-    // que ignora valor vazio e desce: quando ele diz "organizacao", o valor é
-    // não-vazio e já veio trimado — por isso a barra lateral nunca recebe `""`
-    // desta origem.
-    //
-    // `origens.logoUrl === "organizacao"` passou a ser ALCANÇÁVEL na onda do
-    // upload: `camadaDaOrganizacao` declara o logo a partir de
-    // `settings.branding.logo_path`. A condição foi escrita aqui uma onda ANTES
-    // do produtor existir, de propósito — foi o que fez o upload por organização
-    // ser só a camada, sem mais uma passada pela casca inteira.
-    const marcaDoTenant = {
-      ...(marca.origens.nome === "organizacao" ? { nome: marca.name } : {}),
-      ...(marca.origens.logoUrl === "organizacao" && marca.logoUrl !== null
-        ? { logoUrl: marca.logoUrl }
-        : {}),
-    };
-    if (Object.keys(marcaDoTenant).length > 0) {
-      activeOrg = { ...activeOrg, marca: marcaDoTenant };
-    }
+    // Marca visual é global da instalação. `organizations.settings.branding`
+    // permanece no jsonb por compatibilidade com clones antigos, mas o app do
+    // tenant ignora esse envelope: nada de CSS escopado por organização e nada
+    // de preencher `activeOrg.marca`.
   } else {
     const [isEnrolled, mfaRequired] = await Promise.all([
       isMfaEnrolled(),
@@ -194,23 +133,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <IdiomaProvider locale={user.idioma}>
     <AuthProvider user={user} activeOrg={activeOrg}>
       <InterfaceRefresh userId={user.id} org={activeOrg} support={!!user.support} />
-      {/*
-        O MARCADOR da marca da organização — o elemento cuja existência define o
-        escopo `body:has([data-marca-org])` (lib/branding/css.ts).
-
-        `contents` não gera caixa: no box tree os filhos continuam sendo filhos
-        diretos do `<body>`, então nada de layout, `position` ou `flex` muda. O
-        que este elemento existe para fazer é EXISTIR — e sumir junto com esta
-        subárvore quando o logout navega para `/login`.
-
-        Envolve TUDO, e não a div do `AppShell`, porque aquela div é irmã dos dois
-        banners e é SUBSTITUÍDA quando o `MfaEnrollGate` bloqueia (ele renderiza
-        um `fixed inset-0` no lugar dos children). O admin de tenant recém-criado
-        veria a tela de cadastro de MFA — a PRIMEIRA tela dele — com a cor da
-        instalação, e depois o resto do produto com a dele.
-      */}
-      <div data-marca-org="" className="contents">
-        <EstiloDaMarcaDaOrganizacao css={cssDaOrganizacao} />
+      <div className="contents">
         <ImpersonateBanner impersonating={impersonating} />
         <ConexaoCaidaBanner caidas={conexoesCaidas} />
         {needsMfaGate ? (

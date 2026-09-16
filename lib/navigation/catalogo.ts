@@ -15,7 +15,14 @@ import type { Role } from "@/lib/auth/types";
  * Doutrina: docs/doctrine/sistema-vivo.md — "por qual porta se chega até mim?"
  */
 
-export type NavGroupId = "atendimento" | "crm" | "ia" | "canais" | "analise" | "organizacao";
+export type NavGroupId =
+  | "atendimento"
+  | "disparo"
+  | "crm"
+  | "ia"
+  | "canais"
+  | "analise"
+  | "organizacao";
 
 export interface NavGroup {
   id: NavGroupId;
@@ -67,6 +74,7 @@ export interface NavMetadata {
  */
 export const NAV_GROUPS: NavGroup[] = [
   { id: "atendimento", label: "Atendimento" },
+  { id: "disparo", label: "Disparo" },
   { id: "crm", label: "CRM", hub: { href: "/app/crm", label: "Ver tudo em CRM" } },
   { id: "ia", label: "Agente de IA", hub: { href: "/app/ai", label: "Ver tudo em IA" } },
   { id: "canais", label: "Canais" },
@@ -149,6 +157,43 @@ export const NAV_CATALOG = [
     description: "Scripts salvos para responder mais rápido, seus ou da equipe.",
     icon: "FileText",
     group: "atendimento",
+    sidebar: true,
+  },
+  // ---- Disparo — envios programados para grupos ----
+  {
+    href: "/app/disparo/lista",
+    label: "Lista",
+    description: "Todos os envios programados, com pausa, retomada e cancelamento.",
+    icon: "ListChecks",
+    group: "disparo",
+    minRole: "manager",
+    sidebar: true,
+  },
+  {
+    href: "/app/disparo/agendar",
+    label: "Agendar",
+    description: "Criar um envio para grupo, com data, mensagem e recorrência.",
+    icon: "CalendarDots",
+    group: "disparo",
+    minRole: "manager",
+    sidebar: true,
+  },
+  {
+    href: "/app/disparo/grupos",
+    label: "Grupos",
+    description: "Grupos salvos que podem receber envios programados.",
+    icon: "UsersThree",
+    group: "disparo",
+    minRole: "manager",
+    sidebar: true,
+  },
+  {
+    href: "/app/disparo/historico",
+    label: "Histórico",
+    description: "Execuções que já aconteceram, com entrega, falha e motivo.",
+    icon: "ClockCounterClockwise",
+    group: "disparo",
+    minRole: "manager",
     sidebar: true,
   },
 
@@ -629,21 +674,6 @@ export const NAV_CATALOG = [
     // leitura: ele expõe orçamento e performance da conta inteira, e quem
     // apenas LÊ a tela (`manager`) não precisa poder trocar a credencial.
     minRole: "admin",
-  },
-  {
-    href: "/app/settings/marca",
-    label: "Marca",
-    description: "O nome e a cor que sua empresa mostra dentro do sistema.",
-    icon: "Palette",
-    group: "organizacao",
-    section: "Sua empresa",
-    // `admin` pelo mesmo motivo da linha de cima: o que se edita ali é
-    // identidade da empresa, e dá-lo a `manager` o colocaria abaixo de billing e
-    // de API tokens na mesma prancheta.
-    minRole: "admin",
-    // SEM `sidebar`: fica só no hub. Trocar a marca é tarefa de uma vez, e
-    // agrupar o menu já o fez crescer — duas telas a mais estouraram a dobra em
-    // 900px, medido pelo e2e `navegacao.spec.ts`.
   },
   {
     href: "/app/settings/billing",

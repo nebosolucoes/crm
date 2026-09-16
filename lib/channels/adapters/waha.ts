@@ -165,6 +165,18 @@ export const wahaAdapter: ChannelAdapter = {
     }
   },
 
+  async fetchGroups(input) {
+    const client = getWahaClient();
+    if (!client) throw new Error("waha_not_configured");
+    const groups = await client.getGroups(input.sessionRef);
+    return groups.map((group) => ({
+      externalId: group.id,
+      name: group.name,
+      groupKind: group.groupKind,
+      participantCount: group.participantCount,
+    }));
+  },
+
   /**
    * Baixa o anexo que o cliente mandou.
    *

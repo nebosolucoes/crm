@@ -136,6 +136,24 @@ const sessionSnapshotSchema = z.object({
 }).passthrough();
 
 export type WahaSessionSnapshot = z.infer<typeof sessionSnapshotSchema>;
+const wahaGroupSchema = z.object({
+  id: z.union([
+    z.string(),
+    z.object({
+      id: z.string().optional(),
+      _serialized: z.string().optional(),
+      user: z.string().optional(),
+      server: z.string().optional(),
+    }).passthrough(),
+  ]).optional(),
+  name: z.string().trim().min(1).optional(),
+  subject: z.string().trim().min(1).optional(),
+  title: z.string().trim().min(1).optional(),
+  isCommunity: z.boolean().optional(),
+  isCommunityAnnounce: z.boolean().optional(),
+  size: z.number().int().nonnegative().optional(),
+  participants: z.array(z.unknown()).optional(),
+}).passthrough();
 type SessionOperation = "create" | "start" | "stop" | "logout" | "delete";
 
 /** Mantém o prefixo/status que checkHealth e os callers já classificam. */
@@ -405,6 +423,82 @@ export class WahaClient {
     });
     if (!res.ok) throw new Error(`waha_${res.status}`);
     return (await res.json()) as { qr?: string; status: string };
+  }
+
+  async getGroups(session: string): Promise<Array<{
+    id: string;
+    name: string;
+    groupKind: "group" | "community" | "announcement";
+    participantCount: number | null;
+  }>> {
+    // WAHA recomenda paginação e `exclude=participants`: sem isso, uma conta
+    // com muitos grupos pode estourar o timeout enquanto o servidor monta a
+    // lista de participantes, embora a tela só precise de nome e ID.
+    const limit = 100;
+    const grupos: Array<{
+      id: string;
+      name: string;
+      groupKind: "group" | "community" | "announcement";
+      participantCount: number | null;
+    }> = [];
+    for (let offset = 0; offset < 10_000; offset += limit) {
+      const params = new URLSearchParams({
+        limit: String(limit),
+        offset: String(offset),
+        sortBy: "subject",
+        sortOrder: "asc",
+        exclude: "participants",
+      });
+      const res = await this.fetchComTeto(
+        `${this.baseUrl}/api/${encodeURIComponent(session)}/groups?${params.toString()}`,
+        { headers: { "X-Api-Key": this.apiKey, Accept: "application/json" } },
+      );
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        const detail = body.match(/rate-overlimit|session[^\"\s]*/i)?.[0] ?? "";
+        throw new Error(`waha_groups_${res.status}${detail ? `_${detail}` : ""}`);
+      }
+      const body = await res.json().catch(() => null);
+      const arrayResponse = z.array(wahaGroupSchema).safeParse(body);
+      const groupsEnvelope = z.object({ groups: z.array(wahaGroupSchema) }).safeParse(body);
+      const dataEnvelope = z.object({ data: z.array(wahaGroupSchema) }).safeParse(body);
+      const mapResponse = z.record(z.string(), wahaGroupSchema).safeParse(body);
+      const entries: Array<{ group: z.infer<typeof wahaGroupSchema>; fallbackId?: string }> =
+        arrayResponse.success
+          ? arrayResponse.data.map((group) => ({ group }))
+          : groupsEnvelope.success
+            ? groupsEnvelope.data.groups.map((group) => ({ group }))
+            : dataEnvelope.success
+              ? dataEnvelope.data.data.map((group) => ({ group }))
+              : mapResponse.success
+                ? Object.entries(mapResponse.data).map(([fallbackId, group]) => ({ group, fallbackId }))
+                : (() => { throw new Error("waha_groups_invalid_response"); })();
+      grupos.push(
+        ...entries.flatMap(({ group, fallbackId }) => {
+          const id = typeof group.id === "string"
+            ? group.id
+            : group.id?.id
+              ?? group.id?._serialized
+              ?? (group.id?.user && group.id?.server ? `${group.id.user}@${group.id.server}` : null)
+              ?? fallbackId
+              ?? null;
+          if (!id) return [];
+          const groupKind: "group" | "community" | "announcement" = group.isCommunityAnnounce
+            ? "announcement"
+            : group.isCommunity
+              ? "community"
+              : "group";
+          return [{
+            id,
+            name: group.name ?? group.subject ?? group.title ?? id,
+            groupKind,
+            participantCount: group.size ?? (group.participants ? group.participants.length : null),
+          }];
+        }),
+      );
+      if (entries.length < limit) break;
+    }
+    return grupos;
   }
 
   /**

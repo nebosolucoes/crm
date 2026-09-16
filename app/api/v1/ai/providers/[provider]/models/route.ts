@@ -11,8 +11,15 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { loadAuthUser, resolveActiveOrg } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
 import { ehProvedorSuportado } from "@/lib/ai/pontos/provedores";
+import { traduzirCatalogo } from "@/lib/ai/catalogo/openrouter";
+import { buscarCatalogoOpenRouter } from "@/lib/ai/catalogo/buscar-openrouter";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
+
+// A OpenRouter tem catálogo dinâmico. Se a instalação ainda não executou o
+// cron, o seletor pode usar a fonte pública até a sincronização persistir as
+// linhas com preço e capacidade.
 
 // A lista única (`lib/ai/pontos/provedores.ts`) — não uma quarta cópia. Esta
 // rota alimenta o seletor de modelos; com a lista velha, pedir os modelos da
@@ -53,5 +60,33 @@ export async function GET(
     return fail("internal_error", "Erro ao listar modelos.", 500, { requestId });
   }
 
-  return ok({ models: data ?? [] }, { requestId });
+  if ((data?.length ?? 0) > 0 || provider !== "openrouter") {
+    return ok({ models: data ?? [] }, { requestId });
+  }
+
+  try {
+    const modelosAoVivo = traduzirCatalogo(await buscarCatalogoOpenRouter()).map((modelo) => ({
+      provider: modelo.provider,
+      model_id: modelo.model_id,
+      display_name: modelo.display_name,
+      description: modelo.description,
+      context_window: modelo.context_window,
+      input_price_per_million_cents: modelo.input_price_per_million_cents,
+      output_price_per_million_cents: modelo.output_price_per_million_cents,
+      supports_tools: modelo.supports_tools,
+      supports_vision: modelo.supports_vision,
+      is_default_for_provider: false,
+      deprecated_at: null,
+      released_at: null,
+    }));
+    return ok({ models: modelosAoVivo }, { requestId });
+  } catch (err) {
+    // O catálogo remoto é um enriquecimento da tela. Se estiver indisponível,
+    // a resposta continua sendo uma lista vazia e o select não vira erro 500.
+    logger.warn("[ai-models] catálogo público da OpenRouter indisponível", {
+      request_id: requestId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return ok({ models: [] }, { requestId });
+  }
 }

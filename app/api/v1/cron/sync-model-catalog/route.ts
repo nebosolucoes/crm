@@ -47,14 +47,12 @@ import {
   planejarSincronizacao,
   type ModeloExistente,
 } from "@/lib/ai/catalogo/sincronizar";
+import { buscarCatalogoOpenRouter } from "@/lib/ai/catalogo/buscar-openrouter";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
-
-const ENDPOINT_DO_CATALOGO = "https://openrouter.ai/api/v1/models";
-const TIMEOUT_MS = 20_000;
 
 export interface ResultadoDaSincronizacao {
   fonte: string;
@@ -113,19 +111,6 @@ export async function sincronizarCatalogo(
   };
 }
 
-async function buscarDaOpenRouter(): Promise<ModeloDaOpenRouter[]> {
-  const res = await fetch(ENDPOINT_DO_CATALOGO, {
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-    headers: { accept: "application/json" },
-  });
-  if (!res.ok) throw new Error(`catalogo_origem_status_${res.status}`);
-  const json = (await res.json()) as { data?: ModeloDaOpenRouter[] };
-  if (!Array.isArray(json.data)) {
-    throw new Error("catalogo_origem_shape_inesperado — a resposta não trouxe `data` como lista");
-  }
-  return json.data;
-}
-
 function autorizado(req: NextRequest): boolean {
   const esperado = env.INTERNAL_CRON_SECRET || env.INTERNAL_SECRET;
   if (!esperado) return false; // fail-closed
@@ -138,7 +123,7 @@ async function handler(req: NextRequest): Promise<Response> {
     return fail("unauthorized", "cron secret ausente ou inválido", 401, { requestId });
   }
   try {
-    const resultado = await sincronizarCatalogo(createAdminClient(), buscarDaOpenRouter);
+    const resultado = await sincronizarCatalogo(createAdminClient(), buscarCatalogoOpenRouter);
     logger.info("[sync-model-catalog] concluído", { ...resultado, request_id: requestId });
     return ok(resultado, { requestId });
   } catch (err) {
