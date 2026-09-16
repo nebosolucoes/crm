@@ -244,7 +244,7 @@ export async function GET(req: NextRequest): Promise<Response> {
       const dono = Array.isArray(conexao) ? conexao[0]?.user_id : conexao?.user_id;
       externos.push({
         id: e.id,
-        // Rótulo, NUNCA o título do evento: a tabela guarda o `title` e esta
+        // Rótulo, NUNCA o título do evento: a tabela tem a coluna `title` e esta
         // resposta não o lê. Despejar o conteúdo da agenda pessoal na tela de
         // trabalho é o que a consulta da semente também recusa.
         titulo: "Ocupado",

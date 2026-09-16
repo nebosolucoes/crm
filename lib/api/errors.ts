@@ -70,6 +70,7 @@ export const ApiErrorCodes = {
   next_action_changed: "next_action_changed", // o agente reescreveu a proposta entre o render e o clique
   channel_archived: "channel_archived", // ação sobre canal que o usuário excluiu (a linha só sobrevive como âncora das FKs)
   knowledge_source_type_in_use: "knowledge_source_type_in_use", // já existe fonte ATIVA daquele tipo para o agente (índice ai_knowledge_sources_unique_per_agent)
+  voice_already_paired: "voice_already_paired", // POST /voice/sessions/pair com aparelho já vinculado — a saída é DELETE /voice/sessions, nunca re-parear por cima (ver a rota)
 
   // 422 — semântica
   unprocessable_entity: "unprocessable_entity",
@@ -134,6 +135,7 @@ export const ApiErrorCodes = {
   unavailable: "unavailable", // 503: dependência de config ausente (ex.: pool do engine sem SUPABASE_DB_URL)
   waha_error: "waha_error",
   wacalls_error: "wacalls_error", // 502: o serviço de chamada de voz recusou ou não respondeu
+  wacalls_not_connected: "wacalls_not_connected", // 503 + Retry-After: sessão pareada cujo socket com o WhatsApp caiu por um instante (ver `wacallsSemConexao`)
   ai_provider_error: "ai_provider_error",
   nuvemshop_error: "nuvemshop_error",
 } as const;

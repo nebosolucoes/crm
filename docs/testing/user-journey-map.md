@@ -750,6 +750,37 @@ Postgres no da IA).
 
 ---
 
+## Lote 10 da triagem — folga à noite e o Google da dona visto pela Atendente (2026-09-15)
+
+Integração `integracao/triagem-15set-l10` no SHA `ca13073ea`, controle na `main`
+`a0c88136a`; banco do `baseline.sql` em pg17, dona do `bootstrap-owner.ts`,
+Atendente criada pela tela (convite › criar conta › confirmação por e-mail),
+`next build` (exit 0 nas duas árvores) + `next start`, sem Google real, sem IA,
+sem Resend. O Google da dona foi semeado por SQL, versionado ao lado das imagens.
+Régua e medida de cada caso em `evidence/triagem-15set-l10/README.md`.
+
+| # | Caso | Resultado |
+|---|---|---|
+| L10.1 | #882 — dia de folga (jornada até 23:00, São Paulo) não oferece horário no painel; o dia seguinte oferece 21:00 | **PROVADO EM TELA** — quinta 17: 0 horários, "Outro horário" aberto (encaixe por desenho); sexta 18: 30 horários com 21:00. **Não discrimina:** a `main` mostra o mesmo, porque o painel pede o mês a partir de agora e a data UTC de `de` já alcança a exceção. `evidence/triagem-15set-l10/882-02-quinta-17-folga-sem-horario.png`, `evidence/triagem-15set-l10/882-03-sexta-18-controle-oferece-21h.png` |
+| L10.1a | #882 — a dona abre o painel às 21:05 do próprio dia de folga (o caso que discrimina) | **PROVADO EM TELA** — `main`: 21:30, 22:00 e 22:30 oferecidos na quinta fechada; lote: 0. Relógio do navegador em 17/09 21:05 −03:00, GET com `de=2026-09-18T00:05Z`. `evidence/triagem-15set-l10/main-882-04-quinta-17-folga-aberto-as-2105.png`, `evidence/triagem-15set-l10/882-04-lote-quinta-17-folga-aberto-as-2105.png` |
+| L10.2 | #883 — Atendente, na agenda da dona com evento do Google 10:00–11:00: 10:00 não é oferecido | **PROVADO EM TELA** — 10:00 e 10:30 fora da lista (contagem 0). Na `main`, a Atendente via os dois. `evidence/triagem-15set-l10/883-02-atendente-segunda-21-sem-10h.png`, `evidence/triagem-15set-l10/main-883-atendente-segunda-21-oferece-10h.png` |
+| L10.2a | #883 — Atendente tenta "Outro horário" às 10:15 | **PROVADO EM TELA** — `422 agenda_horario_indisponivel`, frase legível acima do Confirmar, sem o título do evento. Na `main`: `201` e um compromisso nasce por cima do Google da dona. `evidence/triagem-15set-l10/883-02-atendente-encaixe-1015-recusado.png`, `evidence/triagem-15set-l10/main-883-atendente-encaixe-1015-marcado.png` |
+| L10.2b | #883 — a dona recebe a mesma resposta | **PROVADO EM TELA** — 10:00 fora, encaixe 10:15 com o mesmo `422`. `evidence/triagem-15set-l10/883-03-dona-encaixe-1015-recusado.png` |
+| L10.3 | #892 — nenhum título do Google da dona aparece nas telas de agenda da Atendente | **PROVADO EM TELA** (texto e HTML, visões Semana, Dia e Mês). Mas a grade dela também não desenha "Ocupado" e explica o bloco travado com "fora dos horários que você publicou". **Diagnóstico por API:** a REST entrega o título a qualquer membro da organização. `evidence/triagem-15set-l10/892-01-atendente-semana-20-26.png`, `evidence/triagem-15set-l10/892-03-atendente-grade-segunda-21-10h.png` |
+| L10.4 | Regressão — encaixe livre como dona, e `/admin/meta` | **PROVADO EM TELA** — 11:15 → `201`, `user/ui`; `/admin/meta` `200` sem 5xx (aberta pela URL). `evidence/triagem-15set-l10/regr-01-dona-encaixe-1115-marcado.png`, `evidence/triagem-15set-l10/regr-02-admin-meta-carrega.png` |
+| L10.5 | #883 — Google real (OAuth e sincronização), gerente, agente de IA | **NÃO MEDIDO** |
+
+**Achados fora do lote, reportados e não consertados:** (1) para o papel `agent`,
+`GET /api/v1/team` responde `403`: ao abrir a Agenda aparece "Você não tem
+permissão para esta ação." e o painel diz que o compromisso é com "Você" enquanto
+marca na agenda da dona — igual na `main`; (2) a semente da Agenda e `GET
+/api/v1/agenda/agendamentos` ainda leem o Google pelo embed
+`calendar_connections!inner`, que a RLS esconde da Atendente — a mesma causa do
+#879 em leitores que o lote não tocou, e consertar é decidir o que ela pode ver
+(#892).
+
+---
+
 ## J17 — Trocar de organização, incluindo a que não foi configurada `[P0]`
 
 **Por que P0:** o seletor de organização fica no topo de toda tela do produto e
@@ -2086,3 +2117,158 @@ Produto `7f1d0f3e`, integrado à main `ca895850`: as dez specs de organizações
 Evidência local preservada em `.superpowers/evidence/comunidade-360/final-qa-targeted-r4/` e log `.superpowers/sdd/comunidade-360/final-qa-targeted-r4.log`. A rodada inclui atualização concorrente da interface sem perder formulário, sugestão obsoleta sem confirmação antiga de sucesso e encerramento de suporte com retorno ao contexto original.
 
 Validação integral do mesmo produto: 733 arquivos unitários / 7.911 casos aprovados + 1 falha esperada; 184 arquivos de banco / 1.466 casos aprovados + 1 falha esperada e 1 ignorado, com INSTALL e UPDATE; tipos, lint (0 erros, 344 avisos) e build aprovados. `lint:channels`, validadores shell e conferência de release também passaram. Os checks remotos continuam sendo condição do merge pelo revisor da PR #613.
+
+## J23 — Clientes pela agenda: o administrador liga, e quem tem horário vira cliente `[P1]` (2026-09-15)
+
+Contribuição de @423313 (PR #867), com a decisão do dono: a regra nasce
+**desligada** em toda organização, e só um administrador a liga, em
+Configurações › Tipos de agendamento (migration 0262). A porta secundária é o
+rodapé da tela de Funis, que diz onde ligar enquanto estiver desligada.
+
+Spec: `tests/e2e/cliente-pela-agenda.spec.ts` (organização e admin próprios,
+criados e apagados pela spec — ligar a regra na organização compartilhada do CI
+etiquetaria os contatos das outras specs). Banco: `tests/invariants/cliente-nasce-do-agendamento.test.ts`.
+
+| Caso | Prioridade | Resultado |
+|---|---|---|
+| J23.1 Marcar horário para um contato PELA AGENDA com a regra desligada: a lista de Contatos não mostra selo "Cliente", a célula Tags da linha não tem "cliente" e a ficha não tem o chip nem "Cliente desde" | `[P1]` | **PASS** — `evidence/cliente-pela-agenda/1-contatos-regra-desligada.png` |
+| J23.2 Configurações › Tipos de agendamento (pelo hub) mostra "Desligado: …"; ligar abre a confirmação que diz que religar tira a etiqueta de quem ficou sem horário e que desligar não tira a etiqueta | `[P1]` | **PASS** — `evidence/cliente-pela-agenda/2-regra-desligada.png`, `evidence/cliente-pela-agenda/3-confirmacao.png` |
+| J23.3 Confirmar: "1 contato ganhou a etiqueta “cliente”."; o interruptor fica `aria-checked=true`, habilitado e com opacidade 1 (medido por `getComputedStyle`) | `[P1]` | **PASS** — `evidence/cliente-pela-agenda/4-regra-ligada.png` |
+| J23.4 Ligada: selo "Cliente" na lista, filtro "cliente" acha o contato, ficha mostra "Cliente desde" com a data do primeiro horário que conta — o dia em que se combinou, ou o dia do atendimento quando ele for mais antigo —, nunca uma data futura, Funis oferece "Funil de clientes" | `[P1]` | **PASS** — `evidence/cliente-pela-agenda/5-contatos-filtro-cliente.png`, `evidence/cliente-pela-agenda/6-ficha-cliente-desde.png` |
+| J23.5 Marcar o funil de clientes, RECARREGAR: o selo "Clientes" e o botão "Deixar de ser funil de clientes" continuam | `[P1]` | **PASS** — `evidence/cliente-pela-agenda/7-funis-com-funil-de-clientes.png` |
+
+Execução (2026-09-15): build de produção (`pnpm e2e:build`) da árvore
+`f1fa08a19` + a spec, Supabase local próprio com o `baseline.sql` aplicado
+(`ON_ERROR_STOP=1`, 0 erros), Chromium real, `next start`. 1 passed.
+
+**Controle da spec:** com o trigger sabotado para ignorar o interruptor (no
+banco do teste, restaurado depois), a spec reprova — em J23.3, e não em J23.1
+como eu previra: o selo da lista é escondido pela própria regra desligada
+(`ActiveOrg.cliente_pela_agenda`), então o contato etiquetado indevidamente só
+aparece quando ligar diz "Nenhum contato tinha horário marcado ainda".
+
+**Achado da própria spec, não do produto:** a primeira versão conferia o botão
+de Funis com `toContainText`, que não exige visibilidade — passou com a tela
+ainda no esqueleto do `loading.tsx` (o conteúdo chega num `<div hidden>` do
+streaming), e a evidência capturada era o esqueleto. Agora a spec espera
+`toBeVisible` antes do texto. Uma rodada caiu por 504 do GoTrue local sob carga
+da máquina (`AuthRetryableFetchError`, média de carga 24); a seguinte passou sem
+nenhum 504.
+
+O que a tela NÃO prova, e onde está provado: cancelado e falta não contam, a
+etiqueta tirada à mão não volta, o `contact.tag_added` no formato do app, a
+classificação do histórico só da organização que liga e sem evento, e quem pode
+ligar (admin, MFA, suporte) — todos no invariante acima, contra Postgres real.
+
+**Rodada 2 (2026-09-15), sobre os achados da revisão.** Execução: build de
+produção da árvore `88461bda5`, Supabase local próprio (project `fx867-e2e`,
+portas 556xx) com o `baseline.sql` aplicado (`ON_ERROR_STOP=1`, 0 erros),
+Chromium real, `next start` na 3867. 1 passed (23s). A evidência 6 agora mostra
+"Criado em 15/09/2026 · Cliente desde 15/09/2026" — a da rodada 1 mostrava
+"Cliente desde 21/09/2026", o dia do horário, que ainda não tinha chegado.
+
+Controles, cada um com a previsão escrita antes:
+
+- **E2E-S1** (o trigger ignora o interruptor, no banco do teste, restaurado
+  depois): reprova no **J23.1**, na célula Tags (`toHaveCount(0)`, recebido 1).
+  Na rodada 1 esse passo não reprovava, porque só olhava o selo que a tela
+  esconde por `ActiveOrg`.
+- **E2E-S2** (`/app/kanban` sem `is_client_pipeline` no select, build
+  refeito): reprova no **J23.5**, depois do reload ("Funil de clientes" onde
+  devia estar "Deixar de ser funil de clientes"). Sem o reload, passava.
+
+Duas rodadas caíram antes da verde por carga da máquina (média 25–42, de outras
+sessões): um 502 do Kong em `fn_support_context` (`recv() failed (104:
+Connection reset by peer)` do PostgREST), que a rota do funil devolve como 503
+`upstream_unavailable`, e 504 do GoTrue em `/auth/v1/user`. Nenhuma das duas
+falhas tocou código desta feature; a terceira rodada, com a carga em 12, passou.
+
+**Rodada 3 (2026-09-15), sobre os achados da segunda revisão.** Três defeitos
+achados executando, nenhum deles alcançável pela spec atual — e é isso que os
+torna interessantes de registrar aqui:
+
+- **A frase da tela sobre a agenda que só tem cancelamento.** Organização cujo
+  único contato TEM horário marcado, todos cancelados: o corpo da RPC era
+  `{ganharam: 0, perderam: 0, clientes: 0}` — três números idênticos aos de uma
+  agenda vazia — e a tela dizia "Nenhum contato tinha horário marcado ainda".
+  Numa clínica com cancelamentos é a primeira frase depois de ligar. Provado e
+  guardado em `components/agenda/ClientePelaAgenda.test.tsx` (o corpo agora tem
+  um quarto número) e no invariante I38. **A spec não alcança**: ela monta uma
+  organização com um horário que CONTA, e montar a agenda só de cancelamento
+  seria uma segunda organização inteira pela tela.
+- **A etiqueta que a equipe repõe à mão.** O sistema a tirava no cancelamento
+  seguinte, porque o dono só era reconciliado quando a data mudava. Invariante
+  I34 (e I34b, o par). **A spec não alcança**: são quatro edições de etiqueta
+  pela tela de Contatos, com um cancelamento no meio.
+- **As três colunas gravadas por sessão.** Um `viewer` da própria organização
+  gravava `first_service_at = '2019-01-01'` com `UPDATE 1`. Invariante I36 (e
+  I37, o par). **A spec não alcança**: nenhuma tela oferece essa escrita — o
+  caminho é a API/PostgREST, e o que a fecha é um trigger.
+
+Não houve rodada nova de Playwright nesta rodada 3: nenhuma das três mudanças de
+comportamento é alcançável pela jornada da spec, e a única mudança de TEXTO na
+tela (a frase nova e a das automações) é medida pelo teste de componente. O que
+a rodada 2 provou pela tela continua valendo — a árvore mudou o corpo da RPC,
+não o caminho que a spec percorre.
+
+## Lote 11 da triagem, em ambiente fresco estilo VPS (2026-09-15)
+
+QA visual da integração `integracao/triagem-15set-l11` no SHA `d82366250`: os PRs
+**#867** ("clientes pela agenda", @423313) e **#897** (o título do compromisso
+pessoal do Google sai do alcance do colega, @webtecnica — issue #892). Provas e
+receita completa do ambiente em `evidence/triagem-15set-l11/README.md`.
+
+Ambiente: Supabase local pg **17.6** próprio (`qa-l11`, portas 6132x) montado **só
+pelo `supabase/baseline.sql`** (`ON_ERROR_STOP=1`, exit 0), chave de cifra semeada
+como o kit faz, dona por `scripts/bootstrap-owner.ts`, **onboarding concluído pela
+tela**, `pnpm e2e:build` exit 0 (399 s) + `next start`, e **os envs opcionais
+ausentes** — sem Resend, sem Google, sem chave de IA, sem Redis. Chromium real em
+`America/Sao_Paulo`/`pt-BR`.
+
+Esta rodada é complementar à J23 acima, que exercita a spec `cliente-pela-agenda`
+numa organização própria: aqui o banco é o de uma **instalação recém-feita**, e o
+que se mede é o que a spec não alcança — o caminho pela navegação, o ciclo
+completo da automação com drenagem de cron de verdade, o papel `agent`, 400 px e
+tema escuro, e a privacidade do #897 com dois logins distintos.
+
+| Caso | Prioridade | Resultado |
+|---|---|---|
+| L11.1 O banco recém-instalado pelo baseline já traz as três colunas da 0262, os quatro gatilhos, as três funções, a view **sem** `title` e `has_column_privilege(authenticated, …, title, SELECT) = false` | `[P0]` | **PASS** — tabela no README |
+| L11.2 `organizations.settings` de uma organização nova **não tem** `crm.cliente_pela_agenda`: a regra nasce desligada | `[P0]` | **PASS** |
+| L11.3 Com a regra desligada, marcar horário pela Agenda para um contato não dá etiqueta, não dá "Cliente desde" e não escreve `first_service_at` | `[P1]` | **PASS** — `evidence/triagem-15set-l11/867-01-marcado-com-a-regra-desligada.png`, `evidence/triagem-15set-l11/867-02-ficha-sem-etiqueta-regra-desligada.png` |
+| L11.4 Chegar ao interruptor **pela navegação**: barra lateral › Configurações › SUA EMPRESA › Tipos de agendamento | `[P1]` | **PASS** — `evidence/triagem-15set-l11/867-04-hub-de-configuracoes-tipos-de-agendamento.png`, `evidence/triagem-15set-l11/867-05-interruptor-nasce-desligado.png` |
+| L11.5 Ligar como admin: confirmação antes, "2 contatos ganharam a etiqueta"; quem tinha horário que conta ganha etiqueta e "Cliente desde"; **quem só tinha horário cancelado não ganha** | `[P1]` | **PASS** — `evidence/triagem-15set-l11/867-06-confirmacao-antes-de-ligar.png`, `evidence/triagem-15set-l11/867-07-ligado-com-o-resultado.png`, `evidence/triagem-15set-l11/867-08-ficha-marina-cliente-desde.png`, `evidence/triagem-15set-l11/867-09-ficha-bruno-so-cancelado-sem-etiqueta.png` |
+| L11.6 A equipe tira a etiqueta à mão e marca **outro** horário: a etiqueta não volta (`client_tag_by_system` vai a `null` e fica) | `[P1]` | **PASS** — `evidence/triagem-15set-l11/867-21-tirando-a-etiqueta-a-mao.png`, `evidence/triagem-15set-l11/867-22-helena-sem-a-etiqueta.png`, `evidence/triagem-15set-l11/867-23-a-etiqueta-nao-volta.png` |
+| L11.7 Automação criada **pela tela** ("quando um contato ganhar a tag `cliente`, adicionar `recepcao-de-cliente`"), primeiro horário de um contato novo, **drenagem pelo endpoint de cron com o segredo** (`scanned 7, done 7`): a automação executa, aparece no histórico e o efeito chega à ficha | `[P1]` | **PASS** — `evidence/triagem-15set-l11/867-14-automacao-quando-ganhar-a-etiqueta.png`, `evidence/triagem-15set-l11/867-16-automacao-ligada.png`, `evidence/triagem-15set-l11/867-19-historico-da-automacao.png`, `evidence/triagem-15set-l11/867-18-diego-com-a-etiqueta-da-automacao.png` |
+| L11.8 Desligar não tira etiqueta de ninguém (tabela idêntica antes/depois, sem diálogo); religar não repõe a que a equipe tirou | `[P1]` | **PASS** — `evidence/triagem-15set-l11/867-27-desligado-ninguem-perde-a-etiqueta.png`, `evidence/triagem-15set-l11/867-28-religado-a-etiqueta-tirada-a-mao-nao-volta.png` |
+| L11.9 `agent` vê a seção mas o interruptor está **desabilitado**, com "Só um administrador pode mudar essa regra."; clique forçado não muda o banco | `[P1]` | **PASS** — `evidence/triagem-15set-l11/867-25-atendente-nao-liga-o-interruptor.png` |
+| L11.10 A tela do interruptor em **400 px, tema escuro**: `scrollWidth` 400 = `clientWidth` 400, 0 elementos fora da tela | `[P2]` | **PASS** — `evidence/triagem-15set-l11/867-26-interruptor-400px-tema-escuro.png` |
+| L11.11 **#897** Atendente criada 100% pela tela (convite › link copiável sem Resend › criar conta › confirmação na caixa local › Inbox) | `[P0]` | **PASS** — `evidence/triagem-15set-l11/897-02-link-do-convite-na-tela.png`, `evidence/triagem-15set-l11/897-06-atendente-dentro-do-sistema.png` |
+| L11.12 **#897** Nenhuma tela da Atendente mostra o título do compromisso pessoal da dona — varrido em `innerText` **e** no `outerHTML` inteiro, nas visões Semana, Dia, Mês, na semana do evento e no painel de marcar | `[P0]` | **PASS** — `evidence/triagem-15set-l11/897-07-atendente-agenda-semana.png`, `evidence/triagem-15set-l11/897-08-atendente-semana-do-evento.png`, `evidence/triagem-15set-l11/897-09-atendente-segunda-21-sem-as-10h.png` |
+| L11.13 **#897** Pela REST com o token de sessão da Atendente: `title` na tabela → `42501`; `title` na view → `42703`; `select=*` na view → a linha sem título. **Controle positivo**: a chave de serviço lê o título | `[P0]` | **PASS** — tabela no README |
+| L11.14 **#897** Para a dona nada quebrou: 1 bloco "Ocupado" na semana, GET com `titulo: "Ocupado"`, painel sem 10:00/10:30 — e ela também não alcança o `title` | `[P1]` | **PASS** — `evidence/triagem-15set-l11/897-11-dona-semana-do-evento.png`, `evidence/triagem-15set-l11/897-12-dona-segunda-21-sem-as-10h.png` |
+| L11.15 Regressão do lote 10: a Atendente não recebe 10:00/10:30 e o encaixe 10:15 é recusado com `422 agenda_horario_indisponivel`, sem citar o título | `[P1]` | **PASS** — `evidence/triagem-15set-l11/897-10-atendente-encaixe-1015-recusado.png` |
+| L11.16 Regressão: "Outro horário" num encaixe livre (`201`, "Marcado.") e `/admin/meta` abre (`200`) | `[P2]` | **PASS** — `evidence/triagem-15set-l11/regr-01-encaixe-1515-marcado.png`, `evidence/triagem-15set-l11/regr-02-admin-meta-carrega.png` |
+
+**Nenhum defeito no código do lote.** Dois achados anteriores a ele, com o detalhe
+e as medidas no README:
+
+1. O contato criado de dentro do painel de marcar leva alguns segundos para
+   aparecer em "Quem será atendido", e nesse intervalo a tela exibe
+   "Compromisso pessoal, sem cliente" **sem indicação de carregamento** — uma
+   escolha de negócio legítima, mostrada como se fosse a escolhida. Medido: ~4 s
+   com a máquina carregada, menos de 1,5 s com ela saudável, e **não consegui
+   produzir um agendamento sem cliente** quando o ambiente estava saudável. O que
+   está medido é o estado EXIBIDO, não um desfecho errado.
+   `components/agenda/VinculoDaMarcacao.tsx`, não tocado pelo lote.
+2. Todo agendamento emite `crm.activity_write_failed` com
+   `origem: "agenda (sem negócio aberto para ancorar)"` — contato criado direto na
+   Agenda não tem negócio para ancorar a atividade de timeline. Aparece também com
+   a regra desligada, então é independente do #867.
+
+**Duas armadilhas de ambiente**, para quem repetir: `supabase start` derruba o
+stack inteiro (exit **137**, que lê como OOM e não é) quando um contêiner falha o
+healthcheck, levando junto o `psql` do baseline — o log do CLI é que diz
+`container is not ready: unhealthy`; e um Realtime unhealthy varrendo o WAL levou o
+Postgres a `57014 statement timeout` e o GoTrue a `504`. **O Realtime não foi
+exercitado nesta rodada.**

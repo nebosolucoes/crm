@@ -117,8 +117,9 @@ export default async function AgendaPage() {
    * bloqueado e o bloco não aparecia. O dono via a agenda vazia e o horário
    * indisponível ao mesmo tempo.
    *
-   * ⚠️ E O `title` NÃO É LIDO, de propósito. A tabela tem a coluna e nós a
-   * gravamos; esta consulta a deixa de fora.
+   * ⚠️ E O `title` NÃO É LIDO, de propósito. A tabela tem a coluna — com nome só
+   * em linhas gravadas antes da v1.17.0, porque desde a migration 0225 o
+   * sincronizador a grava nula —; esta consulta a deixa de fora.
    *
    * A razão é medida, não estética, e está escrita inteira aqui de propósito:
    * sem o argumento completo, a próxima pessoa lê a ausência do título como

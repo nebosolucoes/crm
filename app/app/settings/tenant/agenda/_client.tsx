@@ -1,6 +1,7 @@
 "use client";
 import { AgendasConectadas } from "@/components/agenda/AgendasConectadas";
 import { PrazosDePresenca } from "@/components/agenda/PrazosDePresenca";
+import { ClientePelaAgenda } from "@/components/agenda/ClientePelaAgenda";
 import { DiasBloqueados } from "@/components/agenda/DiasBloqueados";
 
 import { useT } from "@/hooks/i18n/useT";
@@ -181,12 +182,17 @@ export function TiposDeAgendamentoClient({
   podeEditar,
   usuarioAtualId,
   podeConfigurarGoogle,
+  clientePelaAgendaLigado,
+  podeLigarClientePelaAgenda,
 }: {
   tiposIniciais: TipoRow[];
   pessoas: Array<{ id: string; papel: string; nome: string }>;
   podeEditar: boolean;
   usuarioAtualId: string;
   podeConfigurarGoogle: boolean;
+  /** `organizations.settings.crm.cliente_pela_agenda`, lido pela página. */
+  clientePelaAgendaLigado: boolean;
+  podeLigarClientePelaAgenda: boolean;
 }) {
   const t = useT();
   const router = useRouter();
@@ -236,6 +242,10 @@ export function TiposDeAgendamentoClient({
     <div className="flex min-h-0 flex-1 flex-col gap-4" data-testid="tipos-de-agendamento-config">
       {podeConfigurarGoogle && <AgendasConectadas />}
       <PrazosDePresenca podeEditar={podeEditar}/>
+      <ClientePelaAgenda
+        ligadoInicial={clientePelaAgendaLigado}
+        podeLigar={podeLigarClientePelaAgenda}
+      />
       <DiasBloqueados podeEditar={podeEditar}/>
       {podeEditar ? (
         <div>

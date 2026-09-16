@@ -3,6 +3,14 @@
  * exige Bearer. O QR é sintético; este teste não vincula aparelho nem liga.
  * Uma segunda instância do app habilita voz só nesta jornada, preservando o
  * ambiente sem voz de voz-desligada-por-padrao.spec.ts.
+ *
+ * O upstream falso imita o WaCalls de verdade no ponto que importa: o
+ * `POST /api/sessions` anuncia a sessão (`session-list`, com `name`) e emite o
+ * primeiro QR ANTES de responder o id — é exatamente a janela em que a versão
+ * anterior perdia o QR, e o motivo de o relay reconhecer a sessão pelo nome.
+ * `POST /api/sessions/{sid}/pair` responde 405 de propósito: chamá-lo é o
+ * defeito que deixava o discador preso a um cliente morto (ver
+ * `lib/wacalls/client.ts`), e um pareamento que passe por ele tem de falhar aqui.
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -47,16 +55,23 @@ test("a primeira sessão mostra o QR depois de aceitar e ligar a voz", async ({
       req.on("close", () => ouvintes.delete(res));
       return;
     }
+    if (req.method === "GET" && req.url === "/api/sessions") {
+      // A rota lê o estado do WaCalls antes de apagar ou criar qualquer coisa.
+      ordem.push("listar");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ sessions: [] }));
+      return;
+    }
     if (req.method === "POST" && req.url === "/api/sessions") {
       criadas += 1;
       ordem.push("criar");
-      res.writeHead(201, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ id: sessao }));
-      return;
-    }
-    if (req.method === "POST" && req.url === `/api/sessions/${sessao}/pair`) {
-      ordem.push("parear");
       for (const ouvinte of ouvintes) {
+        ouvinte.write(
+          `data: ${JSON.stringify({
+            type: "session-list",
+            sessions: [{ id: sessao, name: `org_${id}`, jid: "", state: "qr", paired: false }],
+          })}\n\n`,
+        );
         ouvinte.write(
           `data: ${JSON.stringify({
             type: "auth-state",
@@ -66,7 +81,13 @@ test("a primeira sessão mostra o QR depois de aceitar e ligar a voz", async ({
           })}\n\n`,
         );
       }
-      res.writeHead(204).end();
+      res.writeHead(201, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ id: sessao }));
+      return;
+    }
+    if (req.method === "POST" && req.url === `/api/sessions/${sessao}/pair`) {
+      ordem.push("parear");
+      res.writeHead(405).end();
       return;
     }
     res.writeHead(404).end();
@@ -161,7 +182,7 @@ test("a primeira sessão mostra o QR depois de aceitar e ligar a voz", async ({
     expect(await qr.evaluate((img) => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
     expect(criadas).toBe(1);
     expect(recusadas).toBe(0);
-    expect(ordem).toEqual(["criar", "eventos", "parear"]);
+    expect(ordem).toEqual(["eventos", "listar", "criar"]);
     const canal = await db
       .from("channel_sessions")
       .select("organization_id, provider, wacalls_session_id")

@@ -96,10 +96,25 @@ interface Banco {
   client: SupabaseClient;
 }
 
-function bancoEmMemoria(tabelas: Record<string, Linha[]>): Banco {
+/**
+ * O que a SESSÃO de quem pergunta enxerga.
+ *
+ * `"tudo"` é o dono ou um `manager`. `"atendente"` é um `agent` olhando a agenda
+ * de OUTRA pessoa: a RLS de `calendar_connections` esconde a conexão, e com ela
+ * some a linha do evento que chega por `calendar_connections!inner` (medido no
+ * Postgres: dono 1, gerente 1, atendente 0 — issue #879). As RPCs
+ * `fn_agenda_*_google_do_dono` são `security definer` e respondem igual para os
+ * dois olhares; quem prova isso no banco de verdade é
+ * `tests/invariants/agenda-ocupacao-google-do-dono.test.ts`.
+ */
+type Olhar = "tudo" | "atendente";
+const ESCONDIDAS_DO_ATENDENTE = new Set(["calendar_connections", "calendar_selected_external_events"]);
+
+function bancoEmMemoria(tabelas: Record<string, Linha[]>, olhar: Olhar = "tudo"): Banco {
   const leitura = (tabela: string) => {
     const filtros: Array<(linha: Linha) => boolean> = [];
-    const linhas = () => (tabelas[tabela] ?? []).filter((linha) => filtros.every((f) => f(linha)));
+    const visiveis = () => (olhar === "atendente" && ESCONDIDAS_DO_ATENDENTE.has(tabela) ? [] : (tabelas[tabela] ?? []));
+    const linhas = () => visiveis().filter((linha) => filtros.every((f) => f(linha)));
     const cadeia = {
       eq: (c: string, v: unknown) => (filtros.push((l) => lerCampo(l, c) === v), cadeia),
       neq: (c: string, v: unknown) => (filtros.push((l) => lerCampo(l, c) !== v), cadeia),
@@ -129,6 +144,35 @@ function bancoEmMemoria(tabelas: Record<string, Linha[]>): Banco {
     }),
     rpc: async (fn: string, args: Linha) => {
       if (fn === "fn_google_coverage") return { data: false, error: null };
+      // As duas da migration 0260 leem a tabela INTEIRA — independem do olhar —
+      // e aplicam o que o corpo SQL aplica: organização, dono e cruzamento estrito.
+      if (fn === "fn_agenda_ocupacao_google_do_dono") {
+        const ocupam = (tabelas.calendar_selected_external_events ?? []).filter((l) => {
+          const conexao = l.calendar_connections as Linha;
+          return (
+            l.organization_id === args.p_org &&
+            conexao.user_id === args.p_owner &&
+            instante(l.starts_at) < instante(args.p_ate) &&
+            instante(l.ends_at) > instante(args.p_de)
+          );
+        });
+        return {
+          data: ocupam.map((l) => ({
+            starts_at: l.starts_at,
+            ends_at: l.ends_at,
+            transparency: l.transparency,
+            status: l.status,
+            connection_status: (l.calendar_connections as Linha).status,
+          })),
+          error: null,
+        };
+      }
+      if (fn === "fn_agenda_conexoes_google_do_dono") {
+        const doDono = (tabelas.calendar_connections ?? []).filter(
+          (l) => l.organization_id === args.p_org && l.user_id === args.p_owner,
+        );
+        return { data: doDono.map((l) => ({ status: l.status, last_sync_at: l.last_sync_at })), error: null };
+      }
       if (fn === "fn_appointment_change") {
         const linha = (tabelas.calendar_appointments ?? []).find((l) => l.id === args.p_id);
         if (!linha) return { data: null, error: { code: "P0002", message: "não achou" } };
@@ -175,7 +219,17 @@ function eventoDoGoogle(inicio: string, fim: string, dono: string = DONO): Linha
   };
 }
 
-function agenda(args: { agendamentos?: Linha[]; eventosDoGoogle?: Linha[] } = {}): Banco {
+function agenda(
+  args: {
+    agendamentos?: Linha[];
+    eventosDoGoogle?: Linha[];
+    olhar?: Olhar;
+    /** Fim da jornada de quarta. Padrão 18:00; a noite em fuso negativo pede mais. */
+    fimDaJornada?: string;
+    /** Dias (`YYYY-MM-DD`, local) bloqueados por inteiro. */
+    diasBloqueados?: string[];
+  } = {},
+): Banco {
   return bancoEmMemoria({
     calendar_event_types: [
       {
@@ -201,17 +255,25 @@ function agenda(args: { agendamentos?: Linha[]; eventosDoGoogle?: Linha[] } = {}
         user_id: DONO,
         schedule: {
           timezone: "America/Sao_Paulo",
-          windows: [{ dow: 3, start: "09:00", end: "18:00" }],
+          windows: [{ dow: 3, start: "09:00", end: args.fimDaJornada ?? "18:00" }],
         },
       },
     ],
-    calendar_availability_exceptions: [],
+    calendar_availability_exceptions: (args.diasBloqueados ?? []).map((dia) => ({
+      organization_id: ORG,
+      user_id: DONO,
+      exception_date: dia,
+      is_unavailable: true,
+      // Dia inteiro é 0…1440 (`ExcecaoDeData`); `null` aqui viraria NaN no motor.
+      start_minute: 0,
+      end_minute: 1440,
+    })),
     calendar_connections: [
       { organization_id: ORG, user_id: DONO, status: "healthy", last_sync_at: AGORA.toISOString() },
     ],
     calendar_appointments: args.agendamentos ?? [],
     calendar_selected_external_events: args.eventosDoGoogle ?? [],
-  });
+  }, args.olhar);
 }
 
 function ctx(actor: Actor): HandlerCtx {
@@ -360,6 +422,70 @@ describe("a grade (IA) — a mesma coleta que o encaixe lê", () => {
       marcarAgendamentoHandler(banco.client, ctx(AGENTE), { event_type_id: TIPO, starts_at: NA_GRADE }),
     ).rejects.toMatchObject(RECUSA);
     expect(criados(banco), "a IA marcou em cima de um compromisso que já existe").toHaveLength(0);
+  });
+});
+
+describe("o Google do DONO vale para quem não enxerga a conexão dele (issue #879)", () => {
+  // Um `agent` marcando na agenda de outra pessoa: a sessão dele não vê a
+  // conexão do Google do dono. A ocupação é da AGENDA, não do olhar — pelos dois
+  // caminhos que leem `coletaOQueOcupa`.
+  const ATENDENTE: Actor = { type: "user", id: "bbbbbbbb-0000-4000-8000-0000000000a7", role: "agent" };
+
+  it("CONTROLE: com o olhar do atendente e sem Google, o encaixe MARCA — o olhar sozinho não barra", async () => {
+    const banco = agenda({ olhar: "atendente" });
+    await marcarAgendamentoHandler(banco.client, ctx(ATENDENTE), { event_type_id: TIPO, starts_at: FORA_DA_GRADE });
+    expect(criados(banco)).toHaveLength(1);
+  });
+
+  it("o ENCAIXE do atendente em cima do Google do dono é RECUSADO", async () => {
+    const banco = agenda({
+      olhar: "atendente",
+      eventosDoGoogle: [eventoDoGoogle(NA_GRADE, "2026-10-07T14:00:00.000Z")],
+    });
+    await expect(
+      marcarAgendamentoHandler(banco.client, ctx(ATENDENTE), { event_type_id: TIPO, starts_at: FORA_DA_GRADE }),
+    ).rejects.toMatchObject(RECUSA);
+    expect(
+      criados(banco),
+      "o atendente marcou em cima do Google do dono — a coleta leu a ocupação com o olhar de quem pergunta",
+    ).toHaveLength(0);
+  });
+
+  it("a GRADE, com um client que não enxerga a conexão, também RECUSA o horário do Google do dono", async () => {
+    const banco = agenda({
+      olhar: "atendente",
+      eventosDoGoogle: [eventoDoGoogle(NA_GRADE, "2026-10-07T14:00:00.000Z")],
+    });
+    await expect(
+      marcarAgendamentoHandler(banco.client, ctx(AGENTE), { event_type_id: TIPO, starts_at: NA_GRADE }),
+    ).rejects.toMatchObject(RECUSA);
+    expect(criados(banco), "a grade ofereceu o horário do Google do dono a quem não enxerga a conexão").toHaveLength(0);
+  });
+});
+
+describe("a exceção de data é do dia LOCAL — a noite em fuso negativo (issue #878)", () => {
+  // Quarta 07/10, 21:00 em São Paulo = 00:00Z de quinta 08/10. A jornada vai até
+  // 23:00 para 21:00 ser um horário da grade; quem barra é o dia bloqueado.
+  const NOITE = "2026-10-08T00:00:00.000Z";
+
+  it("CONTROLE: sem bloqueio, a IA marca às 21:00 da quarta", async () => {
+    const banco = agenda({ fimDaJornada: "23:00" });
+    await marcarAgendamentoHandler(banco.client, ctx(AGENTE), { event_type_id: TIPO, starts_at: NOITE });
+    expect(criados(banco), "a grade não oferece 21:00 nem sem bloqueio — o caso abaixo não provaria nada").toHaveLength(1);
+  });
+
+  it("a IA às 21:00 de um dia BLOQUEADO é RECUSADA — a exceção é buscada no dia local, não no UTC", async () => {
+    const banco = agenda({ fimDaJornada: "23:00", diasBloqueados: ["2026-10-07"] });
+    await expect(
+      marcarAgendamentoHandler(banco.client, ctx(AGENTE), { event_type_id: TIPO, starts_at: NOITE }),
+    ).rejects.toMatchObject(RECUSA);
+    expect(criados(banco), "a IA marcou às 21:00 de um dia bloqueado: a coleta procurou a exceção no dia UTC").toHaveLength(0);
+  });
+
+  it("a PESSOA às 21:00 do dia bloqueado MARCA — o encaixe dispensa a exceção de data, de propósito", async () => {
+    const banco = agenda({ fimDaJornada: "23:00", diasBloqueados: ["2026-10-07"] });
+    await marcarAgendamentoHandler(banco.client, ctx(PESSOA), { event_type_id: TIPO, starts_at: NOITE });
+    expect(criados(banco)).toHaveLength(1);
   });
 });
 

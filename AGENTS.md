@@ -147,9 +147,10 @@ usuário, rode `pnpm test:e2e` com evidência visual. Se toca `Dockerfile*`, `do
 **O que o CI cobre.** `.github/workflows/ci.yml`: `verify` = os passos do job, na ordem —
 typecheck, lint, `lint:channels`, `test:unit` e `test:shell` hoje, e `pnpm lint` sozinho **não**
 cobre os dois últimos (liste em vez de acreditar nesta linha:
-`awk '/^  verify:/,/^  invariants:/' .github/workflows/ci.yml | grep -A1 'name:'`);
-`invariants` = `pnpm test:db` (isolamento RLS + invariantes de governança contra Postgres
-efêmero pg15). `.github/workflows/perf.yml`: `build-and-size` = `pnpm build`.
+`awk '/^  verify:/,/^  invariants-majors:/' .github/workflows/ci.yml | grep -A1 'name:'`);
+`invariants` = fachada sobre a matriz `invariants-majors`, que roda `pnpm test:db` (isolamento
+RLS + invariantes de governança) e `pnpm test:db:update` (atualizar banco COM dados) uma vez por
+major de Postgres suportado. `.github/workflows/perf.yml`: `build-and-size` = `pnpm build`.
 `.github/workflows/e2e.yml` roda as specs Playwright contra um Supabase local de verdade com
 o `baseline.sql` aplicado — o mesmo banco que o self-hoster tem. **É check obrigatório** — a
 data de ativação não é auditável pelo repositório, e a lista viva está logo abaixo, com o

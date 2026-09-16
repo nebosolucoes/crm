@@ -211,6 +211,12 @@ export const AUDIT_ACTIONS = [
   "channel.reactivated",
   // Chamada de voz WhatsApp (WaCalls, spec 18) — pareamento do segundo
   // dispositivo vinculado, opt-in por org. Admin only.
+  //
+  // `voice.session_prepared` NÃO é mais emitida: era o passo "preparar" que
+  // antecedia o `/pair` do upstream, e o `/pair` foi embora (ver
+  // `app/api/v1/voice/sessions/pair/route.ts`). Fica na lista porque a trilha
+  // de quem pareou entre 2026-09-14 e a remoção tem linhas com esse nome, e o
+  // painel rotula a partir daqui.
   "voice.session_prepared",
   "voice.session_pair_started",
   // As mutações da chamada em si. Todas auditadas porque todas têm efeito no
@@ -560,6 +566,9 @@ export const AUDIT_ACTIONS = [
   // porque toda leitura de `admin/` é auditada neste repo — e porque aqui o
   // operador enxerga o agente publicado na organização de outra pessoa.
   "platform_admin.tenant_agents_viewed",
+  // "Cliente pela agenda" ligada ou desligada (migration 0262). Ligar reescreve
+  // etiquetas de toda a organização; metadata leva as contagens.
+  "crm.cliente_pela_agenda_alterado",
 ] as const;
 
 /** Um código de auditoria. Derivado de `AUDIT_ACTIONS` — não redigite a lista. */

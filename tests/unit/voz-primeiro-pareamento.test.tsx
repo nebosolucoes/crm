@@ -31,31 +31,70 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("primeiro pareamento da voz", () => {
-  it("prepara a sessão, abre os eventos e só então pede o QR", async () => {
-    let preparar!: () => void;
-    api.post.mockImplementationOnce(
-      () =>
-        new Promise<void>((resolve) => {
-          preparar = resolve;
-        }),
-    );
+  it("abre os eventos primeiro e só então pede o pareamento — um POST, sem 'preparar'", async () => {
     render(<CanalVozClient wacallsConfigured />);
     fireEvent.click(await screen.findByRole("button", { name: "Parear chamada de voz" }));
-    await waitFor(() =>
-      expect(api.post).toHaveBeenCalledWith("/api/v1/voice/sessions/pair", { prepare_only: true }),
-    );
-    expect(Eventos.abertos).toHaveLength(0);
-    await act(async () => preparar());
+    // A stream nasce ANTES de qualquer POST: o QR sai no instante em que a
+    // sessão é criada, e quem não está ouvindo o perde.
     await waitFor(() => expect(Eventos.abertos).toHaveLength(1));
-    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(api.post).not.toHaveBeenCalled();
     await act(async () => Eventos.abertos[0]!.onopen?.());
-    expect(api.post).toHaveBeenLastCalledWith("/api/v1/voice/sessions/pair", {});
+    expect(api.post).toHaveBeenCalledExactlyOnceWith("/api/v1/voice/sessions/pair", {});
     await act(async () =>
       Eventos.abertos[0]!.onmessage?.({
         data: JSON.stringify({ type: "qr", dataUrl: "data:image/png;base64,cXI=" }),
       }),
     );
     expect(screen.getByAltText("QR Code para parear chamada de voz")).toBeVisible();
+    // O `onopen` pode disparar de novo numa reconexão do EventSource; o
+    // pareamento não pode ser pedido duas vezes por isso.
+    await act(async () => Eventos.abertos[0]!.onopen?.());
+    expect(api.post).toHaveBeenCalledTimes(1);
+  });
+
+  it("QR vencido some da tela, avisa, e o botão volta — em vez de deixar um código morto", async () => {
+    render(<CanalVozClient wacallsConfigured />);
+    fireEvent.click(await screen.findByRole("button", { name: "Parear chamada de voz" }));
+    await waitFor(() => expect(Eventos.abertos).toHaveLength(1));
+    await act(async () => Eventos.abertos[0]!.onopen?.());
+    await act(async () =>
+      Eventos.abertos[0]!.onmessage?.({
+        data: JSON.stringify({ type: "qr", dataUrl: "data:image/png;base64,cXI=" }),
+      }),
+    );
+    expect(screen.getByAltText("QR Code para parear chamada de voz")).toBeVisible();
+    await act(async () => Eventos.abertos[0]!.onmessage?.({ data: JSON.stringify({ type: "expired" }) }));
+    expect(screen.queryByAltText("QR Code para parear chamada de voz")).toBeNull();
+    expect(api.erro).toHaveBeenCalledWith("O código de pareamento venceu. Clique em parear para gerar outro.");
+    expect(Eventos.abertos[0]!.close).toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Parear chamada de voz" })).toBeEnabled();
+  });
+
+  it("409 'já pareada' relê o estado da tela — a rota acabou de corrigir o banco", async () => {
+    api.post.mockRejectedValueOnce(new Error("voice_already_paired"));
+    render(<CanalVozClient wacallsConfigured />);
+    fireEvent.click(await screen.findByRole("button", { name: "Parear chamada de voz" }));
+    await waitFor(() => expect(Eventos.abertos).toHaveLength(1));
+    const leiturasAntes = api.get.mock.calls.filter((c) => String(c[0]).endsWith("/status")).length;
+    await act(async () => Eventos.abertos[0]!.onopen?.());
+    await waitFor(() =>
+      expect(api.get.mock.calls.filter((c) => String(c[0]).endsWith("/status")).length).toBe(leiturasAntes + 1),
+    );
+  });
+
+  it("queda da conexão com o QR na tela tira o código morto e devolve o botão", async () => {
+    render(<CanalVozClient wacallsConfigured />);
+    fireEvent.click(await screen.findByRole("button", { name: "Parear chamada de voz" }));
+    await waitFor(() => expect(Eventos.abertos).toHaveLength(1));
+    await act(async () => Eventos.abertos[0]!.onopen?.());
+    await act(async () =>
+      Eventos.abertos[0]!.onmessage?.({
+        data: JSON.stringify({ type: "qr", dataUrl: "data:image/png;base64,cXI=" }),
+      }),
+    );
+    act(() => Eventos.abertos[0]!.onerror?.());
+    expect(screen.queryByAltText("QR Code para parear chamada de voz")).toBeNull();
+    expect(screen.getByRole("button", { name: "Parear chamada de voz" })).toBeEnabled();
   });
 
   it("falha da conexão avisa a pessoa e permite tentar de novo", async () => {

@@ -545,20 +545,23 @@ export function podeMarcarForaDaGrade(actor: Actor): boolean {
  *   não para o dia. Essa conta segura o alinhamento ao expediente, o aviso
  *   mínimo, a janela de reserva e a ocupação que CRUZA o pedido.
  *
- *   ⚠️ Ela NÃO segura tudo o que o GET do dia esconde, porque a coleta acompanha
- *   a janela estreita. Dois furos, anteriores ao encaixe, medidos em 2026-09-15
- *   chamando este handler com a coleta de verdade sobre o banco em memória de
- *   `tests/unit/pessoa-marca-fora-da-grade.test.ts` (sonda não versionada):
- *   · **buffer contra vizinho** — `coletaOQueOcupa` só traz o que cruza
- *     `[inicio, fim]`. Com `buffer_before_minutes = 30` e um compromisso que
- *     termina 12:45Z, o pedido de 13:00Z não vê o vizinho e é ACEITO — e o GET
- *     do dia não oferece 13:00Z (medição do revisor do lote 8). Para valer, a
- *     janela de coleta teria de ser alargada por `buffer_before`/`buffer_after`.
- *   · **exceção de data à noite em fuso negativo** — as exceções são colhidas
- *     pela data UTC de `inicio`/`fim` (`diaISO`), e `exception_date` é data
- *     LOCAL. Em São Paulo, 21:00 do dia 07 é 00:00Z do dia 08: a exceção do dia
- *     07 fica de fora e o pedido é ACEITO num dia inteiro bloqueado. Para valer,
- *     o recorte teria de ser feito no fuso da jornada, com um dia de margem.
+ *   ⚠️ Ela NÃO segura tudo o que o GET do dia esconde, porque a coleta de
+ *   OCUPAÇÃO acompanha a janela estreita. Dois furos, anteriores ao encaixe,
+ *   foram medidos em 2026-09-15 chamando este handler com a coleta de verdade
+ *   sobre o banco em memória de `tests/unit/pessoa-marca-fora-da-grade.test.ts`
+ *   (sonda não versionada). Um segue aberto:
+ *   · **buffer contra vizinho** (issue #876) — `coletaOQueOcupa` só traz o que
+ *     cruza `[inicio, fim]`. Com `buffer_before_minutes = 30` e um compromisso
+ *     que termina 12:45Z, o pedido de 13:00Z não vê o vizinho e é ACEITO — e o
+ *     GET do dia não oferece 13:00Z (medição do revisor do lote 8). Para valer,
+ *     a janela de coleta teria de ser alargada por `buffer_before`/`buffer_after`.
+ *
+ *   O outro, a EXCEÇÃO DE DATA à noite, foi fechado (issue #878, PR #882): era colhida
+ *   pela data UTC de `inicio`/`fim`, e em São Paulo 21:00 do dia 07 é 00:00Z do
+ *   dia 08 — o pedido era ACEITO num dia inteiro bloqueado. `horariosLivresDaOrg`
+ *   agora a busca no dia LOCAL do fuso da jornada, com um dia de margem de cada
+ *   lado. Vigiado por "a exceção de data é do dia LOCAL" em
+ *   `tests/unit/pessoa-marca-fora-da-grade.test.ts`.
  * - **O encaixe** (pessoa): as regras da grade são dispensadas — é a escolha
  *   explícita de quem atende —, mas a OCUPAÇÃO REAL não
  *   (`exigeSemSobreposicao`).
@@ -638,16 +641,17 @@ async function exigeHorarioLivre(
  * Existe porque não há nada no schema que impeça a sobreposição: sem `exclude`
  * com `tstzrange` nem índice, a única guarda do produto é esta leitura.
  *
- * ⚠️ O GOOGLE QUE ELA VÊ DEPENDE DE QUEM PERGUNTA. A rota passa o client de
- * SESSÃO, e a coleta chega aos eventos do Google pelo embed
- * `calendar_connections!inner` — tabela cuja RLS só mostra a conexão ao próprio
- * dono e a `manager`+. Para um `agent` marcando na agenda de OUTRA pessoa, o
- * embed volta vazio e o Google dela não entra na conta. Medido em 2026-09-15
- * num Postgres descartável com o `baseline.sql`, como `authenticated`, por uma
- * junção equivalente à do embed (`join lateral` em `calendar_connections` com o
- * filtro de dono — não pelo PostgREST): dono 1 evento, gerente 1, atendente 0; e
- * o atendente enxerga a linha em `calendar_selected_external_events` quando lida
- * sem a junção. A ferramenta MCP usa service role, que não passa pela RLS.
+ * O GOOGLE QUE ELA VÊ NÃO DEPENDE DE QUEM PERGUNTA (issue #879, PR #883). Até
+ * aqui dependia: a coleta chegava aos eventos pelo embed
+ * `calendar_connections!inner`, tabela cuja RLS só mostra a conexão ao próprio
+ * dono e a `manager`+, e para um `agent` marcando na agenda de OUTRA pessoa o
+ * Google dela ficava fora da conta — medido num Postgres descartável com o
+ * `baseline.sql`: dono 1 evento, gerente 1, atendente 0. `coletaOQueOcupa` lê
+ * agora por `fn_agenda_ocupacao_google_do_dono` (migration 0260), `security
+ * definer` que confere o pertencimento e devolve só ocupação — e a rota continua
+ * passando o client de SESSÃO. Vigiado no banco por
+ * `tests/invariants/agenda-ocupacao-google-do-dono.test.ts` e aqui por "o
+ * ENCAIXE do atendente em cima do Google do dono é RECUSADO".
  */
 async function exigeSemSobreposicao(
   supabase: SB,

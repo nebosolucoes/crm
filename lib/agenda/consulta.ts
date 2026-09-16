@@ -33,9 +33,42 @@ import { googleRpc } from "./google/sync-store";
  * `motivoParaCliente` vai para o modelo e pode chegar ao cliente final: nada de
  * nome de campo, e ele diz o que fazer em seguida em vez de só negar. É a mesma
  * separação que `lerJornadaDoBanco` já faz, e pela mesma razão (DECISÃO 20).
+ *
+ * ─── ⚠️ O GOOGLE DO DONO DA AGENDA VEM DE FUNÇÃO, NÃO DE TABELA (issue #879) ──
+ *
+ * A junção com `calendar_connections` é o caminho até o Google Agenda, e a RLS
+ * dessa tabela só mostra a conexão ao PRÓPRIO dono e a `manager` para cima (ela
+ * guarda token OAuth):
+ *
+ *     create policy calendar_connections_dono_ou_manager_read ... using (
+ *       ... and (user_id = auth.uid()
+ *                or public.fn_role_at_least(organization_id, 'manager')))
+ *
+ * Consequência medida (Postgres descartável, `baseline.sql`, a MESMA agenda):
+ * dono vê 1 evento do Google, gerente vê 1, **atendente vê 0**. Com o client de
+ * sessão, o Atendente que marca na agenda de outra pessoa conferia ocupação
+ * contra uma lista sem o Google dela — na grade E no encaixe — e marcava por
+ * cima de um compromisso pessoal que existe.
+ *
+ * As duas leituras do Google (os eventos, em `coletaOQueOcupa`, e a situação
+ * das conexões, em `horariosLivresDaOrg`) saem por RPC —
+ * `fn_agenda_ocupacao_google_do_dono` e `fn_agenda_conexoes_google_do_dono`
+ * (migration 0260) — pelo MESMO client que veio de fora. São `security definer`
+ * que atravessam só a RLS da conexão, conferem o pertencimento no corpo
+ * (`fn_user_org_ids()`, a régua das policies) e filtram o dono; o que devolvem é
+ * ocupação (início, fim, transparência, situação), nunca título, descrição ou
+ * participantes.
+ *
+ * ⚠️ NÃO troque por `createAdminClient()` aqui. Foi a primeira forma deste
+ * conserto (PR #883): o admin ficava escondido dentro de uma coleta que recebe o
+ * client de fora, então a rota que passa a SESSÃO recebia sem saber uma leitura
+ * com service role, guardada só pelo `.eq("organization_id")` — o que
+ * `lib/supabase/admin.ts` proíbe em fluxo normal de usuário. E todo teste que
+ * passava pela coleta sem dublar o admin ia para a rede.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { diaLocalISO } from "./fuso";
 import { horariosLivres, type ExcecaoDeData, type Slot } from "./horarios-livres";
 import { lerJornadaDoBanco } from "./jornada";
 import {
@@ -110,10 +143,13 @@ export type ResultadoDaConsulta =
       motivoParaCliente: string;
     };
 
-/** `YYYY-MM-DD` de um instante, em UTC — a régua que a coluna `date` usa. */
-function diaISO(instante: Date): string {
-  return instante.toISOString().slice(0, 10);
-}
+/**
+ * Um dia em milissegundos — a margem de cada lado com que os dias locais são
+ * visitados, a MESMA de `horarios-livres.ts` (lá `naoAntesDe - DIA` …
+ * `naoDepoisDe + DIA`). A coleta tem que cobrir a visita inteira; margem menor
+ * de um lado devolve dia que a grade pergunta e o mapa não tem.
+ */
+const DIA = 86_400_000;
 
 const NAO_OFERECA =
   "Não ofereça horários e não diga que está sem vaga — avise que alguém da equipe confirma o horário.";
@@ -208,14 +244,33 @@ export async function horariosLivresDaOrg(
     };
   }
 
+  // ⚠️ As exceções de data são a MESMA régua de `horariosLivres`: coluna `date`
+  // no Postgres, sem fuso — o dia LOCAL DA REGRA (`leitura.jornada.timezone`),
+  // nunca o dia UTC do instante pedido. Com o dia UTC a coleta começava DEPOIS
+  // do dia pedido num fuso negativo: 21:00 de D em America/Sao_Paulo já é
+  // 00:00Z de D+1, então a exceção de D (folga, feriado, dia inteiro bloqueado)
+  // ficava fora do `.gte()` — e a grade oferecia, e a escrita aceitava, horário
+  // de um dia bloqueado (#878).
+  //
+  // A margem de ±1 dia é a mesma com que `horariosLivres` visita os dias
+  // (`diaLocalISO(naoAntesDe - DIA)` … `diaLocalISO(naoDepoisDe + DIA)`): a
+  // borda de um dia local pode cair no dia UTC vizinho, e a coleta não fica
+  // mais estreita que a visita da grade. Hoje a margem é defesa, não conserto:
+  // os horários dos dias da margem já caem fora de `[naoAntesDe, naoDepoisDe]`
+  // (sem ela, a suíte fica verde — medido na revisão do lote 10). O que fecha
+  // o #878 é buscar pelo dia LOCAL, não a margem.
+  const fusoDaRegra = leitura.jornada.timezone;
+  const primeiroDiaDaRegra = diaLocalISO(new Date(params.de.getTime() - DIA), fusoDaRegra);
+  const ultimoDiaDaRegra = diaLocalISO(new Date(params.ate.getTime() + DIA), fusoDaRegra);
+
   const [{ data: excecoesRaw, error: erroExc }, oQueOcupa] = await Promise.all([
     supabase
       .from("calendar_availability_exceptions")
       .select("exception_date, is_unavailable, start_minute, end_minute")
       .eq("organization_id", organizationId)
       .eq("user_id", donoId)
-      .gte("exception_date", diaISO(params.de))
-      .lte("exception_date", diaISO(params.ate)),
+      .gte("exception_date", primeiroDiaDaRegra)
+      .lte("exception_date", ultimoDiaDaRegra),
     coletaOQueOcupa(supabase, organizationId, { donoId, de: params.de, ate: params.ate }),
   ]);
 
@@ -240,11 +295,14 @@ export async function horariosLivresDaOrg(
   // A situação das conexões do dono, para distinguir "não tem Google" de "tem
   // Google que nunca foi lido". Sem `.select` de erro: conexão ilegível cai no
   // mesmo lado de "não sei", que é o lado seguro.
-  const { data: conexoesRaw } = await supabase
-    .from("calendar_connections")
-    .select("status, last_sync_at")
-    .eq("organization_id", organizationId)
-    .eq("user_id", donoId);
+  //
+  // Por RPC, e não direto em `calendar_connections`: a RLS da tabela esconde a
+  // conexão de um Atendente, e "nunca foi lida" passava a ser "não tem Google"
+  // conforme quem perguntava (ver o cabeçalho, issue #879).
+  const { data: conexoesRaw } = await supabase.rpc("fn_agenda_conexoes_google_do_dono", {
+    p_org: organizationId,
+    p_owner: donoId,
+  });
 
   const excecoes: ExcecaoDeData[] = (excecoesRaw ?? []).map((linha) => ({
     // ⚠️ `exception_date` é `date` no Postgres e chega como "YYYY-MM-DD" pelo
@@ -287,6 +345,15 @@ export async function horariosLivresDaOrg(
   };
 }
 
+
+/** Uma linha de `fn_agenda_ocupacao_google_do_dono` — as cinco colunas que a função declara, e só elas. */
+interface LinhaDaOcupacaoDoGoogle {
+  starts_at: string;
+  ends_at: string;
+  transparency: string;
+  status: string;
+  connection_status: string | null;
+}
 
 export interface ParametrosDaOcupacao {
   donoId: string;
@@ -335,15 +402,19 @@ export async function coletaOQueOcupa(
   const [{ data: agendaRaw, error: erroAg }, { data: externosRaw, error: erroExt }] = await Promise.all([
     agendamentos,
     // `calendar_external_events` NÃO tem `user_id`: o dono vem por
-    // `connection_id → calendar_connections.user_id`. O join traz de carona a
-    // situação da conexão, que decide se o horário sai com aviso de defasagem.
-    supabase
-      .from("calendar_selected_external_events")
-      .select("starts_at, ends_at, transparency, status, calendar_connections!inner(user_id, status)")
-      .eq("organization_id", organizationId)
-      .eq("calendar_connections.user_id", params.donoId)
-      .lt("starts_at", params.ate.toISOString())
-      .gt("ends_at", params.de.toISOString()),
+    // `connection_id → calendar_connections.user_id`, e a situação da conexão
+    // decide se o horário sai com aviso de defasagem.
+    //
+    // ⚠️ POR RPC, e não pelo embed `calendar_connections!inner`: a RLS da conexão
+    // esconde o Google do dono de um Atendente, e a ocupação sumia — da grade E
+    // do encaixe, que é por isso que a leitura mora aqui (issue #879, ver o
+    // cabeçalho). A função confere o pertencimento e devolve só ocupação.
+    supabase.rpc("fn_agenda_ocupacao_google_do_dono", {
+      p_org: organizationId,
+      p_owner: params.donoId,
+      p_de: params.de.toISOString(),
+      p_ate: params.ate.toISOString(),
+    }),
   ]);
 
   const erro = erroAg ?? erroExt;
@@ -353,16 +424,16 @@ export async function coletaOQueOcupa(
     ok: true,
     ...ocupadosDoDono(
       (agendaRaw ?? []) as LinhaDeAgendamento[],
-      (externosRaw ?? []).map((linha) => {
-        const conexao = linha.calendar_connections as unknown as { status?: string } | null;
-        return {
-          starts_at: linha.starts_at,
-          ends_at: linha.ends_at,
-          transparency: linha.transparency,
-          status: linha.status,
-          situacaoDaConexao: conexao?.status ?? "error",
-        } satisfies LinhaDeEventoExterno;
-      }),
+      ((externosRaw ?? []) as LinhaDaOcupacaoDoGoogle[]).map(
+        (linha) =>
+          ({
+            starts_at: linha.starts_at,
+            ends_at: linha.ends_at,
+            transparency: linha.transparency,
+            status: linha.status,
+            situacaoDaConexao: linha.connection_status ?? "error",
+          }) satisfies LinhaDeEventoExterno,
+      ),
     ),
   };
 }

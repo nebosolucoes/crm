@@ -887,6 +887,7 @@ export const DICIONARIO: Traducoes = {
   // ─── Agentes de IA: seletor de modelo, capacidades, credencial, handoff ───
   Modelo: { es: "Modelo" },
   "Selecione um modelo": { es: "Selecciona un modelo" },
+  "Digite o identificador do modelo": { es: "Escribe el identificador del modelo" },
   "Nenhum modelo disponível": { es: "Ningún modelo disponible" },
   "Nenhuma capacidade disponível ainda para esta jornada.": {
     es: "Todavía no hay capacidades disponibles para esta jornada.",
@@ -1444,6 +1445,7 @@ export const DICIONARIO: Traducoes = {
   "é pelo menos": { es: "es al menos" },
   "é no máximo": { es: "es como máximo" },
   "tem a etiqueta": { es: "tiene la etiqueta" },
+  "tem a tag": { es: "tiene la etiqueta" },
   "não tem a etiqueta": { es: "no tiene la etiqueta" },
   "é exatamente": { es: "es exactamente" },
   "não é": { es: "no es" },
@@ -4264,6 +4266,10 @@ export const DICIONARIO: Traducoes = {
   // Mensagens que as rotas de voz devolvem traduzidas (`traduzir(..., idioma)`).
   "Chamada de voz ligada.": { es: "Llamadas de voz activadas." },
   "Chamada de voz desligada.": { es: "Llamadas de voz desactivadas." },
+  "O número de voz está sem conexão com o WhatsApp neste momento. Aguarde alguns segundos e tente de novo; se continuar, desconecte o número e pareie de novo em Configurações › Canais.":
+    {
+      es: "El número de voz está sin conexión con WhatsApp en este momento. Espera unos segundos y vuelve a intentarlo; si continúa, desconecta el número y vuelve a vincularlo en Configuración › Canales.",
+    },
   "Chamada de voz desligada e aparelho desconectado.": {
     es: "Llamadas de voz desactivadas y dispositivo desconectado.",
   },
@@ -4516,6 +4522,7 @@ export const DICIONARIO: Traducoes = {
   "Entrou por": { es: "Entró por" },
   "Posição": { es: "Posición" },
   "na fila": { es: "en la cola" },
+  "Última mensagem do cliente": { es: "Último mensaje del cliente" },
   Arquivada: { es: "Archivada" },
   "Aguardando o cliente": { es: "Esperando al cliente" },
 
@@ -5591,6 +5598,14 @@ export const DICIONARIO: Traducoes = {
   },
   "CPF (opcional)": { es: "CPF (opcional)" },
   "Criar contato": { es: "Crear contacto" },
+  "Trocar contato": { es: "Cambiar contacto" },
+  "Sem contato, este lead não recebe WhatsApp nem entra nas automações.": {
+    es: "Sin contacto, este lead no recibe WhatsApp ni entra en las automatizaciones.",
+  },
+  "Procure pelo nome ou telefone": { es: "Busque por nombre o teléfono" },
+  "Nenhum contato com esse nome ou telefone.": {
+    es: "Ningún contacto con ese nombre o teléfono.",
+  },
   "Contato criado": { es: "Contacto creado" },
   "Não foi possível carregar as sugestões agora.": { es: "No se pudieron cargar las sugerencias ahora." },
   "Não foi possível registrar a decisão.": { es: "No se pudo registrar la decisión." },
@@ -5605,6 +5620,8 @@ export const DICIONARIO: Traducoes = {
   "Nenhuma atividade registrada ainda.": { es: "Ninguna actividad registrada todavía." },
   "Todas as origens": { es: "Todos los orígenes" },
   "Importado (CSV)": { es: "Importado (CSV)" },
+  "Anúncio da Meta": { es: "Anuncio de Meta" },
+  "Anúncio do Google": { es: "Anuncio de Google" },
 
   // ─── Settings: painel de atualização — histórico multi-versão (merge upstream) ───
   "Da versão": { es: "De la versión" },
@@ -5998,6 +6015,34 @@ export const DICIONARIO: Traducoes = {
   "Novo nome de": { es: "Nuevo nombre de" },
   "Padrão": { es: "Predeterminado" },
   "Tornar padrão": { es: "Hacer predeterminado" },
+  "Clientes": { es: "Clientes" },
+  "Funil de clientes": { es: "Embudo de clientes" },
+  "Deixar de ser funil de clientes": { es: "Dejar de ser embudo de clientes" },
+  "Quem já tem atendimento marcado entra pelo funil de clientes. Sem um funil marcado, entra pelo padrão.": { es: "Quien ya tiene una cita agendada entra por el embudo de clientes. Sin un embudo marcado, entra por el predeterminado." },
+  "Cliente desde": { es: "Cliente desde" },
+  // Clientes pela agenda (migration 0262): o interruptor em Tipos de agendamento e a porta no rodapé de Funis.
+  "Acompanhamento somente leitura ou encerrado.": { es: "Acompañamiento de solo lectura o finalizado." },
+  "Confirme a verificação em duas etapas.": { es: "Confirma la verificación en dos pasos." },
+  "Outra mudança estava em andamento. Tente de novo.": { es: "Otro cambio estaba en curso. Inténtalo de nuevo." },
+  "Clientes pela agenda": { es: "Clientes por la agenda" },
+  "Quem tem horário marcado vira cliente": { es: "Quien tiene una cita agendada pasa a ser cliente" },
+  "Com isto ligado, todo contato com horário marcado ganha a etiqueta “cliente” e a ficha passa a mostrar “Cliente desde”. Ao ligar, quem já teve horário marcado também ganha. Horário cancelado e falta não contam: se não sobrar nenhum horário que conte, sai a etiqueta que o sistema pôs — a que a equipe pôs à mão fica. Se alguém da equipe tirar a etiqueta, ela não volta.": { es: "Con esto activado, todo contacto con una cita agendada recibe la etiqueta “cliente” y su ficha pasa a mostrar “Cliente desde”. Al activarlo, quien ya tuvo una cita también la recibe. Las citas canceladas y las ausencias no cuentan: si no queda ninguna cita que cuente, se quita la etiqueta que puso el sistema — la que el equipo puso a mano se queda. Si alguien del equipo quita la etiqueta, no vuelve." },
+  "Desligado: ninguém ganha a etiqueta, a ficha não mostra “Cliente desde” e todo contato novo entra pelo funil padrão. As etiquetas que já existem ficam como estão.": { es: "Desactivado: nadie recibe la etiqueta, la ficha no muestra “Cliente desde” y todo contacto nuevo entra por el embudo predeterminado. Las etiquetas que ya existen se quedan como están." },
+  "Ligado: quem marcar horário ganha a etiqueta “cliente” na hora.": { es: "Activado: quien agende una cita recibe la etiqueta “cliente” en el momento." },
+  "As automações “Quando um contato ganhar uma tag” disparam uma vez por contato: na primeira vez que o sistema acrescenta a etiqueta. Não disparam para quem já era cliente ao ligar, para quem já tinha a etiqueta posta à mão, nem de novo para quem cancela e marca outra vez.": { es: "Las automatizaciones “Cuando un contacto reciba una etiqueta” se activan una vez por contacto: la primera vez que el sistema agrega la etiqueta. No se activan para quien ya era cliente al activarla, para quien ya tenía la etiqueta puesta a mano, ni de nuevo para quien cancela y vuelve a agendar." },
+  "Ligar clientes pela agenda?": { es: "¿Activar clientes por la agenda?" },
+  "Todos os contatos que já tiveram horário marcado (sem contar cancelados e faltas) ganham a etiqueta “cliente” agora. Se a regra já esteve ligada, quem ficou sem horário que conte perde a etiqueta que o sistema tinha posto. Desligar depois não tira a etiqueta de ninguém.": { es: "Todos los contactos que ya tuvieron una cita (sin contar canceladas ni ausencias) reciben la etiqueta “cliente” ahora. Si la regla ya estuvo activada, quien se quedó sin una cita que cuente pierde la etiqueta que había puesto el sistema. Desactivarlo después no le quita la etiqueta a nadie." },
+  "{n} contatos ganharam a etiqueta “cliente”.": { es: "{n} contactos recibieron la etiqueta “cliente”." },
+  "1 contato ganhou a etiqueta “cliente”.": { es: "1 contacto recibió la etiqueta “cliente”." },
+  "Nenhum contato tinha horário marcado ainda. Quem marcar daqui em diante ganha a etiqueta.": { es: "Ningún contacto tenía una cita todavía. Quien agende a partir de ahora recibirá la etiqueta." },
+  "Nenhum contato novo ganhou a etiqueta: {c} contatos já eram clientes.": { es: "Ningún contacto nuevo recibió la etiqueta: {c} contactos ya eran clientes." },
+  "Nenhum contato novo ganhou a etiqueta: 1 contato já era cliente.": { es: "Ningún contacto nuevo recibió la etiqueta: 1 contacto ya era cliente." },
+  "Nenhum contato ganhou a etiqueta.": { es: "Ningún contacto recibió la etiqueta." },
+  "Nenhum contato virou cliente: os horários que existem estão cancelados ou marcados como falta.": { es: "Ningún contacto pasó a ser cliente: las citas que existen están canceladas o marcadas como ausencia." },
+  "{m} contatos perderam a etiqueta “cliente”: enquanto a regra estava desligada, os horários deles foram cancelados, marcados como falta ou apagados.": { es: "{m} contactos perdieron la etiqueta “cliente”: mientras la regla estaba desactivada, sus citas se cancelaron, se marcaron como ausencia o se eliminaron." },
+  "1 contato perdeu a etiqueta “cliente”: enquanto a regra estava desligada, os horários dele foram cancelados, marcados como falta ou apagados.": { es: "1 contacto perdió la etiqueta “cliente”: mientras la regla estaba desactivada, sus citas se cancelaron, se marcaron como ausencia o se eliminaron." },
+  "Para separar quem já é cliente, ligue “Clientes pela agenda” em Configurações › Tipos de agendamento. Enquanto estiver desligado, todo contato novo entra pelo funil padrão.": { es: "Para separar a quien ya es cliente, active “Clientes por la agenda” en Configuración › Tipos de cita. Mientras esté desactivado, todo contacto nuevo entra por el embudo predeterminado." },
+  "Abrir Tipos de agendamento": { es: "Abrir Tipos de cita" },
   "Ele sai desta lista e para de receber negócio novo. O histórico continua guardado, e nada é apagado.": {
     es: "Sale de esta lista y deja de recibir negocio nuevo. El historial se conserva, y nada se borra.",
   },
@@ -7481,7 +7526,13 @@ export const DICIONARIO: Traducoes = {
   // `hooks/voice/useVoiceCallSession.ts` (`EstadoDaMidia`).
   "Abrindo o áudio…": { es: "Abriendo el audio…" },
   "Sem áudio: o canal de voz não abriu": { es: "Sin audio: el canal de voz no se abrió" },
+  "O áudio desta ligação está em outra aba": { es: "El audio de esta llamada está en otra pestaña" },
+  "Ouvir aqui": { es: "Escuchar aquí" },
+  "O áudio caiu": { es: "El audio se cayó" },
+  "Não consegui abrir o áudio. Confira o microfone.": { es: "No pude abrir el audio. Revisa el micrófono." },
+  "Reconectar o áudio": { es: "Reconectar el audio" },
   "Chamada de voz": { es: "Llamada de voz" },
+  "Chamada de voz sem resposta": { es: "Llamada de voz sin respuesta" },
   "A chamada de voz não está configurada.": { es: "La llamada de voz no está configurada." },
   "Falta o endereço do serviço (": { es: "Falta la dirección del servicio (" },
   ") nas variáveis de ambiente desta instalação.": {
@@ -7518,6 +7569,9 @@ export const DICIONARIO: Traducoes = {
   "chamada de voz": { es: "llamada de voz" },
   "chamadas de voz": { es: "llamadas de voz" },
   "Não foi possível iniciar o pareamento.": { es: "No fue posible iniciar el emparejamiento." },
+  "O código de pareamento venceu. Clique em parear para gerar outro.": {
+    es: "El código de vinculación venció. Haz clic en vincular para generar otro.",
+  },
   "Não foi possível receber o código de pareamento. Tente novamente.": {
     es: "No fue posible recibir el código de emparejamiento. Inténtalo de nuevo.",
   },

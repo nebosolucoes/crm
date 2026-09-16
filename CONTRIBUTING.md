@@ -146,6 +146,32 @@ local. **Não travamos PR externo nisso** — mande o que conseguiu provar (unit
 que testou na mão), que a prova de tela fica com o mantenedor. Exigir prova sem entregar a
 ferramenta de produzi-la seria pedágio, não rigor.
 
+### Texto de tela: toda frase nova precisa do espanhol
+
+O produto fala português e espanhol, e o CI reprova **frase nova sem tradução**. A regra não
+estava escrita aqui até 16/09/2026, e um PR de primeira contribuição foi reprovado por ela — a
+falha era nossa, não de quem contribuiu.
+
+Se você acrescentou uma frase que aparece na tela, ela passa por `t("...")` **e** ganha uma linha
+em `lib/i18n/dicionario.ts`:
+
+```ts
+"Digite o identificador do modelo": { es: "Escribe el identificador del modelo" },
+```
+
+A chave é o texto em português (não um código). Só o espanhol precisa de linha; o resto degrada
+para o português de propósito.
+
+Para conferir antes de abrir o PR, sem rodar a suíte inteira:
+
+```bash
+pnpm test:unit tests/unit/i18n-espanhol-cobre-a-tela.test.ts
+```
+
+Ele reprova nas duas direções: chave usada na tela sem espanhol, e prosa em português que não
+passou por `t()`. **Se você não fala espanhol, mande assim mesmo** e diga no PR — a tradução é
+trabalho de dez segundos para quem tria, e não é motivo para segurar um conserto.
+
 ### Anti-patterns proibidos
 
 Lista completa em `CLAUDE.md`. Os mais letais:
