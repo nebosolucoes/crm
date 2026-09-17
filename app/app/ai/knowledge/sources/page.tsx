@@ -11,6 +11,7 @@ import {
 import type { EstadoDaChave } from "@/components/ai/ChaveDeConhecimento";
 import type { SourceRow } from "@/hooks/ai/useKnowledgeSources";
 import { AcervoClient, type AgenteQueUsa } from "./_client";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,8 @@ export const dynamic = "force-dynamic";
  * depois é o defeito que esta página tinha.
  */
 export default async function AcervoPage() {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("ai_agents");
   const user = await requireAuth();
   // `t` local em vez do hook: esta página é componente de SERVIDOR, e lá o
   // idioma vem resolvido em `user.idioma` (a cadeia pessoa → organização →

@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const supabase = await createClient();
 
   // spec 13 §4: escrita é agent+ (viewer é read-only).
-  const authz = await requireRole("agent", { requestId, resource: "conversations" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "conversations" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const user = authz.user;

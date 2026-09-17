@@ -5,6 +5,7 @@ import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { ROLE_RANK } from "@/lib/auth/types";
 
 import { TarefasClient } from "./_components/TarefasClient";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Tarefas" };
@@ -27,6 +28,8 @@ export const metadata: Metadata = { title: "Tarefas" };
  * A tela esconder o botão é cortesia, não autorização.
  */
 export default async function TarefasPage() {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("crm");
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");

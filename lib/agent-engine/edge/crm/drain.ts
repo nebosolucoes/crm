@@ -21,6 +21,8 @@ import { enqueueJob } from '../../queue/queue';
 import { avisoDeEventoMorto, IA_QUE_NAO_RESPONDEU } from '@/lib/event-log/aviso-de-evento-morto';
 import { TIPOS_DERIVAVEIS, DERIVACAO_TERMINADA } from '@/lib/messaging/media/derivable';
 import { decidirElegibilidadeDaConversa } from '@/lib/ai/elegibilidade/consulta-pg';
+import { avisarBloqueioPorRecursoPg } from '@/lib/entitlements/aviso-na-central';
+import { orgTemRecursoPg } from '@/lib/entitlements/resolver-pg';
 
 const DRAIN_CONSUMER = 'agent-engine';
 
@@ -221,6 +223,34 @@ async function processEvent(
   if (modeRows[0]?.mode === 'external') {
     log.info('drain: org em modo external (spec 14) — evento pulado', { event_id: event.id });
     return 'processado';
+  }
+
+  // O PLANO (migration 0275): sem Agentes de IA, não há turno a enfileirar —
+  // done, sem job, sem gasto; a conversa fica para atendimento humano. O aviso
+  // na Central é um por organização/mês. Falha da consulta NÃO bloqueia: um
+  // lead real pode estar esperando, e o claim do worker tem a segunda checagem
+  // (a mesma decisão do gate de elegibilidade, logo abaixo).
+  try {
+    if (!(await orgTemRecursoPg(pool, event.organization_id, 'ai_agents'))) {
+      log.info('drain: organização sem Agentes de IA no plano — turno pulado (sem gasto)', {
+        event_id: event.id,
+        conversation_id: p.conversation_id,
+        motivo: 'feature_not_entitled',
+      });
+      try {
+        await avisarBloqueioPorRecursoPg(pool, event.organization_id, 'ai_agents', 'O atendimento automático de uma conversa');
+      } catch (err) {
+        log.warn('drain: aviso de plano na Central não gravado', {
+          error: (err instanceof Error ? err.message : String(err)).slice(0, 160),
+        });
+      }
+      return 'processado';
+    }
+  } catch (err) {
+    log.warn('drain: checagem de plano falhou — seguindo para o turno', {
+      event_id: event.id,
+      error: (err instanceof Error ? err.message : String(err)).slice(0, 160),
+    });
   }
 
   // Grupos: skip, sem exceção (regra dura nº 12).

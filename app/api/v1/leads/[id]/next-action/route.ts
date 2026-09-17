@@ -50,7 +50,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
 
   // Mesmo piso do move: quem não pode mexer no negócio não decide por ele.
   // `viewer` lê o board e vê a proposta, mas não aprova nem descarta.
-  const authz = await requireRole("agent", { requestId, resource: "crm_leads" });
+  const authz = await requireRole("agent", { feature: "crm", requestId, resource: "crm_leads" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user } = authz;

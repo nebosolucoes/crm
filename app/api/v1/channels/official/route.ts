@@ -37,6 +37,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { metadataInicialDoCanal } from "@/lib/ai/elegibilidade/pre-go-live";
 import { encryptWebhookSecret } from "@/lib/webhooks/secrets";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { recusaPorLimite } from "@/lib/entitlements/exigir-na-rota";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -231,6 +232,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // devolver a linha à vida, ou o canal fica "conectado" na tela e excluído para
   // todo o resto do sistema. Para o canal que já estava ativo é um no-op — e a
   // auditoria de volta sai de lá, junto da ressurreição, não daqui.
+  // Limite do plano (etapa 8): conta como canal novo quem não existia ou
+  // estava arquivado — ressuscitar é +1 canal ativo.
+  if (!existente || existente.archived_at) {
+    const noTeto = await recusaPorLimite(orgId, "max_channels", {
+      admin,
+      requestId,
+      resource: "channels_official",
+      actorUserId: userId,
+    });
+    if (noTeto) return noTeto;
+  }
+
   const { error } = existente
     ? await reactivateChannelSession(
         admin,

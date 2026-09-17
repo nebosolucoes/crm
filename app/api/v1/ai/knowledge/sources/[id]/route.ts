@@ -40,7 +40,7 @@ const patchSourceSchema = z.object({
 // ---------------------------------------------------------------------------
 
 async function resolveContext(requestId: string) {
-  const authz = await requireRole("manager", { requestId, resource: "ai_knowledge" });
+  const authz = await requireRole("manager", { feature: "ai_agents", requestId, resource: "ai_knowledge" });
   if (!authz.ok) return { error: authz.response };
   return { authUser: authz.user, activeOrg: authz.org };
 }

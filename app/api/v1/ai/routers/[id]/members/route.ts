@@ -41,7 +41,7 @@ export async function PUT(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     return fail("invalid_request", "id inválido.", 400, { requestId });
   }
 
-  const authz = await requireRole("admin", { requestId, resource: "ai_routers" });
+  const authz = await requireRole("admin", { feature: "ai_agents", requestId, resource: "ai_routers" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org } = authz;

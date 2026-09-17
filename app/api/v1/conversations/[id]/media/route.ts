@@ -37,6 +37,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   // Sessão de navegador OU token de servidor: é o primeiro passo do envio de
   // mídia, e quem envia por token precisa subir o arquivo antes de mandar.
   const authz = await resolveAuthDual(req, {
+    feature: "inbox",
     requestId,
     resource: "conversation_media",
     role: "agent",

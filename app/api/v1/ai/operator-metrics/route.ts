@@ -38,7 +38,7 @@ export const dynamic = "force-dynamic";
 const DIAS = 30;
 
 export async function GET(): Promise<Response> {
-  const authz = await requireRole("manager", { resource: "ai_operator_metrics" });
+  const authz = await requireRole("manager", { feature: "ai_agents", resource: "ai_operator_metrics" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org } = authz;

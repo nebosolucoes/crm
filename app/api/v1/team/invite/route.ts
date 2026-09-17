@@ -25,6 +25,7 @@ import { ApiError } from "@/lib/api/types";
 import { requireRole } from "@/lib/auth/require-role";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { inviteMemberSchema, validateRequest } from "@/lib/schemas";
+import { recusaPorLimite } from "@/lib/entitlements/exigir-na-rota";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,18 @@ export async function POST(req: NextRequest): Promise<Response> {
   const failed: FailedItem[] = [];
 
   const admin = isServiceRoleConfigured() ? createAdminClient() : null;
+  // Limite do plano (etapa 8): membros ativos + convites pendentes contra o
+  // teto de usuários, ANTES de mandar qualquer e-mail. Um lote que estoure o
+  // teto é recusado inteiro — meio convite enviado é pior que nenhum.
+  if (admin) {
+    const noTeto = await recusaPorLimite(activeOrg.orgId, "max_users", {
+      admin,
+      requestId,
+      resource: "team",
+      actorUserId: authUser.id,
+    });
+    if (noTeto) return noTeto;
+  }
   const inviterName = authUser.full_name ?? authUser.email ?? "Um colega";
   // Emails com membership ATIVA na org — para pular o reconvite de quem já é membro.
   // O schema `auth` NÃO é acessível via PostgREST (erro "Invalid schema: auth"), então

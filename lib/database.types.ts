@@ -6204,6 +6204,62 @@ export type Database = {
           },
         ]
       }
+      organization_feature_overrides: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          ends_at: string | null
+          feature: string
+          id: string
+          limits: Json
+          mode: string
+          organization_id: string
+          reason: string
+          revoke_reason: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          starts_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          feature: string
+          id?: string
+          limits?: Json
+          mode: string
+          organization_id: string
+          reason: string
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          starts_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          feature?: string
+          id?: string
+          limits?: Json
+          mode?: string
+          organization_id?: string
+          reason?: string
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          starts_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_feature_overrides_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           ai_budget_cents: number | null
@@ -6219,6 +6275,8 @@ export type Database = {
           media_retention_days: number
           onboarded_at: string | null
           onboarding_state: Json
+          plan_assigned_at: string | null
+          plan_id: string | null
           privacy_policy_url: string | null
           rate_limit_rps: number
           redacted_at: string | null
@@ -6245,6 +6303,8 @@ export type Database = {
           media_retention_days?: number
           onboarded_at?: string | null
           onboarding_state?: Json
+          plan_assigned_at?: string | null
+          plan_id?: string | null
           privacy_policy_url?: string | null
           rate_limit_rps?: number
           redacted_at?: string | null
@@ -6271,6 +6331,8 @@ export type Database = {
           media_retention_days?: number
           onboarded_at?: string | null
           onboarding_state?: Json
+          plan_assigned_at?: string | null
+          plan_id?: string | null
           privacy_policy_url?: string | null
           rate_limit_rps?: number
           redacted_at?: string | null
@@ -6283,7 +6345,15 @@ export type Database = {
           timezone?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "organizations_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "platform_plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       outbound_copies: {
         Row: {
@@ -6436,6 +6506,71 @@ export type Database = {
           logo_url?: string | null
           seeded_from_env?: boolean
           show_powered_by?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      platform_plan_features: {
+        Row: {
+          feature: string
+          plan_id: string
+        }
+        Insert: {
+          feature: string
+          plan_id: string
+        }
+        Update: {
+          feature?: string
+          plan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_plan_features_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "platform_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_plans: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          is_default: boolean
+          limits: Json
+          name: string
+          slug: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          limits?: Json
+          name: string
+          slug: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          limits?: Json
+          name?: string
+          slug?: string
           updated_at?: string
           updated_by?: string | null
         }
@@ -8056,6 +8191,12 @@ export type Database = {
       fn_appointment_enrollment_current: { Args: { p_org: string; p_id: string; p_node?: string | null }; Returns: boolean }
       fn_agenda_settings: { Args: { p_org: string; p_config: Json }; Returns: Json }
       fn_definir_cliente_pela_agenda: { Args: { p_ligado: boolean; p_org: string }; Returns: Json }
+      fn_definir_plano_da_organizacao: { Args: { p_actor: string; p_org: string; p_plan: string; p_reason: string }; Returns: Json }
+      fn_criar_override_de_recurso: { Args: { p_actor: string; p_org: string; p_feature: string; p_mode: string; p_starts_at?: string | null; p_ends_at?: string | null; p_limits?: Json; p_reason: string }; Returns: string }
+      fn_revogar_override_de_recurso: { Args: { p_actor: string; p_org: string; p_override: string; p_reason: string }; Returns: boolean }
+      fn_org_entitlements: { Args: { p_org: string }; Returns: Json }
+      fn_org_has_feature: { Args: { p_org: string; p_feature: string }; Returns: boolean }
+      fn_exigir_platform_admin_full: { Args: { p_actor: string }; Returns: undefined }
       fn_followup_patch: { Args: { p_org: string; p_id: string; p_revision: number; p_patch: Json }; Returns: number }
       fn_followup_apply_step: { Args: { p_org: string; p_id: string; p_revision: number; p_patch: Json; p_event: Json }; Returns: number }
       fn_followup_inline_settle: { Args: { p_org: string; p_id: string; p_worker: string; p_done: boolean; p_error?: string | null; p_retry_at?: string | null; p_hold?: boolean; p_acquired_at?: string }; Returns: boolean }

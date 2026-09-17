@@ -46,7 +46,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const requestId = randomUUID();
   const { id: leadId } = await ctx.params;
 
-  const guard = await requireRole("agent", { requestId });
+  const guard = await requireRole("agent", { feature: "crm", requestId });
   if (!guard.ok) return guard.response;
   const t = (texto: string) => traduzir(texto, guard.user.idioma);
   const orgId = guard.org.orgId;

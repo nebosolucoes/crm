@@ -37,6 +37,14 @@ export interface PassoDoOnboarding {
 export interface ContextoDoPasso {
   /** A integração de loja está ligada nesta instalação? */
   lojaLigada: boolean;
+  /**
+   * A organização tem Agentes de IA no plano (migration 0275)? Sem isso,
+   * "Treinar" e "Ver ele atender" não existem: seriam passos que pedem um
+   * funcionário que a organização não contratou.
+   */
+  iaLigada: boolean;
+  /** A organização tem CRM no plano? Sem isso, "Onde ele organiza" não existe. */
+  crmLigado: boolean;
 }
 
 /** Um passo marcado no estado — com ou sem `skipped`. */
@@ -75,7 +83,7 @@ export const PASSOS: readonly PassoDoOnboarding[] = [
   {
     segmento: "setup-ai",
     rotulo: "Treinar",
-    existe: () => true,
+    existe: (ctx) => ctx.iaLigada,
     cumprido: (s) => marcado(s.ai),
     pulado: (s) => foiPulado(s.ai),
   },
@@ -85,7 +93,7 @@ export const PASSOS: readonly PassoDoOnboarding[] = [
     // pessoa acabou de confirmar funcionando, e é o mesmo cérebro que vai
     // atender. Pedir o quadro antes obrigaria a montá-lo no escuro.
     rotulo: "Onde ele organiza",
-    existe: () => true,
+    existe: (ctx) => ctx.crmLigado,
     cumprido: (s) => marcado(s.funil),
     pulado: (s) => foiPulado(s.funil),
   },
@@ -96,7 +104,8 @@ export const PASSOS: readonly PassoDoOnboarding[] = [
     // sistema" em "contratei alguém" — e é onde o erro aparece antes do
     // primeiro cliente real, não depois.
     rotulo: "Ver ele atender",
-    existe: () => true,
+    // Testar o funcionário exige que ele exista.
+    existe: (ctx) => ctx.iaLigada,
     cumprido: (s) => marcado(s.teste),
     pulado: (s) => foiPulado(s.teste),
   },

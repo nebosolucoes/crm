@@ -1,4 +1,5 @@
 import type { InterfaceSettings } from "@/lib/navigation/interface";
+import type { EntitlementsSerializados } from "@/lib/entitlements/tipos";
 import type { Idioma } from "@/lib/i18n/idiomas";
 
 /**
@@ -158,6 +159,20 @@ export interface ActiveOrg {
    * `first_service_at` está congelada.
    */
   cliente_pela_agenda?: boolean;
+  /**
+   * O que a organização PODE USAR — plano + overrides, já resolvido pelo banco
+   * (`fn_org_entitlements`, migration 0275) e serializado para atravessar a
+   * fronteira servidor→navegador.
+   *
+   * Opcional pelo mesmo motivo de `visibility_mode`: só o layout de `/app`
+   * preenche. NÃO é autorização: quem decide 403 é `requireRole({ feature })`
+   * no servidor, e quem decide o redirect de página é `exigirRecurso()`. Isto
+   * serve para o Sidebar, os hubs e o ⌘K não desenharem um grupo que a API vai
+   * recusar — e `temRecurso(undefined, …)` responde fechado para o vendável e
+   * aberto para `channels`, então um render antes do contexto nunca mostra a
+   * mais nem esconde Canais.
+   */
+  entitlements?: EntitlementsSerializados;
   /**
    * O que ESTA organização definiu para si — CAMPO A CAMPO, e só o que ela
    * mesma definiu.

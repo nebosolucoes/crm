@@ -17,6 +17,7 @@ import { CONVERSATION_TERMINAL_STATUSES } from "@/lib/schemas";
 import { orgTemAutomatico } from "@/lib/ai/agents/org-tem-automatico";
 import { comandosDaFila } from "@/lib/inbox/comando-da-conversa";
 import { createClient } from "@/lib/supabase/server";
+import { recusaPorRecurso } from "@/lib/entitlements/exigir-na-rota";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +83,9 @@ export async function GET(req: NextRequest): Promise<Response> {
       { requestId },
     );
   }
+  // Recurso do plano (0275): depois da sessão e da organização, antes de qualquer dado.
+  const recusa = await recusaPorRecurso(activeOrg.orgId, "inbox", { requestId, resource: "conversations", actorUserId: authUser?.id ?? null });
+  if (recusa) return recusa;
 
   const org = activeOrg.orgId;
   const sp = req.nextUrl.searchParams;

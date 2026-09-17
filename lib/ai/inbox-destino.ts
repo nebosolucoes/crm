@@ -70,6 +70,7 @@ export const POLITICAS_DE_AVISO = {
   // cai em "sem destino" com a orientação abaixo: o telefone está no corpo do
   // aviso, escrito pelo worker.
   voice_call_missed: { refs: ["contact"], orientacao: "Retorne a ligação quando puder — quem ligou não foi atendido." },
+  entitlement_changed: { refs: [], orientacao: "Veja em Configurações › Billing o plano atual, os recursos liberados e até quando valem.", geral: { papel: "admin", href: "/app/settings/billing", rotulo: "Ver plano e recursos" } },
   other: { refs: ["lead", "channel_session", "appointment", "ai_agent"], orientacao: "Confira a situação descrita neste aviso com a pessoa responsável." },
 } satisfies Record<InboxKind, Politica>;
 

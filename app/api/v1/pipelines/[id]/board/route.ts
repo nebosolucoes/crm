@@ -27,6 +27,7 @@ import type { LeadCandidate } from "@/lib/leads/active-lead";
 import { createClient } from "@/lib/supabase/server";
 import type { BoardData, Pipeline, Stage } from "@/lib/kanban/types";
 import type { Lead } from "@/lib/types/leads";
+import { recusaPorRecurso } from "@/lib/entitlements/exigir-na-rota";
 
 export const dynamic = "force-dynamic";
 
@@ -384,6 +385,9 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
   if (stagesErr) return fail("internal_error", stagesErr.message, 500, { requestId });
   if (leadsErr) return fail("internal_error", leadsErr.message, 500, { requestId });
   if (!pipeline) return fail("resource_not_found", t("Pipeline não encontrado."), 404, { requestId });
+  // Recurso do plano (0275): depois da sessão e da organização, antes de qualquer dado.
+  const recusa = await recusaPorRecurso((pipeline as { organization_id: string }).organization_id, "crm", { requestId, resource: "pipelines", actorUserId: user.id });
+  if (recusa) return recusa;
 
   const leadsWithOwner = await withOwnerAgents(
     supabase,

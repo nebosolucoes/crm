@@ -24,6 +24,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   const requestId = randomUUID();
   const authz = await requireRole("manager", {
+    feature: "broadcast",
     requestId,
     resource: "scheduled_group_messages",
   });

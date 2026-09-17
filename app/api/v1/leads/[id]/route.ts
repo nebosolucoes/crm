@@ -27,7 +27,7 @@ export async function PATCH(
 
   const supabase = await createClient();
   // spec 13 §4: escrita é agent+ (viewer é read-only).
-  const authz = await requireRole("agent", { requestId, resource: "crm_leads" });
+  const authz = await requireRole("agent", { feature: "crm", requestId, resource: "crm_leads" });
   if (!authz.ok) return authz.response;
   const user = authz.user;
   const activeOrg = authz.org;

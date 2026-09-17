@@ -29,7 +29,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "pipelines" });
+  const authz = await requireRole("manager", { feature: "crm", requestId, resource: "pipelines" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "crm_pipelines" });
+  const authz = await requireRole("manager", { feature: "crm", requestId, resource: "crm_pipelines" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const orgId = authz.org.orgId;

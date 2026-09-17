@@ -42,6 +42,7 @@ export async function DELETE(): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const authz = await requireRole("admin", {
+    feature: "inbox",
     requestId,
     resource: "channel_sessions",
     allowPlatformAdmin: true,

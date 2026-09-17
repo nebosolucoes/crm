@@ -19,6 +19,8 @@ import type { Actor } from "@/lib/api/handlers/types";
 import type { Role } from "@/lib/auth/types";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { orgTemRecurso } from "@/lib/entitlements/resolver";
+import { recursoDaTool } from "@/lib/mcp/tools/catalogo/recursos";
 
 export interface McpAuthResult {
   organizationId: string;
@@ -151,5 +153,33 @@ export function ensureRole(actual: Role, minimum: Role): void {
 export function ensureScope(scopes: string[], required: string): void {
   if (!scopes.includes(required)) {
     throw new McpAuthError(-32002, 403, `Token missing required scope '${required}'.`);
+  }
+}
+
+/** Código MCP próprio da recusa por PLANO — distinto de papel/scope (-32002). */
+// -32003 já é Not Found na spec 11 §2.3; plano ganha código próprio.
+export const MCP_CODE_FEATURE_NOT_ENTITLED = -32005;
+
+/**
+ * A ORGANIZAÇÃO tem o recurso que esta tool exige? (migration 0275)
+ *
+ * Vem DEPOIS de `ensureScope`/`ensureRole`, pelo mesmo motivo de `requireRole`:
+ * quem não tem papel leva a recusa de papel, sem que a resposta revele o plano.
+ * Tool fora do mapa (`recursoDaTool` → undefined) é recusada FECHADA: a cerca
+ * `lib/mcp/tools/catalogo/recursos.test.ts` impede que isso chegue a produção,
+ * e se chegar, o erro é visível em vez de um gate silenciosamente aberto.
+ */
+export async function ensureRecurso(organizationId: string, toolName: string): Promise<void> {
+  const recurso = recursoDaTool(toolName);
+  if (recurso === null) return;
+  if (recurso === undefined) {
+    throw new McpAuthError(MCP_CODE_FEATURE_NOT_ENTITLED, 403, `Tool '${toolName}' sem recurso declarado.`);
+  }
+  if (!(await orgTemRecurso(organizationId, recurso))) {
+    throw new McpAuthError(
+      MCP_CODE_FEATURE_NOT_ENTITLED,
+      403,
+      `feature_not_entitled: '${recurso}' não está no plano desta organização.`,
+    );
   }
 }

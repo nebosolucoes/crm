@@ -53,7 +53,7 @@ export const dynamic = "force-dynamic";
 export async function GET(): Promise<Response> {
   const requestId = randomUUID();
 
-  const authz = await requireRole("manager", { requestId, resource: "org_voice_calls" });
+  const authz = await requireRole("manager", { feature: "inbox", requestId, resource: "org_voice_calls" });
   if (!authz.ok) return authz.response;
   const { org } = authz;
 
@@ -97,7 +97,7 @@ export async function PUT(req: NextRequest): Promise<Response> {
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
 
-  const authz = await requireRole("admin", { requestId, resource: "org_voice_calls" });
+  const authz = await requireRole("admin", { feature: "inbox", requestId, resource: "org_voice_calls" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org } = authz;

@@ -88,7 +88,7 @@ const patchSchema = z
 
 export async function GET(_req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "ai_budget" });
+  const authz = await requireRole("manager", { feature: "ai_agents", requestId, resource: "ai_budget" });
   if (!authz.ok) return authz.response;
   const { org: activeOrg } = authz;
 
@@ -101,7 +101,7 @@ export async function PATCH(req: NextRequest): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("admin", { requestId, resource: "ai_budget" });
+  const authz = await requireRole("admin", { feature: "ai_agents", requestId, resource: "ai_budget" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org: activeOrg } = authz;

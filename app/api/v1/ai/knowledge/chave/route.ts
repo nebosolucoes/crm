@@ -32,7 +32,7 @@ export const dynamic = "force-dynamic";
 export async function GET(): Promise<Response> {
   const requestId = randomUUID();
 
-  const authz = await requireRole("manager", { requestId, resource: "ai_knowledge" });
+  const authz = await requireRole("manager", { feature: "ai_agents", requestId, resource: "ai_knowledge" });
   if (!authz.ok) return authz.response;
   const { org: activeOrg } = authz;
 

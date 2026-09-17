@@ -583,6 +583,30 @@ export const AUDIT_ACTIONS = [
   // Mover um card para OUTRO funil (issue #922) clona o negócio no destino e
   // encerra o original: é a escrita que mexe em DOIS funis de uma vez.
   "lead.moved_to_pipeline",
+  // ─── PLANOS E ENTITLEMENTS (migration 0267) ───
+  //
+  // O catálogo comercial é escrito só por platform admin, e cada escrita é
+  // uma decisão sobre o que um cliente pode usar — por isso cada uma tem código
+  // próprio, e não um `plan.changed` genérico: "quem liberou IA para esta
+  // organização, e até quando" é pergunta que se faz depois, e ela não se
+  // responde filtrando um código que também cobre "renomeou o plano".
+  //
+  // A NEGATIVA de acesso por recurso NÃO ganha código: é `authz.denied` com
+  // `metadata.reason = "feature_not_entitled"`, como já é para papel e MFA.
+  // A EXPIRAÇÃO de um override também não: não é mutação (o tempo passou), e
+  // a linha da liberação já carrega o `ends_at`.
+  "plan.created",
+  "plan.updated",
+  "plan.activated",
+  "plan.deactivated",
+  // metadata: from_plan, to_plan (slugs), reason
+  "tenant.plan_changed",
+  // metadata: feature, mode, starts_at, ends_at, limits, reason
+  "tenant.feature_override_created",
+  "tenant.feature_override_revoked",
+  // Leituras de `admin/`, auditadas como toda leitura de admin neste repo.
+  "platform_admin.plans_listed",
+  "platform_admin.tenant_entitlements_viewed",
 ] as const;
 
 /** Um código de auditoria. Derivado de `AUDIT_ACTIONS` — não redigite a lista. */

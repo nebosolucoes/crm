@@ -4,6 +4,7 @@ import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { ROLE_RANK } from "@/lib/auth/types";
 
 import { DossieDoFollowup } from "./_components/DossieDoFollowup";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,8 @@ export const dynamic = "force-dynamic";
  * gate real está em cada rota — o `canWrite` daqui só decide o que aparece.
  */
 export default async function DossieDoFollowupPage({ params }: { params: Promise<{ id: string }> }) {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("ai_agents");
   const { id } = await params;
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);

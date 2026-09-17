@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
 import { ContactDetailClient } from "./_client";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,8 @@ export default async function ContactDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("crm");
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");

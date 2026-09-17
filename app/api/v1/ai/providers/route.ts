@@ -48,7 +48,7 @@ interface ModeloDoCatalogo {
 }
 
 export async function GET(): Promise<Response> {
-  const authz = await requireRole("manager", { resource: "ai_providers" });
+  const authz = await requireRole("manager", { feature: "ai_agents", resource: "ai_providers" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org } = authz;
@@ -225,7 +225,7 @@ export async function PUT(req: NextRequest): Promise<Response> {
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
 
-  const authz = await requireRole("admin", { resource: "ai_providers" });
+  const authz = await requireRole("admin", { feature: "ai_agents", resource: "ai_providers" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org } = authz;
@@ -367,7 +367,7 @@ export async function PATCH(req: NextRequest): Promise<Response> {
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
 
-  const authz = await requireRole("admin", { resource: "ai_providers" });
+  const authz = await requireRole("admin", { feature: "ai_agents", resource: "ai_providers" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org } = authz;

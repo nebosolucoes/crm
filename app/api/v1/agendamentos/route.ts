@@ -37,7 +37,7 @@ function apresentarAgendamento(
 
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("viewer", { requestId, resource: "scheduled_group_messages" });
+  const authz = await requireRole("viewer", { feature: "broadcast", requestId, resource: "scheduled_group_messages" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "scheduled_group_messages" });
+  const authz = await requireRole("manager", { feature: "broadcast", requestId, resource: "scheduled_group_messages" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 

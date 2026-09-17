@@ -16,7 +16,9 @@ export class OnboardingError extends Error {
       | "no_active_org"
       | "forbidden"
       | "not_found"
-      | "db_error",
+      | "db_error"
+      // A organização não tem o recurso no plano (migration 0275).
+      | "feature_not_entitled",
     message: string,
   ) {
     super(message);

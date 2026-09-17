@@ -53,7 +53,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   const requestId = randomUUID();
   // Mesma régua do POST unitário de lead: escrita é `agent` para cima.
-  const authz = await requireRole("agent", { requestId, resource: "crm_leads" });
+  const authz = await requireRole("agent", { feature: "crm", requestId, resource: "crm_leads" });
   if (!authz.ok) return authz.response;
   const orgId = authz.org.orgId;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
@@ -284,7 +284,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
 export async function GET(): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "crm_leads" });
+  const authz = await requireRole("agent", { feature: "crm", requestId, resource: "crm_leads" });
   if (!authz.ok) return authz.response;
 
   // ⚠️ VALOR E TAGS ENTRE ASPAS, e não é estilo: "12.500,00" tem uma vírgula

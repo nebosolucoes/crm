@@ -8,7 +8,7 @@ import { audit } from "@/lib/audit";
 
 export async function GET() {
   const requestId = randomUUID();
-  const auth = await requireRole("viewer", { requestId, resource: "agenda" });
+  const auth = await requireRole("viewer", { feature: "inbox", requestId, resource: "agenda" });
   if (!auth.ok) return auth.response;
   const { data, error } = await (
     await createClient()
@@ -25,7 +25,7 @@ export async function PATCH(req: Request) {
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
   const requestId = randomUUID();
-  const auth = await requireRole("manager", { requestId, resource: "agenda" });
+  const auth = await requireRole("manager", { feature: "inbox", requestId, resource: "agenda" });
   if (!auth.ok) return auth.response;
   const parsed = agendaSettingsWriteSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success)

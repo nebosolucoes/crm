@@ -1004,6 +1004,40 @@ respeitá-lo. `label`/`segmento` são display-only (dependem da tela).
 
 ---
 
+## J24 — Planos comerciais: o que o cliente pode usar `[P0]`
+
+**Por que P0:** é a primeira impressão de quem COMPRA, não só de quem instala — o
+revendedor cria o plano, atribui ao cliente, e o cliente abre o app e vê exatamente
+o que contratou. Um plano que "vaza" (menu some mas a API responde) ou que "trava"
+(Canais desligado por engano) é o fim da confiança nos dois lados.
+
+**Contexto do código:** migration 0275 (`platform_plans`, `platform_plan_features`,
+`organizations.plan_id`, `organization_feature_overrides`, `fn_org_entitlements`).
+Vocabulário e receita em `lib/entitlements/recursos.ts`; gates em `requireRole({ feature })`,
+`exigirRecurso()`, MCP (`ensureRecurso`), workers (`resolver-pg.ts`); admin em `/admin/planos`
+e aba Plano de `/admin/tenants/[id]`; cliente em `/app/settings/billing`.
+
+| # | Caso | Expectativa | Cobertura |
+|---|---|---|---|
+| J24.1 | Instalação fresca, sem tocar em plano | tudo como antes: toda org no `legado`, menu completo | **INVARIANTE** — `entitlements-planos.test.ts` "organização nova nasce no padrão"; **E2E** — caso (2) parte de "Legado" |
+| J24.2 | Dono cria plano só com Atendimento; Canais vem travado | linha aparece no catálogo sem CRM; `channels` não é escolha | **E2E** — `planos-e-entitlements.spec.ts` (1); **ROTA** — `plans/route.test.ts` recusa `channels` como recurso |
+| J24.3 | Dono atribui o plano ao cliente, com motivo | tabela plano \| override \| efetivo; audit `tenant.plan_changed`; Central do cliente avisada | **E2E** (2); **ROTA** — `tenants/[id]/plan/route.test.ts` |
+| J24.4 | Cliente abre o app num plano Starter | menu sem Funis/Agentes/Desempenho; `/app/kanban` digitado → tela "não está incluído no seu plano" | **E2E** (3); **CERCA** — `paginas-exigem-recurso.test.ts` |
+| J24.5 | Cliente chama a API de negócios pelo navegador | 403 `feature_not_entitled` com `details.feature`; a de conversas segue 200 | **E2E** (3) via `page.request`; **UNIT** — `require-role.test.ts` "feature" |
+| J24.6 | Dono libera IA por 30 dias | cliente vê o grupo IA e "Liberado até dd/mm" no Billing | **E2E** (4); **INVARIANTE** — "override enable ativo"; **ROTA** — `overrides/route.test.ts` |
+| J24.7 | Dono encerra a liberação | cliente perde IA; `/app/ai/agents` cai na tela de recurso indisponível | **E2E** (5); **INVARIANTE** — "revogado NÃO conta" |
+| J24.8 | Prazo da liberação passa | plano volta a valer sozinho, sem cron | **INVARIANTE** — "override vencido, futuro ou revogado NÃO conta" |
+| J24.9 | Alguém tenta desligar Canais (override disable) | 23514 no banco, 422 na rota, opção desabilitada na tela | **INVARIANTE** — "camada 3"; **ROTA** — `overrides/route.test.ts` |
+| J24.10 | Disparo agendado numa org que perdeu Disparo | run `skipped` `feature_not_entitled` no Histórico, relógio avança, Central avisada | **UNIT** — `worker.plano.test.ts` |
+| J24.11 | Mensagem chega numa org sem IA | drain não enfileira; job já claimado termina `done` com motivo | **UNIT** — `drain.test.ts` (mocks de plano); código em `agent-worker/main.ts` |
+| J24.12 | Regra de automação com `send_ai_message` numa org sem IA | a ação vira `skipped` na aba Atividade; as irmãs rodam | **UNIT** — `gate-do-plano.test.ts` |
+| J24.13 | Plano com teto de agentes atingido | `POST /ai/agents` → 409 `limit_reached` antes de gravar | **UNIT** — `limites-barram-a-criacao.test.ts` |
+| J24.14 | Banco sem a migration 0275 (clone com `update.sh` que engoliu o apêndice) | tudo ligado como antes, `origem: sem_schema`, aviso no Billing, erro no log/Sentry | **UNIT** — `resolver.test.ts` "PGRST202/42883" |
+
+**NÃO MEDIDO nesta rodada:** `channel-sessions`/`channels/official`/`channels/partner` no teto
+(mesmo helper das rotas provadas; o fake teria de carregar WAHA e cifra); Disparo pulado
+provado pela tela (exige o scheduler).
+
 ## J7 — Exploração completa `[P2]`
 
 Andar por TODAS as rotas navegáveis logado como admin e como agent: settings, contacts,

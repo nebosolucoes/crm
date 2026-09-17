@@ -8,6 +8,7 @@ import { COLUNAS_DO_PRODUTO, type Produto } from "@/lib/schemas/produtos";
 import { createClient } from "@/lib/supabase/server";
 
 import { ProdutosClient } from "./_client";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Produtos" };
@@ -30,6 +31,8 @@ export const metadata: Metadata = { title: "Produtos" };
  * novo — a tela esconder o botão é cortesia, não autorização.
  */
 export default async function ProdutosPage() {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("crm");
   const user = await requireAuth();
   const t = (texto: string) => traduzir(texto, user.idioma);
   const activeOrg = await resolveActiveOrg(user);

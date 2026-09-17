@@ -18,6 +18,19 @@ import { audit } from "@/lib/audit";
 import { createClient } from "@/lib/supabase/server";
 import type { AuthUser, Role } from "@/lib/auth/types";
 
+// O plano da organização (migration 0275): este teste simula a sessão com uma
+// organização fictícia, então simula também o plano — tudo liberado, como o
+// legado. Sem isto o resolvedor real iria ao banco com um id que não existe.
+vi.mock("@/lib/entitlements/resolver", () => ({
+  orgTemRecurso: async () => true,
+  entitlementsDaOrg: async () => ({
+    plan: { id: "legado", slug: "legado", name: "Legado", is_active: true },
+    origem: "atribuido",
+    features: new Set(["channels", "inbox", "broadcast", "crm", "ai_agents", "analytics"]),
+    limits: {},
+    overrides: [],
+  }),
+}));
 vi.mock("@/lib/auth/server", () => ({
   loadAuthUser: vi.fn(),
   resolveActiveOrg: vi.fn(),

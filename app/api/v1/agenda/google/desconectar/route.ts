@@ -66,7 +66,7 @@ export async function DELETE(req: NextRequest): Promise<Response> {
 
   const requestId = req.headers.get("x-request-id") ?? undefined;
 
-  const autorizado = await requireRole("agent", { requestId, resource: "calendar_connections" });
+  const autorizado = await requireRole("agent", { feature: "inbox", requestId, resource: "calendar_connections" });
   if (!autorizado.ok) return autorizado.response;
   const t = (texto: string) => traduzir(texto, autorizado.user.idioma);
   const { user, org } = autorizado;
@@ -79,7 +79,7 @@ export async function DELETE(req: NextRequest): Promise<Response> {
   }
   if (lido.data.user_id && lido.data.user_id !== user.id) {
     // Desconectar a agenda de OUTRA pessoa é ato de gestão, não de uso.
-    const gestor = await requireRole("manager", { requestId, resource: "calendar_connections" });
+    const gestor = await requireRole("manager", { feature: "inbox", requestId, resource: "calendar_connections" });
     if (!gestor.ok) return gestor.response;
     alvo = lido.data.user_id;
   }

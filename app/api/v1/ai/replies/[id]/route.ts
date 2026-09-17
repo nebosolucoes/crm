@@ -16,7 +16,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const denied = await requireSupportWrite();
   if (denied) return denied;
   const requestId = randomUUID(),
-    auth = await requireRole("agent", { requestId, resource: "conversations" });
+    auth = await requireRole("agent", { feature: "ai_agents", requestId, resource: "conversations" });
   if (!auth.ok) return auth.response;
   const { id } = await ctx.params,
     parsed = input.safeParse(await req.json().catch(() => null));

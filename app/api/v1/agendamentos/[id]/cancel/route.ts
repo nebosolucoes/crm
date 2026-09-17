@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, ctx: Contexto): Promise<Response> {
 
   const requestId = randomUUID();
   const { id } = await ctx.params;
-  const authz = await requireRole("manager", { requestId, resource: "scheduled_group_messages" });
+  const authz = await requireRole("manager", { feature: "broadcast", requestId, resource: "scheduled_group_messages" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 

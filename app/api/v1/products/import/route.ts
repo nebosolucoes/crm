@@ -57,7 +57,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   const requestId = randomUUID();
   // Preço de venda é escrita de gestão: o mesmo papel do POST unitário.
-  const authz = await requireRole("manager", { requestId, resource: "catalog_products" });
+  const authz = await requireRole("manager", { feature: "crm", requestId, resource: "catalog_products" });
   if (!authz.ok) return authz.response;
   const orgId = authz.org.orgId;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
@@ -244,7 +244,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 /** GET devolve o modelo de planilha, para a pessoa não ter de adivinhar as colunas. */
 export async function GET(): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "catalog_products" });
+  const authz = await requireRole("manager", { feature: "crm", requestId, resource: "catalog_products" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 

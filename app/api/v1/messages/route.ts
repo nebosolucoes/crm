@@ -27,6 +27,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   // CRM que está sendo absorvido, e qualquer integração server-to-server. A org
   // nunca vem do corpo; no ramo do token ela sai da linha do token.
   const authz = await resolveAuthDual(req, {
+    feature: "inbox",
     requestId,
     resource: "messages",
     role: "agent",

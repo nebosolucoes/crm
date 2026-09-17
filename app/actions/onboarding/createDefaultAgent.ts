@@ -18,6 +18,7 @@ import {
   loadOnboardingState,
   OnboardingError,
 } from "./_shared";
+import { orgTemRecurso } from "@/lib/entitlements/resolver";
 
 /**
  * O jeito de falar do funcionário.
@@ -101,6 +102,11 @@ export async function createDefaultAgent(formData: FormData): Promise<CreateAgen
   let ctx;
   try {
     ctx = await requireOnboardingCtx();
+    // O passo "Treinar" não existe para quem não tem IA no plano; a action
+    // recusa mesmo assim, porque a URL do passo continua digitável.
+    if (!(await orgTemRecurso(ctx.orgId, "ai_agents"))) {
+      throw new OnboardingError("feature_not_entitled", "Agentes de IA não estão no plano desta organização.");
+    }
   } catch (err) {
     if (err instanceof OnboardingError) return { ok: false, error: err.code as never };
     throw err;

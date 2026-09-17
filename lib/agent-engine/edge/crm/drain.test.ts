@@ -20,6 +20,8 @@ it('org em ai_dispatch_mode=external: evento vira done SEM enfileirar job', asyn
   const query = vi.fn().mockImplementation((sql: string) => {
     calls.push(sql);
     if (sql.includes('returning e.id')) return { rows: [event] };            // claim
+    // O plano da organização (migration 0275): estes casos são de organização COM IA.
+    if (sql.includes('fn_org_has_feature')) return { rows: [{ tem: true }] };
     if (sql.includes("ai_dispatch_mode")) return { rows: [{ mode: 'external' }] }; // guard
     if (sql.includes('is_group')) return { rows: [{ is_group: false }] };
     return { rows: [] };                                                      // reaper / done
@@ -53,6 +55,8 @@ function poolFalso(
   const query = vi.fn().mockImplementation((sql: string) => {
     calls.push(sql);
     if (sql.includes('returning e.id')) return { rows: [eventoDeAudio(Number(process.env.__ESPERA__ ?? 0))] };
+    // O plano da organização (migration 0275): estes casos são de organização COM IA.
+    if (sql.includes('fn_org_has_feature')) return { rows: [{ tem: true }] };
     if (sql.includes('ai_dispatch_mode')) return { rows: [{ mode: null }] };
     if (sql.includes('is_group')) return { rows: [{ is_group: false }] };
     if (sql.includes('tem_agente')) return { rows: [capacidade] };
@@ -139,6 +143,8 @@ it('coalescência exclui job em hold (held_run_after) — sessão morta não seq
   const query = vi.fn().mockImplementation((sql: string) => {
     calls.push(sql);
     if (sql.includes('returning e.id')) return { rows: [eventoDeAudio(0)] };
+    // O plano da organização (migration 0275): estes casos são de organização COM IA.
+    if (sql.includes('fn_org_has_feature')) return { rows: [{ tem: true }] };
     if (sql.includes('ai_dispatch_mode')) return { rows: [{ mode: null }] };
     if (sql.includes('is_group')) return { rows: [{ is_group: false }] };
     if (sql.includes('tem_agente')) return { rows: [{ tem_agente: true, tem_roteador: false }] };
@@ -224,6 +230,8 @@ function poolElegibilidade(
   const query = vi.fn().mockImplementation((sql: string) => {
     calls.push(sql);
     if (sql.includes('returning e.id')) return { rows: [{ ...event, created_at: new Date().toISOString() }] };
+    // O plano da organização (migration 0275): estes casos são de organização COM IA.
+    if (sql.includes('fn_org_has_feature')) return { rows: [{ tem: true }] };
     if (sql.includes('ai_dispatch_mode')) return { rows: [{ mode: null }] };
     if (sql.includes('is_group')) return { rows: [{ is_group: false }] };
     if (sql.includes('tem_agente')) return { rows: [{ tem_agente: true, tem_roteador: false }] };

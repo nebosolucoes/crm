@@ -22,6 +22,7 @@ import type { ActionResultDetail } from "@/lib/automation/types";
 import { audit } from "@/lib/audit";
 import { ENTIDADE_ESPERADA_POR_GATILHO } from "@/lib/schemas/webhooks";
 import { logger } from "@/lib/logger";
+import { resultadoSeForaDoPlano } from "./gate-do-plano";
 
 export const AUTOMATION_CONSUMER_KEY = "automation-rules";
 
@@ -216,6 +217,14 @@ export async function runAutomationForEvent(
       const executor = getAction(action.type);
       if (!executor) {
         results.push({ type: action.type, status: "failed", error: "unknown_action" });
+        continue;
+      }
+      // O PLANO (migration 0275), por AÇÃO: a que a organização não tem no
+      // plano vira `skipped` com o motivo — e as irmãs seguem. Falha da
+      // consulta não barra: a regra roda como sempre rodou.
+      const foraDoPlano = await resultadoSeForaDoPlano(admin, row.organization_id, action.type, rule.name);
+      if (foraDoPlano) {
+        results.push(foraDoPlano);
         continue;
       }
       try {

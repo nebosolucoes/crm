@@ -61,7 +61,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
   const supabase = await createClient();
   // spec 13 §4: escrita é agent+ (viewer é read-only), igual ao POST unitário.
-  const authz = await requireRole("agent", { requestId, resource: "contacts" });
+  const authz = await requireRole("agent", { feature: "crm", requestId, resource: "contacts" });
   if (!authz.ok) return authz.response;
   const user = authz.user;
   const orgId = authz.org.orgId;

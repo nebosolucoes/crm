@@ -59,7 +59,7 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
   const requestId = randomUUID();
   const { id } = await ctx.params;
 
-  const authz = await requireRole("agent", { requestId, resource: "conversations" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "conversations" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org } = authz;

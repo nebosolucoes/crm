@@ -30,7 +30,7 @@ export interface ReactivationLive {
 
 export async function GET(_req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
-  const guard = await requireRole("viewer", { requestId });
+  const guard = await requireRole("viewer", { feature: "crm", requestId });
   if (!guard.ok) return guard.response;
 
   const supabase = await createClient();

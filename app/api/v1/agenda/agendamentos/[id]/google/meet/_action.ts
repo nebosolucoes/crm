@@ -16,7 +16,7 @@ export async function meetingAction(
   const denied = await requireSupportWrite();
   if (denied) return denied;
   const requestId = randomUUID();
-  const auth = await requireRole("agent", { requestId, resource: "agenda" });
+  const auth = await requireRole("agent", { feature: "inbox", requestId, resource: "agenda" });
   if (!auth.ok) return auth.response;
   const { id } = await context.params;
   const parsed = z

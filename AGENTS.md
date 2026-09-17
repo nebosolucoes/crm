@@ -199,6 +199,9 @@ O gate de arquitetura de qualquer peça que atende pessoas é a skill `sistema-v
 1. Zod valida **todo** input externo (body, query, path).
 2. Guard canônico: `requireRole()` de `lib/auth/require-role.ts`,
    `requirePlatformAdmin`, ou secret/HMAC. Nunca reimplemente a comparação de rank na mão.
+   Rota de módulo vendável (Atendimento, Disparo, CRM, IA, Análises) passa `feature:` — o recurso
+   do plano da organização (`lib/entitlements/rotas.ts` diz qual; a cerca
+   `tests/unit/rotas-declaram-recurso.test.ts` cobra). Página vendável chama `exigirRecurso()`.
 3. `organization_id` resolvido de **fonte confiável** (cookie/JWT/webhook secret/path token) —
    **nunca do body**.
 4. Query: RLS pelo client de sessão, ou filtro manual de `organization_id` quando usa service role.
@@ -206,7 +209,7 @@ O gate de arquitetura de qualquer peça que atende pessoas é a skill `sistema-v
 6. Responda com `ok()` / `fail()` de `lib/api/wrappers.ts` — nunca monte `Response` na mão.
 
 ```ts
-const authz = await requireRole("manager", { requestId });
+const authz = await requireRole("manager", { requestId, feature: "crm" });
 if (!authz.ok) return authz.response;
 ```
 

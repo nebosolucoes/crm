@@ -9,6 +9,7 @@ import type { CredentialRow } from "@/hooks/ai/useCredentials";
 import { lerAmbiente } from "@/lib/instalacao/ambiente";
 
 import { AgentForm } from "../[id]/_components/AgentForm";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,8 @@ function provedoresDaInstalacao(): string[] {
 }
 
 export default async function NewAgentPage() {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("ai_agents");
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");

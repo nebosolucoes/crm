@@ -18,6 +18,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Tipado com a URL: o teste lê o 1º argumento, e `(...a: unknown[])` o esconde.
 const getSpy = vi.fn(async (_url: string) => ({ data: [], meta: { has_more: false, cursor: null } }));
+// O plano da organização (migration 0275): este teste simula a sessão com uma
+// organização fictícia, então simula também o plano — tudo liberado, como o
+// legado. Sem isto o resolvedor real iria ao banco com um id que não existe.
+vi.mock("@/lib/entitlements/resolver", () => ({
+  orgTemRecurso: async () => true,
+  entitlementsDaOrg: async () => ({
+    plan: { id: "legado", slug: "legado", name: "Legado", is_active: true },
+    origem: "atribuido",
+    features: new Set(["channels", "inbox", "broadcast", "crm", "ai_agents", "analytics"]),
+    limits: {},
+    overrides: [],
+  }),
+}));
 vi.mock("@/lib/api/client", () => ({ apiClient: { get: (url: string) => getSpy(url) } }));
 vi.mock("@/components/feedback/ApiErrorToast", () => ({ showApiError: vi.fn() }));
 vi.mock("@/lib/supabase/browser", () => ({

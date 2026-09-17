@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Agendamento as AgendamentoDaTela } from "@/components/agenda/tipos";
 
 import { AgendaClient } from "./_client";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,8 @@ function contatoDoEmbed(
 }
 
 export default async function AgendaPage() {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("inbox");
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");

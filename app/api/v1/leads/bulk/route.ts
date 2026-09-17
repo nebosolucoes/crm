@@ -47,7 +47,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   const supabase = await createClient();
 
   // spec 13 §4: escrita é agent+ (viewer é read-only).
-  const authz = await requireRole("agent", { requestId, resource: "crm_leads" });
+  const authz = await requireRole("agent", { feature: "crm", requestId, resource: "crm_leads" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const user = authz.user;
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   // INB-03). Gate por-action: move/tag/delete continuam agent+ (piso acima);
   // só o assign exige manager. Reusa o helper (nada de ROLE_RANK na mão).
   if (input.action === "assign") {
-    const mgr = await requireRole("manager", { requestId, resource: "crm_leads" });
+    const mgr = await requireRole("manager", { feature: "crm", requestId, resource: "crm_leads" });
     if (!mgr.ok) return mgr.response;
 
     // Novo dono tem que ser membro ativo agent+ da MESMA org (org de fonte

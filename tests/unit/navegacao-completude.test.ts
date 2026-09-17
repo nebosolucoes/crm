@@ -46,6 +46,8 @@ const NAV_ALLOWLIST: Record<string, string> = {
     "rota legada bloqueada para tenant: marca visual é configuração global exclusiva de /admin/marca, e o app herda a marca da instalação",
   "/app/agendamentos":
     "redirect legado para /app/disparo/lista — Disparo agora é o grupo do menu, com Lista, Agendar, Grupos e Histórico como portas reais",
+  "/app/recurso-indisponivel":
+    "destino de REDIRECT, não de navegação: é onde exigirRecurso() (lib/entitlements) deixa quem abre uma tela que o plano da organização não inclui — como /account-suspended, só que dentro do shell. Ninguém navega até uma tela que diz 'você não tem isto'; a porta para o que ela explica é /app/settings/billing",
 };
 
 /** Deriva as rotas estáticas a partir dos arquivos de página que existem. */

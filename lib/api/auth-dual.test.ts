@@ -27,6 +27,12 @@ import { resolveAuthDual } from "./auth-dual";
 vi.mock("@/lib/auth/require-role", () => ({ requireRole: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({ session: true })) }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn(() => ({ admin: true })) }));
+vi.mock("@/lib/audit", () => ({ audit: vi.fn(async () => undefined) }));
+// O plano da organização (migration 0275), controlado por teste.
+const orgTemRecurso = vi.fn(async (_org: string, _recurso: string) => true);
+vi.mock("@/lib/entitlements/resolver", () => ({
+  orgTemRecurso: (o: string, r: string) => orgTemRecurso(o, r),
+}));
 
 vi.mock("@/lib/mcp/auth", async () => {
   const actual = await vi.importActual<typeof import("@/lib/mcp/auth")>("@/lib/mcp/auth");
@@ -129,6 +135,45 @@ describe("resolveAuthDual", () => {
     expect(r.organizationId).toBe(ORG_DA_SESSAO);
     expect(r.via).toBe("session");
     expect(validateBearerToken).not.toHaveBeenCalled();
+  });
+});
+
+describe("resolveAuthDual × recurso do plano (migration 0275)", () => {
+  it("no ramo do token, a feature é conferida na org DO TOKEN e a recusa audita o token", async () => {
+    vi.mocked(validateBearerToken).mockResolvedValue({
+      organizationId: ORG_DO_TOKEN,
+      scopes: ["mcp:read", "mcp:write"],
+      role: "agent",
+      actor: { type: "api_token", id: "tok-1" },
+    } as never);
+    orgTemRecurso.mockResolvedValue(false);
+
+    const r = await resolveAuthDual(req({ authorization: "Bearer dsk_ok" }), { ...OPCOES, feature: "inbox" });
+
+    expect(r.ok).toBe(false);
+    if (r.ok) throw new Error("unreachable");
+    expect(r.response.status).toBe(403);
+    expect((await r.response.json()).error.code).toBe("feature_not_entitled");
+    expect(orgTemRecurso).toHaveBeenCalledWith(ORG_DO_TOKEN, "inbox");
+    expect(requireRole).not.toHaveBeenCalled();
+  });
+
+  it("no ramo do token com o recurso no plano, passa", async () => {
+    vi.mocked(validateBearerToken).mockResolvedValue({
+      organizationId: ORG_DO_TOKEN,
+      scopes: ["mcp:read", "mcp:write"],
+      role: "agent",
+      actor: { type: "api_token", id: "tok-1" },
+    } as never);
+    orgTemRecurso.mockResolvedValue(true);
+    const r = await resolveAuthDual(req({ authorization: "Bearer dsk_ok" }), { ...OPCOES, feature: "inbox" });
+    expect(r.ok).toBe(true);
+  });
+
+  it("no ramo da sessão, a feature é repassada ao requireRole", async () => {
+    sessaoOk();
+    await resolveAuthDual(req(), { ...OPCOES, feature: "inbox" });
+    expect(requireRole).toHaveBeenCalledWith("agent", expect.objectContaining({ feature: "inbox" }));
   });
 });
 

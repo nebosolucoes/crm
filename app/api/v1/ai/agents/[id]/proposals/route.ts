@@ -28,7 +28,7 @@ export async function GET(req: NextRequest, ctx: Ctx): Promise<Response> {
     return fail("invalid_request", "id inválido.", 400, { requestId });
   }
 
-  const authz = await requireRole("agent", { requestId, resource: "flywheel_proposals" });
+  const authz = await requireRole("agent", { feature: "ai_agents", requestId, resource: "flywheel_proposals" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org } = authz;

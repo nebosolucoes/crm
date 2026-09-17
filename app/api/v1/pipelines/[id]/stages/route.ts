@@ -43,7 +43,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "crm_stages" });
+  const authz = await requireRole("manager", { feature: "crm", requestId, resource: "crm_stages" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 

@@ -219,6 +219,16 @@ const PROVA_PROPRIA: readonly Excecao[] = [
       "da organização viraram venda, e quem o lê é o servidor com o admin client " +
       "filtrando organization_id à mão (a tela `/app/settings/conversoes`).",
   },
+  {
+    tabela: "organization_feature_overrides",
+    razao:
+      "tests/invariants/entitlements-planos.test.ts (\"overrides: membro lê os " +
+      "da própria organização e nenhum de outra; platform admin lê todos\") — " +
+      "JWT de admin A e de viewer B, cada um enxerga só a própria; e " +
+      "(\"authenticated não tem EXECUTE… nem INSERT/UPDATE/DELETE\") — nenhuma " +
+      "escrita direta. Fora de TABLES porque a tabela nasce vazia e só a RPC " +
+      "service-only (`fn_criar_override_de_recurso`) a preenche.",
+  },
 ];
 
 /**

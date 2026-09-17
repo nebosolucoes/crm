@@ -46,6 +46,7 @@ export async function GET(): Promise<Response> {
   const requestId = randomUUID();
 
   const authz = await requireRole("admin", {
+    feature: "inbox",
     requestId,
     resource: "channel_sessions",
     allowPlatformAdmin: true,

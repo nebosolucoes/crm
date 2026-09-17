@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ok, fail } from "@/lib/api/wrappers";
 export async function GET(req: Request) {
   const requestId = randomUUID();
-  const auth = await requireRole("agent", { requestId, resource: "agenda" });
+  const auth = await requireRole("agent", { feature: "inbox", requestId, resource: "agenda" });
   if (!auth.ok) return auth.response;
   const input = z
     .object({ contact_id: z.uuid().optional(), q: z.string().max(100).optional() })

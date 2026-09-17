@@ -74,6 +74,9 @@ export const KIND_LABEL = {
   // conseguiu. O motivo cru do upstream (`user_ended`, `do_not_disturb`) nunca
   // chega à tela — vira frase de gente no corpo do aviso, escrito pelo worker.
   voice_call_missed: "Alguém ligou e ninguém atendeu",
+  // O que a organização pode usar mudou — plano trocado, recurso liberado com
+  // prazo, ou algo deixou de rodar por não estar no plano. O corpo diz qual.
+  entitlement_changed: "Seu plano ou seus recursos mudaram",
   other: "Aviso do assistente",
 } as const satisfies Record<InboxKind, string>;
 

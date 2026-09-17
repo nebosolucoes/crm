@@ -69,7 +69,7 @@ function periodoPadrao(): { from: string; to: string } {
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
 
-  const authz = await requireRole("manager", { requestId, resource: "ads_insights" });
+  const authz = await requireRole("manager", { feature: "analytics", requestId, resource: "ads_insights" });
   if (!authz.ok) return authz.response;
   const { org } = authz;
 

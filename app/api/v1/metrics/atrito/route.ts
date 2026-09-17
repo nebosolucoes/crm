@@ -89,7 +89,7 @@ const VAZIO: Omit<AtritoRaw, "escopo"> = {
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
 
-  const authz = await requireRole("agent", { requestId, resource: "metrics" });
+  const authz = await requireRole("agent", { feature: "analytics", requestId, resource: "metrics" });
   if (!authz.ok) return authz.response;
   const { org: activeOrg, user } = authz;
   const idioma = normalizarIdioma(user.locale);
@@ -193,7 +193,7 @@ export async function PATCH(req: NextRequest): Promise<Response> {
 
   const requestId = randomUUID();
 
-  const authz = await requireRole("manager", { requestId, resource: "metrics" });
+  const authz = await requireRole("manager", { feature: "analytics", requestId, resource: "metrics" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org: activeOrg, user } = authz;

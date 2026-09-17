@@ -29,7 +29,7 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
   const { id } = await ctx.params;
   const supabase = await createClient();
 
-  const authz = await requireRole("agent", { requestId, resource: "conversations" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "conversations" });
   if (!authz.ok) return authz.response;
 
   try {

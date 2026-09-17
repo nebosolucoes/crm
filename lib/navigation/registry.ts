@@ -48,7 +48,9 @@ import {
   type NavGroup,
   type NavGroupId,
 } from "./catalogo";
-import { destinosDaInterface, type InterfaceSettings } from "./interface";
+import { GRUPO_PARA_RECURSO } from "@/lib/entitlements/recursos";
+import { temRecurso } from "@/lib/entitlements/tipos";
+import { destinosDaInterface, type Entitlements, type InterfaceSettings } from "./interface";
 export { NAV_GROUPS, GRUPO_NO_RODAPE } from "./catalogo";
 export type { NavGroup, NavGroupId } from "./catalogo";
 const ICONS = {
@@ -111,11 +113,12 @@ export function sidebarGroups(
   isPlatformAdmin: boolean,
   role: Role | null,
   settings?: InterfaceSettings,
+  entitlements?: Entitlements,
 ): Array<{ group: NavGroup; items: NavDestination[] }> {
   const visible = new Set<string>(
-    destinosDaInterface(settings, isPlatformAdmin, role).map((d) => d.href),
+    destinosDaInterface(settings, isPlatformAdmin, role, entitlements).map((d) => d.href),
   );
-  return NAV_GROUPS.map((group) => ({
+  return NAV_GROUPS.filter((group) => grupoTemRecurso(group.id, entitlements)).map((group) => ({
     group,
     items: NAV_DESTINATIONS.filter(
       (d) => d.group === group.id && (d.sidebar || (!group.hub && !!settings?.destinos)) && visible.has(d.href),
@@ -139,10 +142,11 @@ export function hubSections(
   isPlatformAdmin: boolean,
   role: Role | null,
   settings?: InterfaceSettings,
+  entitlements?: Entitlements,
 ): Array<{ section: string; items: NavDestination[] }> {
   const porSecao = new Map<string, NavDestination[]>();
   const visible = new Set<string>(
-    destinosDaInterface(settings, isPlatformAdmin, role).map((d) => d.href),
+    destinosDaInterface(settings, isPlatformAdmin, role, entitlements).map((d) => d.href),
   );
   for (const d of NAV_DESTINATIONS) {
     if (d.group !== group || !visible.has(d.href)) continue;
@@ -159,9 +163,27 @@ export function searchable(
   isPlatformAdmin: boolean,
   role: Role | null,
   settings?: InterfaceSettings,
+  entitlements?: Entitlements,
 ): NavDestination[] {
   const visible = new Set<string>(
-    destinosDaInterface(settings, isPlatformAdmin, role).map((d) => d.href),
+    destinosDaInterface(settings, isPlatformAdmin, role, entitlements).map((d) => d.href),
   );
   return NAV_DESTINATIONS.filter((d) => visible.has(d.href));
+}
+
+/**
+ * O GRUPO some inteiro quando a organização não tem o recurso dele — mesmo que
+ * um destino de exceção lá dentro continue permitido (`/app/ai/inbox`, a
+ * Central, fica fora do plano de propósito: é por ela que o sistema fala com a
+ * organização, inclusive para dizer que um recurso mudou). Sem isto, uma
+ * organização sem IA veria "Agente de IA › Ver tudo em IA" no menu só por
+ * causa da Central — e o hub abriria com um item. A Central continua a um
+ * clique pelo sino (`AlertsBell`) e pelo ⌘K, que filtram por destino.
+ *
+ * `undefined` não filtra, pela mesma regra de `orgPodeVer`.
+ */
+function grupoTemRecurso(group: NavGroupId, entitlements: Entitlements): boolean {
+  if (entitlements === undefined) return true;
+  const recurso = GRUPO_PARA_RECURSO[group];
+  return recurso === null || temRecurso(entitlements, recurso);
 }

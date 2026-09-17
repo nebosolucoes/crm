@@ -8,10 +8,11 @@
 
 import type { EventHandler, HandlerResult } from "@/lib/event-log/dispatcher";
 import { processSentiment } from "@/workers/ai-sentiment-worker";
+import { handlerComPlano } from "@/lib/entitlements/handler-com-plano";
 
 export const AI_SENTIMENT_HANDLER_KEY = "ai-sentiment-worker.v1";
 
-export const aiSentimentHandler: EventHandler = {
+const aiSentimentHandlerSemPlano: EventHandler = {
   key: AI_SENTIMENT_HANDLER_KEY,
   events: ["message.received"],
   async handle(row): Promise<HandlerResult> {
@@ -30,3 +31,6 @@ export const aiSentimentHandler: EventHandler = {
     };
   },
 };
+
+/** Com o gate de plano (migration 0275): sem `ai_agents`, o evento vira `skipped`. */
+export const aiSentimentHandler: EventHandler = handlerComPlano(aiSentimentHandlerSemPlano, "ai_agents");

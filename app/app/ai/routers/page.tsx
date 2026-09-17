@@ -7,10 +7,13 @@ import { createClient } from "@/lib/supabase/server";
 import type { RouterListItem } from "@/hooks/ai/useRouters";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { RoutersClient } from "./_client";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 
 export default async function RoutersPage() {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("ai_agents");
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");

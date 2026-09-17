@@ -29,7 +29,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams): Promise<
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "message_templates" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "message_templates" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org } = authz;
@@ -71,7 +71,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams): Promis
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "message_templates" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "message_templates" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org } = authz;

@@ -8,12 +8,15 @@ import type { FollowupFlowPointerRow } from "@/hooks/followup/useFollowupFlows";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FlowsList } from "./_components/FlowsList";
 import { QueueTab } from "./_components/QueueTab";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 
 const FLOW_COLUMNS = "id, name, status, active_version_id, handoff_policy, updated_at";
 
 export default async function FollowupFlowsPage() {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("ai_agents");
   const user = await requireAuth();
   // `t` local em vez do hook: esta página é componente de SERVIDOR, e lá o
   // idioma vem resolvido em `user.idioma` (a cadeia pessoa → organização →

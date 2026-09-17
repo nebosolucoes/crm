@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { AgentRow } from "@/hooks/ai/useAgent";
 import { AgentsList } from "./_components/AgentsList";
 import { logger } from "@/lib/logger";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,8 @@ const AGENT_COLUMNS =
   "versao_publicada:ai_agent_versions!ai_agents_published_version_id_fkey(provider, model)";
 
 export default async function AgentsListPage() {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("ai_agents");
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");

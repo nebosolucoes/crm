@@ -46,6 +46,7 @@ import {
   encodeCursor,
 } from "@/lib/leads/timeline-query";
 import type { TimelineItem } from "@/lib/types/contacts";
+import { recusaPorRecurso } from "@/lib/entitlements/exigir-na-rota";
 
 export const dynamic = "force-dynamic";
 
@@ -81,11 +82,14 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   // O lead vem pela RLS do caller — é ele que prova a org, nunca o body.
   const { data: lead, error: leadErr } = await supabase
     .from("crm_leads")
-    .select("id, contact_id")
+    .select("id, contact_id, organization_id")
     .eq("id", leadId)
     .maybeSingle();
   if (leadErr) return fail("internal_error", leadErr.message, 500, { requestId });
   if (!lead) return fail("not_found", t("Negócio não encontrado."), 404, { requestId });
+  // Recurso do plano (0275): depois da sessão e da organização, antes de qualquer dado.
+  const recusa = await recusaPorRecurso((lead as { organization_id: string }).organization_id, "crm", { requestId, resource: "crm_leads", actorUserId: user.id });
+  if (recusa) return recusa;
 
   const contactId = (lead as { contact_id: string | null }).contact_id;
 

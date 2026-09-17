@@ -39,7 +39,7 @@ export async function POST(
   const requestId = randomUUID();
   const { id } = await params;
 
-  const authz = await requireRole("agent", { requestId, resource: "voice_calls" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "voice_calls" });
   if (!authz.ok) return authz.response;
   const { user, org: activeOrg } = authz;
 

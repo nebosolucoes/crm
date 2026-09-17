@@ -33,7 +33,7 @@ const KNOB_COLUMNS =
 
 export async function GET(): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "channel_knobs" });
+  const authz = await requireRole("agent", { feature: "ai_agents", requestId, resource: "channel_knobs" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org } = authz;
@@ -74,7 +74,7 @@ export async function PUT(req: NextRequest): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "channel_knobs" });
+  const authz = await requireRole("manager", { feature: "ai_agents", requestId, resource: "channel_knobs" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org } = authz;

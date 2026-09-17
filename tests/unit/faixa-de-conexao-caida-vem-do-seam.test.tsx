@@ -41,6 +41,17 @@ vi.mock("@/lib/channels/health", () => ({
   listarConexoesCaidas: (...args: unknown[]) => listarConexoesCaidas(...(args as [])),
 }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => adminClient }));
+// O resolvedor de plano é OUTRO seam do mesmo `Promise.all` (migration 0275):
+// aqui ele responde o plano legado (tudo ligado), que é o de toda instalação.
+vi.mock("@/lib/entitlements/resolver", () => ({
+  entitlementsDaOrg: async () => ({
+    plan: { id: "legado", slug: "legado", name: "Legado", is_active: true },
+    origem: "atribuido",
+    features: new Set(["channels", "inbox", "broadcast", "crm", "ai_agents", "analytics"]),
+    limits: {},
+    overrides: [],
+  }),
+}));
 vi.mock("@/lib/auth/server", () => ({
   loadAuthUser: async () => ({
     id: "user-1",

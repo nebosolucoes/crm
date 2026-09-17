@@ -17,6 +17,7 @@ import { coberturaDoFunil, type EtapaDoMapa } from "@/lib/leads/agent-mapping";
 import type { CoberturaPorFunil } from "./_components/FunisDoAgente";
 import { lerAmbiente } from "@/lib/instalacao/ambiente";
 import { escolherVersoesDaTela } from "@/lib/ai/agents/versoes-da-tela";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,8 @@ function provedoresDaInstalacao(): string[] {
 }
 
 export default async function AgentEditorPage({ params }: { params: Promise<{ id: string }> }) {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("ai_agents");
   const { id } = await params;
 
   const user = await requireAuth();

@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { ok } from "@/lib/api/wrappers";
 import { loadAuthUser, resolveActiveOrg } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
+import { recusaPorRecurso } from "@/lib/entitlements/exigir-na-rota";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,9 @@ export async function GET(): Promise<Response> {
   if (!user) return new Response(null, { status: 401 });
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) return new Response(null, { status: 403 });
+  // Recurso do plano (0275): depois da sessão e da organização, antes de qualquer dado.
+  const recusa = await recusaPorRecurso(activeOrg.orgId, "inbox", { requestId, resource: "voice_calls", actorUserId: user.id });
+  if (recusa) return recusa;
 
   const supabase = await createClient();
   const { data } = await supabase

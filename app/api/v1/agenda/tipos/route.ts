@@ -171,7 +171,7 @@ function slugDe(nome: string): string {
 
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = req.headers.get("x-request-id") ?? undefined;
-  const autorizado = await requireRole("viewer", { requestId, resource: "calendar_event_types" });
+  const autorizado = await requireRole("viewer", { feature: "inbox", requestId, resource: "calendar_event_types" });
   if (!autorizado.ok) return autorizado.response;
 
   // A MESMA coleta que a ferramenta MCP usa. Esta query era inline aqui, e havia
@@ -220,7 +220,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = req.headers.get("x-request-id") ?? undefined;
-  const autorizado = await requireRole("manager", { requestId, resource: "calendar_event_types" });
+  const autorizado = await requireRole("manager", { feature: "inbox", requestId, resource: "calendar_event_types" });
   if (!autorizado.ok) return autorizado.response;
   const t = (texto: string) => traduzir(texto, autorizado.user.idioma);
 
@@ -264,7 +264,7 @@ export async function PATCH(req: NextRequest): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = req.headers.get("x-request-id") ?? undefined;
-  const autorizado = await requireRole("manager", { requestId, resource: "calendar_event_types" });
+  const autorizado = await requireRole("manager", { feature: "inbox", requestId, resource: "calendar_event_types" });
   if (!autorizado.ok) return autorizado.response;
   const t = (texto: string) => traduzir(texto, autorizado.user.idioma);
 
@@ -309,7 +309,7 @@ export async function DELETE(req: NextRequest): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = req.headers.get("x-request-id") ?? undefined;
-  const autorizado = await requireRole("manager", { requestId, resource: "calendar_event_types" });
+  const autorizado = await requireRole("manager", { feature: "inbox", requestId, resource: "calendar_event_types" });
   if (!autorizado.ok) return autorizado.response;
   const t = (texto: string) => traduzir(texto, autorizado.user.idioma);
 

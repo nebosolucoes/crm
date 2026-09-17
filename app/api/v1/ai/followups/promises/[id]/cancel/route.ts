@@ -42,7 +42,7 @@ export async function POST(_req: NextRequest, ctx: RouteCtx): Promise<Response> 
     return fail("invalid_request", "id inválido.", 400, { requestId });
   }
 
-  const authz = await requireRole("manager", { requestId, resource: "followup_promises" });
+  const authz = await requireRole("manager", { feature: "ai_agents", requestId, resource: "followup_promises" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org } = authz;

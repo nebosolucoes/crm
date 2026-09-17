@@ -12,7 +12,7 @@ import { traduzir } from "@/lib/i18n/dicionario";
 
 export async function GET(_req: Request, context: { params: Promise<{ id: string }> }) {
   const requestId = randomUUID();
-  const auth = await requireRole("viewer", { requestId, resource: "agenda" });
+  const auth = await requireRole("viewer", { feature: "inbox", requestId, resource: "agenda" });
   if (!auth.ok) return auth.response;
   const { id } = await context.params;
   if (!z.uuid().safeParse(id).success)

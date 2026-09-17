@@ -6,6 +6,7 @@ import { ROLE_RANK } from "@/lib/auth/types";
 import { createClient } from "@/lib/supabase/server";
 import type { FollowupFlowDetailRow } from "@/hooks/followup/useFollowupFlow";
 import { FlowBuilder } from "./_components/FlowBuilder";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,8 @@ export default async function FollowupFlowBuilderPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("ai_agents");
   const { id } = await params;
 
   const user = await requireAuth();

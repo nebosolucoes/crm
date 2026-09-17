@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 import { comNomeDoAtendente } from "@/lib/users/com-nome-do-atendente";
 
 import { listConversationsHandler } from "./_handler";
+import { recusaPorRecurso } from "@/lib/entitlements/exigir-na-rota";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,9 @@ export async function GET(req: NextRequest): Promise<Response> {
   if (!activeOrg) {
     return fail("no_active_org", t("No active organization."), 403, { requestId });
   }
+  // Recurso do plano (0275): depois da sessão e da organização, antes de qualquer dado.
+  const recusa = await recusaPorRecurso(activeOrg.orgId, "inbox", { requestId, resource: "conversations", actorUserId: authUser?.id ?? null });
+  if (recusa) return recusa;
 
   const url = new URL(req.url);
   const qsParsed = listConversationsQuerySchema.safeParse({

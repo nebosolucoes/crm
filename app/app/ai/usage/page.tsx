@@ -7,6 +7,7 @@ import { BudgetCard } from "@/components/ai/BudgetCard";
 import { getBudgetStatus } from "@/lib/ai/budget/check";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { UsageDashboardClient } from "./_client";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,8 @@ function singleParam(v: string | string[] | undefined): string | undefined {
 }
 
 export default async function AiUsagePage({ searchParams }: PageProps) {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("ai_agents");
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");

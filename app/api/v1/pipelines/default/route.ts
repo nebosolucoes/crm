@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "pipelines" });
+  const authz = await requireRole("agent", { feature: "crm", requestId, resource: "pipelines" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org } = authz;

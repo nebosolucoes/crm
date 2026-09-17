@@ -6,10 +6,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { SkillsState } from "@/hooks/ai/useSkills";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { SkillsClient } from "./_client";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 
 export default async function SkillsPage() {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("ai_agents");
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");

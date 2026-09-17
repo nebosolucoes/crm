@@ -8,7 +8,7 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const denied = await requireSupportWrite();if (denied) return denied;
-  const requestId = randomUUID();const auth = await requireRole("agent", { requestId, resource: "agenda" });if (!auth.ok) return auth.response;
+  const requestId = randomUUID();const auth = await requireRole("agent", { feature: "inbox", requestId, resource: "agenda" });if (!auth.ok) return auth.response;
   const { id } = await context.params;
   const parsed = z.object({ expected_domain_revision: z.string(), expected_google_local_revision: z.string(), etag: z.string().nullable(), choice: z.enum(["google", "local", "preserve_remote", "retry"]) }).strict().safeParse(await req.json().catch(() => null));
   if (!z.uuid().safeParse(id).success || !parsed.success) return fail("validation_failed", "Atualize o compromisso antes de decidir.", 422, { requestId });

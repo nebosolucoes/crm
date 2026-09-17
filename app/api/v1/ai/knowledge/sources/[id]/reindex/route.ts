@@ -40,7 +40,7 @@ export async function POST(
   const requestId = randomUUID();
   const { id } = await params;
 
-  const authz = await requireRole("manager", { requestId, resource: "ai_knowledge" });
+  const authz = await requireRole("manager", { feature: "ai_agents", requestId, resource: "ai_knowledge" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org: activeOrg } = authz;

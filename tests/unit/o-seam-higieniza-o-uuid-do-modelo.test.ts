@@ -36,6 +36,19 @@ const BOM = "fb8061a5-27c0-4b13-9728-833b8f06828a";
 // A coleta é o FIM da cadeia: é ela quem recebe o `ownerUserId` e consulta a
 // jornada. Espiá-la aqui é o que torna a asserção sobre o caminho, e não sobre
 // a função de higiene.
+// O plano da organização (migration 0275): este teste simula a sessão com uma
+// organização fictícia, então simula também o plano — tudo liberado, como o
+// legado. Sem isto o resolvedor real iria ao banco com um id que não existe.
+vi.mock("@/lib/entitlements/resolver", () => ({
+  orgTemRecurso: async () => true,
+  entitlementsDaOrg: async () => ({
+    plan: { id: "legado", slug: "legado", name: "Legado", is_active: true },
+    origem: "atribuido",
+    features: new Set(["channels", "inbox", "broadcast", "crm", "ai_agents", "analytics"]),
+    limits: {},
+    overrides: [],
+  }),
+}));
 vi.mock("@/lib/agenda/consulta", async (original) => {
   const real = await original<typeof import("@/lib/agenda/consulta")>();
   return { ...real, horariosLivresDaOrg: vi.fn() };

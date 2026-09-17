@@ -63,7 +63,7 @@ function resolveRange(qs: { from?: string; to?: string }): { from: Date; to: Dat
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
 
-  const authz = await requireRole("manager", { requestId, resource: "ai_usage" });
+  const authz = await requireRole("manager", { feature: "ai_agents", requestId, resource: "ai_usage" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org: activeOrg } = authz;

@@ -36,7 +36,7 @@ const createRouterSchema = z.object({
 
 export async function GET(_req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "ai_routers" });
+  const authz = await requireRole("agent", { feature: "ai_agents", requestId, resource: "ai_routers" });
   if (!authz.ok) return authz.response;
   const { org } = authz;
 
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("admin", { requestId, resource: "ai_routers" });
+  const authz = await requireRole("admin", { feature: "ai_agents", requestId, resource: "ai_routers" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org } = authz;

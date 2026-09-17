@@ -72,7 +72,18 @@ MCP error codes mapeados:
 | 404 not found | `-32003` Not Found |
 | 422 validation | `-32602` Invalid Params |
 | 429 rate limit | `-32004` Rate Limited |
+| 403 recurso fora do plano da organização (migration 0275) | `-32005` `feature_not_entitled` |
 | 500 | `-32603` Internal Error |
+
+**Plano da organização (migration 0275):** cada tool declara o recurso que exige em
+`lib/mcp/tools/catalogo/recursos.ts` (por domínio, com exceções por tool; `null` = do produto).
+`ensureRecurso(organizationId, toolName)` roda nos DOIS ingressos — o servidor externo
+(`lib/mcp/server.ts`) e o runtime do agente (`lib/ai/runtime/tools.ts`) — DEPOIS de `ensureScope`
+e `ensureRole`, para a recusa de papel não revelar o plano. Um token de organização Starter lê
+conversas (Atendimento) e não cria negócio (CRM); o agente de organização sem CRM não move funil.
+Ao modelo vai uma recusa própria ("não está incluído no plano da empresa"), sem preço nem cargo
+(`recusaDeCapacidadeParaOModelo(tool, "fora_do_plano")`). Vocabulário e a régua:
+`lib/entitlements/` e `docs/specs/01` §5.1.
 
 ---
 

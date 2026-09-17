@@ -41,6 +41,9 @@ const TABS: TabItem[] = [
   { label: "Visão Geral", href: "", disabled: false },
   { label: "Saúde", href: "/health", disabled: false },
   { label: "Agente", href: "/agent", disabled: false },
+  // O plano comercial do cliente (migration 0275): atribuir, liberar com
+  // prazo, ver o efetivo. Entra antes de Equipe/Uso, que ainda são promessa.
+  { label: "Plano", href: "/plano", disabled: false },
   { label: "Equipe", href: "/team", disabled: true },
   { label: "Uso", href: "/usage", disabled: true },
 ];

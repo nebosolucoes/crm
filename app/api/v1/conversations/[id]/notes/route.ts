@@ -27,7 +27,7 @@ interface RouteParams {
 
 export async function GET(_req: NextRequest, { params }: RouteParams): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "conversation_notes" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "conversation_notes" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org } = authz;
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest, { params }: RouteParams): Promise<R
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "conversation_notes" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "conversation_notes" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org } = authz;

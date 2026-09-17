@@ -23,6 +23,11 @@ vi.mock("@/lib/auth/server", () => ({
 }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ audit: vi.fn(async () => undefined) }));
+// O plano da organização (migration 0275): controlado por teste, por recurso.
+const temRecursoNoPlano = vi.fn(async (_org: string, _recurso: string) => true);
+vi.mock("@/lib/entitlements/resolver", () => ({
+  orgTemRecurso: (org: string, recurso: string) => temRecursoNoPlano(org, recurso),
+}));
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const ORG_ID = "22222222-2222-4222-8222-222222222222";
@@ -189,6 +194,65 @@ describe("requireRole — helper único (spec 13 §4)", () => {
       expect(res.response.status).toBe(403);
       const body = await res.response.json();
       expect(body.error.code).toBe("forbidden_tenant");
+    });
+  });
+
+  describe("feature — o recurso do plano da ORGANIZAÇÃO (migration 0275)", () => {
+    beforeEach(() => temRecursoNoPlano.mockResolvedValue(true));
+
+    it("sem feature, o plano não é consultado", async () => {
+      session("agent");
+      const res = await requireRole("agent");
+      expect(res.ok).toBe(true);
+      expect(temRecursoNoPlano).not.toHaveBeenCalled();
+    });
+
+    it("com o recurso no plano, passa e a consulta é pela org ativa", async () => {
+      session("agent");
+      const res = await requireRole("agent", { feature: "crm" });
+      expect(res.ok).toBe(true);
+      expect(temRecursoNoPlano).toHaveBeenCalledWith(ORG_ID, "crm");
+    });
+
+    it("sem o recurso → 403 feature_not_entitled com details.feature + authz.denied reason", async () => {
+      session("admin");
+      temRecursoNoPlano.mockResolvedValue(false);
+      const res = await requireRole("agent", { feature: "broadcast", requestId: "req-1", resource: "scheduled_group_messages" });
+      expect(res.ok).toBe(false);
+      if (res.ok) throw new Error("unreachable");
+      expect(res.response.status).toBe(403);
+      const body = await res.response.json();
+      expect(body.error.code).toBe("feature_not_entitled");
+      expect(body.error.details).toEqual({ feature: "broadcast" });
+      expect(audit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "authz.denied",
+          organizationId: ORG_ID,
+          actorUserId: USER_ID,
+          resourceType: "scheduled_group_messages",
+          requestId: "req-1",
+          metadata: { reason: "feature_not_entitled", feature: "broadcast" },
+        }),
+      );
+    });
+
+    it("o papel é decidido ANTES do plano: quem não tem papel leva forbidden_role e o plano nem é consultado", async () => {
+      session("viewer");
+      temRecursoNoPlano.mockResolvedValue(false);
+      const res = await requireRole("manager", { feature: "crm" });
+      expect(res.ok).toBe(false);
+      if (res.ok) throw new Error("unreachable");
+      expect((await res.response.json()).error.code).toBe("forbidden_role");
+      expect(temRecursoNoPlano).not.toHaveBeenCalled();
+    });
+
+    it("platform admin com allowPlatformAdmin bypassa o papel, NUNCA o plano", async () => {
+      session("viewer", { platformAdmin: true });
+      temRecursoNoPlano.mockResolvedValue(false);
+      const res = await requireRole("admin", { allowPlatformAdmin: true, feature: "ai_agents" });
+      expect(res.ok).toBe(false);
+      if (res.ok) throw new Error("unreachable");
+      expect((await res.response.json()).error.code).toBe("feature_not_entitled");
     });
   });
 

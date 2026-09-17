@@ -72,6 +72,10 @@ export type InboxKind =
   // não distingue "tocou e ninguém pegou" de "o operador recusou", e para quem
   // lê a Central os dois pedem a mesma coisa: alguém precisa ligar de volta.
   | 'voice_call_missed'
+  // (migration 0275) O plano da organização mudou, um recurso foi liberado com
+  // prazo ou bloqueado, ou uma execução foi pulada por falta de recurso. Quem
+  // escreve: a rota admin de planos e, uma vez por org/mês, o worker.
+  | 'entitlement_changed'
   | 'other';
 
 export interface InboxItemRow {

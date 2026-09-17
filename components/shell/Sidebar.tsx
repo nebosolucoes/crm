@@ -45,6 +45,11 @@ export function SidebarContent({
     user.is_platform_admin && !user.support,
     activeOrg?.role ?? null,
     activeOrg?.interface_settings,
+    // O que a organização pode usar, resolvido pelo layout de `/app`. Ausente
+    // (`undefined`) = ninguém resolveu = NÃO filtra: isto é desenho, não
+    // autorização — a API recusa sozinha. Fechar aqui por ausência esconderia o
+    // menu inteiro em qualquer render que não passe pelo layout (testes, casca).
+    activeOrg?.entitlements,
   );
   // Configurações sai da área que rola e vai para o rodapé fixo: medido em
   // 1280x768, ele caía fora da dobra mesmo em telas de 1080px.

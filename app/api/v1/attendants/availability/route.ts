@@ -39,7 +39,7 @@ interface AvailabilityRow {
 export async function GET(_req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
 
-  const authz = await requireRole("agent", { requestId, resource: "attendant_availability" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "attendant_availability" });
   if (!authz.ok) return authz.response;
   const { org: activeOrg } = authz;
 

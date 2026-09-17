@@ -270,6 +270,34 @@ const PARES: Array<{
     arquivo: "lib/schemas/team.ts",
     simbolo: "ROLES",
   },
+  {
+    tabela: "platform_plan_features",
+    coluna: "feature",
+    // lib/entitlements/recursos.ts → RECURSOS_VENDAVEIS (tupla `as const`). Os
+    // CINCO que um plano pode incluir — `channels` fica FORA dos dois lados de
+    // propósito: não é dado, é lei (migration 0275). Este par é o passo 3 da
+    // receita de "recurso novo" escrita no cabeçalho daquele arquivo.
+    arquivo: "lib/entitlements/recursos.ts",
+    simbolo: "RECURSOS_VENDAVEIS",
+  },
+  {
+    tabela: "organization_feature_overrides",
+    coluna: "feature",
+    // lib/entitlements/recursos.ts → RECURSOS (os seis, com `channels`): um
+    // override pode carregar LIMITE para channels (max_channels, max_users),
+    // nunca desligá-lo — isso é a outra constraint da coluna
+    // (`ofo_canais_nunca_desligam`), que não define vocabulário e por isso não
+    // dispara a recusa de "duas definidoras" do extrator.
+    arquivo: "lib/entitlements/recursos.ts",
+    simbolo: "RECURSOS",
+  },
+  {
+    tabela: "organization_feature_overrides",
+    coluna: "mode",
+    // lib/entitlements/tipos.ts → MODOS_DE_OVERRIDE (tupla `as const`).
+    arquivo: "lib/entitlements/tipos.ts",
+    simbolo: "MODOS_DE_OVERRIDE",
+  },
 ];
 
 /** Tira um nível de parênteses externos, se ele envolver a expressão inteira. */

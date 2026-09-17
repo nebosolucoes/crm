@@ -7,6 +7,7 @@ import { listSelectableChannels } from "@/lib/channels/selectable";
 import { createClient } from "@/lib/supabase/server";
 import type { RouterDetailState } from "@/hooks/ai/useRouters";
 import { RouterEditorClient } from "./_client";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,8 @@ const ROUTER_DETAIL_COLUMNS = "id, name, channel_session_id, is_active, config, 
 const MEMBER_COLUMNS = "id, agent_id, intent_name, intent_description, examples, position";
 
 export default async function RouterEditorPage({ params }: { params: Promise<{ id: string }> }) {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("ai_agents");
   const { id } = await params;
 
   const user = await requireAuth();

@@ -40,9 +40,25 @@ import { catalogEntry } from "@/lib/mcp/tools/catalog";
  *   consegue e sugerir que a pessoa fale com quem cuida do sistema, porque isso
  *   é defeito de configuração, não desenho.
  */
-export function recusaDeCapacidadeParaOModelo(toolName: string): string {
+export function recusaDeCapacidadeParaOModelo(
+  toolName: string,
+  motivo?: "fora_do_plano",
+): string {
   const entrada = catalogEntry(toolName);
   const oQue = entrada?.rotulo ? `«${entrada.rotulo.toLowerCase()}»` : "essa alteração";
+
+  // Terceira situação (migration 0275): a EMPRESA não tem o módulo no plano.
+  // Não é defeito de configuração nem restrição a uma pessoa — é comercial, e
+  // a ação de quem lê é outra: falar com quem administra a empresa.
+  if (motivo === "fora_do_plano") {
+    return [
+      `Esta ação (${oQue}) não está incluída no plano da empresa neste momento.`,
+      "Não é falha sua nem de quem está falando com você.",
+      "Diga que não conseguiu, sem citar planos, preços, cargos internos nem termos como",
+      '"agent", "manager", "papel" ou "permissão", e ofereça o que você consegue fazer sem isso.',
+      "Se você já apurou algo útil, diga junto.",
+    ].join(" ");
+  }
 
   if (entrada?.apenasHumano) {
     return [

@@ -55,7 +55,7 @@ export async function PATCH(req: NextRequest, ctx: Contexto): Promise<Response> 
   const requestId = randomUUID();
   const { id } = await ctx.params;
 
-  const authz = await requireRole("agent", { requestId, resource: "crm_tasks" });
+  const authz = await requireRole("agent", { feature: "crm", requestId, resource: "crm_tasks" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 
@@ -132,7 +132,7 @@ export async function DELETE(_req: NextRequest, ctx: Contexto): Promise<Response
   const requestId = randomUUID();
   const { id } = await ctx.params;
 
-  const authz = await requireRole("agent", { requestId, resource: "crm_tasks" });
+  const authz = await requireRole("agent", { feature: "crm", requestId, resource: "crm_tasks" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 

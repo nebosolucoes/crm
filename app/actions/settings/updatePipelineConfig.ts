@@ -12,6 +12,7 @@ import {
 } from "@/lib/schemas/settings";
 import { loadAuthUser, resolveActiveOrg } from "@/lib/auth/server";
 import { ROLE_RANK } from "@/lib/auth/types";
+import { orgTemRecurso } from "@/lib/entitlements/resolver";
 
 export type UpdatePipelineConfigResult =
   | { ok: true }
@@ -36,6 +37,10 @@ export async function updatePipelineConfig(
   if (!activeOrg) return { ok: false, error: "forbidden_tenant" };
   if (!authUser.is_platform_admin && ROLE_RANK[activeOrg.role] < ROLE_RANK.admin) {
     return { ok: false, error: "forbidden_role" };
+  }
+  // O plano da organização (migration 0275), depois do papel — como na API.
+  if (!(await orgTemRecurso(activeOrg.orgId, "crm"))) {
+    return { ok: false, error: "feature_not_entitled" };
   }
 
   const supabase = await createClient();

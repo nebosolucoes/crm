@@ -4,11 +4,14 @@ import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { TemplatesClient } from "./_components/TemplatesClient";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Respostas rápidas" };
 
 export default async function TemplatesPage() {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("inbox");
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app/inbox");

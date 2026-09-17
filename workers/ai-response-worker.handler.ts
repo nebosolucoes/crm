@@ -9,10 +9,11 @@
 
 import type { EventHandler, HandlerResult } from "@/lib/event-log/dispatcher";
 import { processMessageReceived } from "@/workers/ai-response-worker";
+import { handlerComPlano } from "@/lib/entitlements/handler-com-plano";
 
 export const AI_RESPONSE_HANDLER_KEY = "ai-response-worker.v1";
 
-export const aiResponseHandler: EventHandler = {
+const aiResponseHandlerSemPlano: EventHandler = {
   key: AI_RESPONSE_HANDLER_KEY,
   events: ["message.received"],
   async handle(row): Promise<HandlerResult> {
@@ -30,3 +31,6 @@ export const aiResponseHandler: EventHandler = {
     return { consumer_key: AI_RESPONSE_HANDLER_KEY, status: "error", detail: result.detail };
   },
 };
+
+/** Com o gate de plano (migration 0275): sem `ai_agents`, o evento vira `skipped`. */
+export const aiResponseHandler: EventHandler = handlerComPlano(aiResponseHandlerSemPlano, "ai_agents");

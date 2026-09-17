@@ -14,7 +14,7 @@ import { traduzir } from "@/lib/i18n/dicionario";
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string }> };
 async function context(ctx: Ctx, requestId: string) {
-  const auth = await requireRole("agent", { requestId, resource: "conversations" });
+  const auth = await requireRole("agent", { feature: "inbox", requestId, resource: "conversations" });
   if (!auth.ok) return { response: auth.response } as const;
   const t = (texto: string) => traduzir(texto, auth.user.idioma);
   const { id } = await ctx.params;

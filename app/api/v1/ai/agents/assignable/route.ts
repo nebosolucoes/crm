@@ -53,7 +53,7 @@ export interface AssignableAgent {
 
 export async function GET(_req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "ai_agents" });
+  const authz = await requireRole("agent", { feature: "ai_agents", requestId, resource: "ai_agents" });
   if (!authz.ok) return authz.response;
   const orgId = authz.org.orgId;
 

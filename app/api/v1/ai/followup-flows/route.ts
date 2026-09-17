@@ -20,7 +20,7 @@ const LIST_COLUMNS = "id, name, status, active_version_id, handoff_policy, updat
 
 export async function GET(_req?: NextRequest): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("viewer", { requestId, resource: "followup_flows" });
+  const authz = await requireRole("viewer", { feature: "ai_agents", requestId, resource: "followup_flows" });
   if (!authz.ok) return authz.response;
   const { org: activeOrg } = authz;
 
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "followup_flows" });
+  const authz = await requireRole("manager", { feature: "ai_agents", requestId, resource: "followup_flows" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org: activeOrg } = authz;

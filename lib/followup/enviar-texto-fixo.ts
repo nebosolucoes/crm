@@ -14,6 +14,8 @@ import { createSupabaseAdminClient, type FollowupJobRequest } from "@/lib/follow
 import type { EnrollmentRow } from "@/lib/followup/node-handlers";
 import { completeTurnForEnrollment, type TurnBridgeAdminClient } from "@/lib/followup/turn-bridge";
 import { logger } from "@/lib/logger";
+import { avisarBloqueioPorRecurso } from "@/lib/entitlements/aviso-na-central";
+import { orgTemRecurso } from "@/lib/entitlements/resolver";
 
 function ponteSupabase(admin: SupabaseClient): TurnBridgeAdminClient {
   const base = createSupabaseAdminClient(admin);
@@ -87,6 +89,24 @@ export async function enviarTextoFixoPendente(
     const jobClaim={worker_id:claimed.locked_by as string,acquired_at:claimed.locked_at as string};
 
     try {
+      // O PLANO (migration 0275): este caminho envia SEM passar pelo claim do
+      // worker, então precisa do próprio gate. Sem Agentes de IA o job termina
+      // `done` com o motivo (aparece em Execuções) e a Central recebe um aviso
+      // por organização/mês. Falha da consulta não pula o envio.
+      let temIa = true;
+      try {
+        temIa = await orgTemRecurso(job.organization_id as string, "ai_agents");
+      } catch (err) {
+        logger.warn("[followup] plano não pôde ser conferido — seguindo com o envio", {
+          job_id: job.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      if (!temIa) {
+        await settle(job.organization_id, job.id, jobClaim.acquired_at, true, "feature_not_entitled: ai_agents não está no plano da organização");
+        void avisarBloqueioPorRecurso(admin, job.organization_id as string, "ai_agents", "Um follow-up automático");
+        continue;
+      }
       const { data: enr } = await admin
         .from("followup_enrollments")
         .select("current_node_id,status,revision")

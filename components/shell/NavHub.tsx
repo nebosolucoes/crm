@@ -6,9 +6,12 @@ import type { Role } from "@/lib/auth/types";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { IDIOMA_PADRAO, type Idioma } from "@/lib/i18n/idiomas";
 import { hubSections, type NavGroupId } from "@/lib/navigation/registry";
+import type { Entitlements } from "@/lib/navigation/interface";
 
 interface NavHubProps {
   interfaceSettings?: InterfaceSettings;
+  /** O que a organização pode usar. Ausente = não filtra (ver `orgPodeVer`). */
+  entitlements?: Entitlements;
   group: NavGroupId;
   isPlatformAdmin: boolean;
   role: Role | null;
@@ -56,9 +59,10 @@ export function NavHub({
   title,
   subtitle,
   interfaceSettings,
+  entitlements,
   locale = IDIOMA_PADRAO,
 }: NavHubProps) {
-  const secoes = hubSections(group, isPlatformAdmin, role, interfaceSettings);
+  const secoes = hubSections(group, isPlatformAdmin, role, interfaceSettings, entitlements);
 
   return (
     <div className="flex h-full flex-col gap-8 p-6">

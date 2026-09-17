@@ -30,7 +30,7 @@ const ENROLLMENT_STATUSES = [
 
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("viewer", { requestId, resource: "followup_enrollments" });
+  const authz = await requireRole("viewer", { feature: "ai_agents", requestId, resource: "followup_enrollments" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org: activeOrg } = authz;
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "followup_enrollments" });
+  const authz = await requireRole("manager", { feature: "ai_agents", requestId, resource: "followup_enrollments" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org: activeOrg } = authz;

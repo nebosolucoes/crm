@@ -31,6 +31,7 @@ import { isServiceRoleConfigured } from "@/lib/audit";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { recusaPorRecurso } from "@/lib/entitlements/exigir-na-rota";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +69,9 @@ export async function GET(req: NextRequest): Promise<Response> {
     return fail("forbidden", traduzir("sem organização ativa", user.idioma), 403, { requestId });
   }
   const orgId = activeOrg.orgId;
+  // Recurso do plano (0275): depois da sessão e da organização, antes de qualquer dado.
+  const recusa = await recusaPorRecurso(orgId, "crm", { requestId, resource: "leads_proposals", actorUserId: user.id });
+  if (recusa) return recusa;
   const supabase = await createClient();
 
   // ── PENDENTES ────────────────────────────────────────────────────────────

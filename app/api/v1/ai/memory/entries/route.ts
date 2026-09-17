@@ -26,7 +26,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "org_memory" });
+  const authz = await requireRole("manager", { feature: "ai_agents", requestId, resource: "org_memory" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org } = authz;

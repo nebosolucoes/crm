@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request): Promise<Response> {
   const requestId = randomUUID();
 
-  const authz = await requireRole("agent", { requestId, resource: "voice_calls" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "voice_calls" });
   if (!authz.ok) return authz.response;
   const { org: activeOrg } = authz;
 

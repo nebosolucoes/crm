@@ -32,7 +32,7 @@ export type { AtRiskLead } from "@/lib/leads/radar-de-risco";
 
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "leads_at_risk" });
+  const authz = await requireRole("agent", { feature: "crm", requestId, resource: "leads_at_risk" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org } = authz;

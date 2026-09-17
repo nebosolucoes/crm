@@ -4,11 +4,14 @@ import { traduzir } from "@/lib/i18n/dicionario";
 import { ROLE_RANK } from "@/lib/auth/types";
 
 import { MetricsClient } from "./_components/MetricsClient";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Desempenho" };
 
 export default async function MetricsPage() {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("analytics");
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   // spec 13 §6.1: agent vê as próprias (RLS); a comparação por atendente é manager+.

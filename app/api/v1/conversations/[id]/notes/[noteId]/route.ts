@@ -24,7 +24,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams): Promis
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "conversation_notes" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "conversation_notes" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org } = authz;

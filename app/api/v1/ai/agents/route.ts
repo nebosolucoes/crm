@@ -24,6 +24,7 @@ import { mensagemDoEscopo, validarEscopoDaVersao } from "@/lib/ai/agents/escopo"
 import { agentCreateSchema } from "@/lib/ai/guardrails-schema";
 import { agentMcpCreateSchema } from "@/lib/ai/agents/validation";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { recusaPorLimite } from "@/lib/entitlements/exigir-na-rota";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +57,7 @@ const VERSION_COLUMNS =
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
 
-  const authz = await requireRole("manager", { requestId, resource: "ai_agents" });
+  const authz = await requireRole("manager", { feature: "ai_agents", requestId, resource: "ai_agents" });
   if (!authz.ok) return authz.response;
   const { org: activeOrg } = authz;
 
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   const requestId = randomUUID();
 
-  const authz = await requireRole("admin", { requestId, resource: "ai_agents" });
+  const authz = await requireRole("admin", { feature: "ai_agents", requestId, resource: "ai_agents" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org: activeOrg } = authz;
@@ -106,6 +107,14 @@ export async function POST(req: NextRequest): Promise<Response> {
     ("version" in rawBody || (rawBody as { kind?: unknown }).kind === "mcp_agent");
 
   const admin = createAdminClient();
+  // Limite do plano (etapa 8): o teto de agentes barra antes de gravar.
+  const noTeto = await recusaPorLimite(activeOrg.orgId, "max_ai_agents", {
+    admin,
+    requestId,
+    resource: "ai_agents",
+    actorUserId: authUser.id,
+  });
+  if (noTeto) return noTeto;
 
   if (wantsMcp) {
     const parsed = agentMcpCreateSchema.safeParse(rawBody);

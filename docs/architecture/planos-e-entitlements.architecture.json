@@ -1,0 +1,611 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Planos e entitlements — o que a organização pode usar, decidido num lugar só",
+    "subtitle": "plano é dado (tabela), recurso é código (vocabulário), entitlement é a resposta (uma função SQL); channels nunca desliga; o usuário ainda precisa do papel",
+    "output": "planos-e-entitlements.html",
+    "quality_profile": "standard"
+  },
+  "lanes": [
+    {
+      "id": "admin",
+      "label": "Plataforma (quem vende)"
+    },
+    {
+      "id": "tenant",
+      "label": "O que o cliente vê"
+    },
+    {
+      "id": "borda",
+      "label": "Borda HTTP e páginas"
+    },
+    {
+      "id": "regra",
+      "label": "Vocabulário e resolução"
+    },
+    {
+      "id": "gasta",
+      "label": "Quem executa em background"
+    },
+    {
+      "id": "dados",
+      "label": "Banco"
+    },
+    {
+      "id": "volta",
+      "label": "O laço de retorno"
+    }
+  ],
+  "mainPath": [
+    "tab-plano",
+    "rota-admin-plan",
+    "fn-definir-plano",
+    "organizations",
+    "fn-entitlements",
+    "require-role",
+    "audit"
+  ],
+  "nodes": [
+    {
+      "id": "planos-admin",
+      "lane": "admin",
+      "col": 1,
+      "type": "frontend",
+      "label": "/admin/planos e /admin/planos/[id]",
+      "sublabel": "criar, editar, ativar/desativar; checkbox de channels travado"
+    },
+    {
+      "id": "tab-plano",
+      "lane": "admin",
+      "col": 2,
+      "type": "frontend",
+      "label": "Aba Plano em /admin/tenants/[id]",
+      "sublabel": "trocar plano com motivo · overrides com validade · tabela plano | override | efetivo"
+    },
+    {
+      "id": "form-tenant",
+      "lane": "admin",
+      "col": 3,
+      "type": "frontend",
+      "label": "/admin/tenants/new",
+      "sublabel": "select de planos ativos substitui o enum morto de settings.plan"
+    },
+    {
+      "id": "sidebar",
+      "lane": "tenant",
+      "col": 1,
+      "type": "frontend",
+      "label": "Sidebar · hubs · ⌘K",
+      "sublabel": "projeções de NAV_CATALOG filtradas por GRUPO_PARA_RECURSO — não decidem, desenham"
+    },
+    {
+      "id": "billing",
+      "lane": "tenant",
+      "col": 2,
+      "type": "frontend",
+      "label": "/app/settings/billing",
+      "sublabel": "plano atual, recursos, overrides com 'até dd/mm'"
+    },
+    {
+      "id": "indisponivel",
+      "lane": "tenant",
+      "col": 3,
+      "type": "frontend",
+      "label": "/app/recurso-indisponivel",
+      "sublabel": "destino do redirect de exigirRecurso(); nome leigo do recurso"
+    },
+    {
+      "id": "central",
+      "lane": "tenant",
+      "col": 4,
+      "type": "frontend",
+      "label": "Central de avisos",
+      "sublabel": "kind entitlement_changed: plano trocado, recurso liberado até X, execução pulada"
+    },
+    {
+      "id": "rota-admin-plans",
+      "lane": "borda",
+      "col": 1,
+      "type": "api",
+      "label": "GET/POST /api/v1/admin/plans · PATCH /[id]",
+      "sublabel": "requirePlatformAdmin + Zod + Idempotency-Key + audit"
+    },
+    {
+      "id": "rota-admin-plan",
+      "lane": "borda",
+      "col": 2,
+      "type": "api",
+      "label": "PUT /api/v1/admin/tenants/[id]/plan · POST/DELETE …/overrides",
+      "sublabel": "chama a RPC com o client de SESSÃO — o banco confere fn_is_platform_admin()"
+    },
+    {
+      "id": "require-role",
+      "lane": "borda",
+      "col": 3,
+      "type": "service",
+      "label": "requireRole({ feature }) · resolveAuthDual",
+      "sublabel": "papel do banco → MFA → entitlement; falta → 403 feature_not_entitled"
+    },
+    {
+      "id": "exigir-recurso",
+      "lane": "borda",
+      "col": 4,
+      "type": "service",
+      "label": "exigirRecurso() nas páginas",
+      "sublabel": "cerca: toda page.tsx de destino vendável chama, ou justifica na allowlist"
+    },
+    {
+      "id": "mcp",
+      "lane": "borda",
+      "col": 5,
+      "type": "api",
+      "label": "/api/mcp",
+      "sublabel": "cada tool declara recurso no catálogo; server.ts recusa antes de executar"
+    },
+    {
+      "id": "recursos",
+      "lane": "regra",
+      "col": 1,
+      "type": "service",
+      "label": "lib/entitlements/recursos.ts",
+      "sublabel": "RECURSOS · RECURSOS_VENDAVEIS · GRUPO_PARA_RECURSO · recursoDoDestino — client-safe"
+    },
+    {
+      "id": "limites",
+      "lane": "regra",
+      "col": 2,
+      "type": "service",
+      "label": "lib/entitlements/limites.ts",
+      "sublabel": "chaves, schema Zod, mescla por chave; enforced:false até a etapa 8"
+    },
+    {
+      "id": "tipos",
+      "lane": "regra",
+      "col": 3,
+      "type": "service",
+      "label": "lib/entitlements/tipos.ts",
+      "sublabel": "lerEntitlements (tolerante) · temRecurso — channels curto-circuita"
+    },
+    {
+      "id": "resolver",
+      "lane": "regra",
+      "col": 4,
+      "type": "service",
+      "label": "resolver.ts (Supabase, cache por request) · resolver-pg.ts (pool, 60 s)",
+      "sublabel": "os dois chamam a MESMA função SQL; erro de RPC lança, nunca vira 'sem recurso'"
+    },
+    {
+      "id": "drain",
+      "lane": "gasta",
+      "col": 1,
+      "type": "worker",
+      "label": "drain.ts (enfileira o turno)",
+      "sublabel": "sem ai_agents → não cria job, log com motivo"
+    },
+    {
+      "id": "agent-worker",
+      "lane": "gasta",
+      "col": 2,
+      "type": "worker",
+      "label": "agent-worker (após o claim)",
+      "sublabel": "sem ai_agents → job done com last_error feature_not_entitled — vale para todos os JobKind"
+    },
+    {
+      "id": "broadcast-worker",
+      "lane": "gasta",
+      "col": 3,
+      "type": "worker",
+      "label": "lib/agendamentos-grupos/worker.ts",
+      "sublabel": "sem broadcast → run skipped feature_not_entitled, relógio avança"
+    },
+    {
+      "id": "automation",
+      "lane": "gasta",
+      "col": 4,
+      "type": "worker",
+      "label": "automation engine · follow-up engine",
+      "sublabel": "gate por AÇÃO: send_ai_message → ai_agents; mover lead → crm"
+    },
+    {
+      "id": "platform_plans",
+      "lane": "dados",
+      "col": 1,
+      "type": "database",
+      "label": "platform_plans",
+      "sublabel": "slug, is_active, is_default (único parcial), limits jsonb; RLS: só platform admin lê"
+    },
+    {
+      "id": "plan_features",
+      "lane": "dados",
+      "col": 2,
+      "type": "database",
+      "label": "platform_plan_features",
+      "sublabel": "(plan_id, feature) — CHECK dos 5 vendáveis; channels NÃO é linha"
+    },
+    {
+      "id": "organizations",
+      "lane": "dados",
+      "col": 3,
+      "type": "database",
+      "label": "organizations.plan_id",
+      "sublabel": "fonte de verdade da atribuição; trigger BEFORE INSERT põe o padrão"
+    },
+    {
+      "id": "overrides",
+      "lane": "dados",
+      "col": 4,
+      "type": "database",
+      "label": "organization_feature_overrides",
+      "sublabel": "feature, mode, limits, starts_at, ends_at, revoked_at; CHECK channels nunca disable"
+    },
+    {
+      "id": "fn-entitlements",
+      "lane": "dados",
+      "col": 5,
+      "type": "database",
+      "label": "fn_org_entitlements(org) · fn_org_has_feature(org, f)",
+      "sublabel": "plano ∪ enable − disable ∪ {channels}; expiração passiva por ends_at"
+    },
+    {
+      "id": "fn-definir-plano",
+      "lane": "dados",
+      "col": 6,
+      "type": "database",
+      "label": "fn_definir_plano_da_organizacao · fn_criar/revogar_override",
+      "sublabel": "security definer; exigem fn_is_platform_admin() ou service_role; recusam plano inativo"
+    },
+    {
+      "id": "legado",
+      "lane": "dados",
+      "col": 7,
+      "type": "database",
+      "label": "plano 'legado' (seed) + backfill",
+      "sublabel": "todos os recursos, is_default; toda org existente cai nele — efeito no deploy: zero"
+    },
+    {
+      "id": "audit",
+      "lane": "volta",
+      "col": 1,
+      "type": "database",
+      "label": "api_audit_log",
+      "sublabel": "plan.* · tenant.plan_changed · tenant.feature_override_* · authz.denied{feature_not_entitled}"
+    },
+    {
+      "id": "runs",
+      "lane": "volta",
+      "col": 2,
+      "type": "frontend",
+      "label": "Execuções de IA · Histórico de disparo",
+      "sublabel": "o que foi pulado por recurso aparece como linha com motivo, não como ausência"
+    },
+    {
+      "id": "invariantes",
+      "lane": "volta",
+      "col": 3,
+      "type": "service",
+      "label": "tests/invariants/entitlements-*",
+      "sublabel": "canais-sempre · resolução · RLS entre tenants · paridade CHECK↔TS"
+    }
+  ],
+  "edges": [
+    {
+      "id": "admin-cria-plano",
+      "from": "planos-admin",
+      "to": "rota-admin-plans",
+      "label": "cria/edita"
+    },
+    {
+      "id": "admin-lista-planos",
+      "from": "planos-admin",
+      "to": "platform_plans",
+      "label": "lista com is_active/is_default; audita platform_admin.plans_listed"
+    },
+    {
+      "id": "rota-plans-escreve",
+      "from": "rota-admin-plans",
+      "to": "platform_plans",
+      "label": "insert/update via service role"
+    },
+    {
+      "id": "rota-plans-features",
+      "from": "rota-admin-plans",
+      "to": "plan_features",
+      "label": "replace das linhas do plano"
+    },
+    {
+      "id": "rota-plans-audita",
+      "from": "rota-admin-plans",
+      "to": "audit",
+      "label": "plan.created/updated/(de)activated"
+    },
+    {
+      "id": "rota-plans-valida",
+      "from": "rota-admin-plans",
+      "to": "recursos",
+      "label": "Zod com RECURSOS_VENDAVEIS"
+    },
+    {
+      "id": "rota-plans-limites",
+      "from": "rota-admin-plans",
+      "to": "limites",
+      "label": "limitesSchema"
+    },
+    {
+      "id": "tab-troca",
+      "from": "tab-plano",
+      "to": "rota-admin-plan",
+      "label": "PUT plan · POST override · DELETE override"
+    },
+    {
+      "id": "tab-le",
+      "from": "tab-plano",
+      "to": "fn-entitlements",
+      "label": "GET entitlements (efetivo)"
+    },
+    {
+      "id": "rota-plan-rpc",
+      "from": "rota-admin-plan",
+      "to": "fn-definir-plano",
+      "label": "rpc com sessão (auth.uid())"
+    },
+    {
+      "id": "fn-definir-grava",
+      "from": "fn-definir-plano",
+      "to": "organizations",
+      "label": "plan_id, plan_assigned_at"
+    },
+    {
+      "id": "fn-definir-override",
+      "from": "fn-definir-plano",
+      "to": "overrides",
+      "label": "insert · revoked_at"
+    },
+    {
+      "id": "fn-definir-recusa-inativo",
+      "from": "fn-definir-plano",
+      "to": "platform_plans",
+      "label": "recusa is_active=false"
+    },
+    {
+      "id": "rota-plan-audita",
+      "from": "rota-admin-plan",
+      "to": "audit",
+      "label": "tenant.plan_changed · feature_override_*"
+    },
+    {
+      "id": "rota-plan-avisa",
+      "from": "rota-admin-plan",
+      "to": "central",
+      "label": "entitlement_changed (kind)"
+    },
+    {
+      "id": "form-tenant-planos",
+      "from": "form-tenant",
+      "to": "platform_plans",
+      "label": "lista ativos"
+    },
+    {
+      "id": "form-tenant-cria",
+      "from": "form-tenant",
+      "to": "organizations",
+      "label": "fn_create_tenant_with_owner grava plan_id"
+    },
+    {
+      "id": "fn-le-plano",
+      "from": "fn-entitlements",
+      "to": "platform_plans",
+      "label": "coalesce(plan_id, is_default)"
+    },
+    {
+      "id": "fn-le-features",
+      "from": "fn-entitlements",
+      "to": "plan_features",
+      "label": "features do plano"
+    },
+    {
+      "id": "fn-le-org",
+      "from": "fn-entitlements",
+      "to": "organizations",
+      "label": "plan_id"
+    },
+    {
+      "id": "fn-le-overrides",
+      "from": "fn-entitlements",
+      "to": "overrides",
+      "label": "ativos: não revogado, janela aberta; disable vence"
+    },
+    {
+      "id": "legado-semeia",
+      "from": "legado",
+      "to": "platform_plans",
+      "label": "seed idempotente"
+    },
+    {
+      "id": "legado-backfill",
+      "from": "legado",
+      "to": "organizations",
+      "label": "update … where plan_id is null"
+    },
+    {
+      "id": "resolver-rpc",
+      "from": "resolver",
+      "to": "fn-entitlements",
+      "label": "rpc / select"
+    },
+    {
+      "id": "resolver-forma",
+      "from": "resolver",
+      "to": "tipos",
+      "label": "lerEntitlements"
+    },
+    {
+      "id": "tipos-vocab",
+      "from": "tipos",
+      "to": "recursos",
+      "label": "ehRecurso · sempreLigado"
+    },
+    {
+      "id": "tipos-limites",
+      "from": "tipos",
+      "to": "limites",
+      "label": "lerLimites"
+    },
+    {
+      "id": "require-role-resolver",
+      "from": "require-role",
+      "to": "resolver",
+      "label": "entitlementsDaOrg(org)"
+    },
+    {
+      "id": "require-role-audita",
+      "from": "require-role",
+      "to": "audit",
+      "label": "authz.denied reason=feature_not_entitled"
+    },
+    {
+      "id": "exigir-resolver",
+      "from": "exigir-recurso",
+      "to": "resolver",
+      "label": "temRecurso"
+    },
+    {
+      "id": "exigir-redireciona",
+      "from": "exigir-recurso",
+      "to": "indisponivel",
+      "label": "redirect ?recurso="
+    },
+    {
+      "id": "exigir-destino",
+      "from": "exigir-recurso",
+      "to": "recursos",
+      "label": "recursoDoDestino (cerca)"
+    },
+    {
+      "id": "mcp-resolver",
+      "from": "mcp",
+      "to": "resolver",
+      "label": "recurso da tool"
+    },
+    {
+      "id": "mcp-audita",
+      "from": "mcp",
+      "to": "audit",
+      "label": "recusa auditada"
+    },
+    {
+      "id": "sidebar-vocab",
+      "from": "sidebar",
+      "to": "recursos",
+      "label": "GRUPO_PARA_RECURSO"
+    },
+    {
+      "id": "sidebar-le",
+      "from": "sidebar",
+      "to": "tipos",
+      "label": "temRecurso(activeOrg.entitlements)"
+    },
+    {
+      "id": "billing-le",
+      "from": "billing",
+      "to": "resolver",
+      "label": "plano, features, overrides"
+    },
+    {
+      "id": "billing-rotulo",
+      "from": "billing",
+      "to": "recursos",
+      "label": "ROTULO_DO_RECURSO"
+    },
+    {
+      "id": "indisponivel-rotulo",
+      "from": "indisponivel",
+      "to": "recursos",
+      "label": "nome leigo"
+    },
+    {
+      "id": "central-le",
+      "from": "central",
+      "to": "overrides",
+      "label": "'liberado até ends_at'"
+    },
+    {
+      "id": "drain-pg",
+      "from": "drain",
+      "to": "resolver",
+      "label": "resolver-pg"
+    },
+    {
+      "id": "drain-runs",
+      "from": "drain",
+      "to": "runs",
+      "label": "motivo no log do drain"
+    },
+    {
+      "id": "worker-pg",
+      "from": "agent-worker",
+      "to": "resolver",
+      "label": "resolver-pg após claim"
+    },
+    {
+      "id": "worker-runs",
+      "from": "agent-worker",
+      "to": "runs",
+      "label": "job done: feature_not_entitled"
+    },
+    {
+      "id": "worker-avisa",
+      "from": "agent-worker",
+      "to": "central",
+      "label": "1 aviso por org/mês"
+    },
+    {
+      "id": "broadcast-le",
+      "from": "broadcast-worker",
+      "to": "fn-entitlements",
+      "label": "fn_org_has_feature(org,'broadcast')"
+    },
+    {
+      "id": "broadcast-runs",
+      "from": "broadcast-worker",
+      "to": "runs",
+      "label": "run skipped com error_code"
+    },
+    {
+      "id": "automation-le",
+      "from": "automation",
+      "to": "resolver",
+      "label": "por ação"
+    },
+    {
+      "id": "automation-runs",
+      "from": "automation",
+      "to": "runs",
+      "label": "ação skipped na run"
+    },
+    {
+      "id": "inv-canais",
+      "from": "invariantes",
+      "to": "fn-entitlements",
+      "label": "canais sempre · resolução"
+    },
+    {
+      "id": "inv-rls",
+      "from": "invariantes",
+      "to": "overrides",
+      "label": "RLS entre tenants"
+    },
+    {
+      "id": "inv-check",
+      "from": "invariantes",
+      "to": "recursos",
+      "label": "CHECK ↔ RECURSOS/RECURSOS_VENDAVEIS"
+    },
+    {
+      "id": "audit-runs",
+      "from": "audit",
+      "to": "runs",
+      "label": "quem trocou o plano antes da execução pulada"
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { loadAuthUser, resolveActiveOrg } from "@/lib/auth/server";
 import { InboxLayout } from "@/components/inbox/InboxLayout";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Inbox" };
@@ -13,6 +14,8 @@ export default async function InboxPage({
 }: {
   searchParams: Promise<{ id?: string }>;
 }) {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("inbox");
   const user = await loadAuthUser();
   if (!user) redirect("/login");
   const activeOrg = await resolveActiveOrg(user);

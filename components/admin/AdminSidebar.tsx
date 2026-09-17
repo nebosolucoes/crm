@@ -16,6 +16,7 @@ import {
   Key,
   WebhooksLogo,
   ArrowRight,
+  Receipt,
 } from "@/lib/ui/icons";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,10 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/dashboard", label: "Dashboard", icon: Gauge },
   { href: "/admin/inbox", label: "Inbox", icon: ChatsCircle },
   { href: "/admin/tenants", label: "Tenants", icon: Buildings },
+  // O catálogo comercial (migration 0275): os planos e o que cada um inclui.
+  // Mesma razão das entradas de instalação abaixo: /admin tem navegação
+  // própria, fora do registro do tenant.
+  { href: "/admin/planos", label: "Planos", icon: Receipt },
   { href: "/admin/audit", label: "Audit", icon: ClipboardText },
   { href: "/admin/lgpd", label: "LGPD", icon: Scales },
   { href: "/admin/incidents", label: "Incidents", icon: Warning },

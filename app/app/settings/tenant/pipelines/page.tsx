@@ -5,6 +5,7 @@ import { ROLE_RANK } from "@/lib/auth/types";
 import { createClient } from "@/lib/supabase/server";
 import { PipelinesClient, type PipelineRow } from "./_client";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,8 @@ export const dynamic = "force-dynamic";
  * para admin — esconder o que a ação recusaria é honestidade, não permissão nova.
  */
 export default async function PipelinesSettingsPage() {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("crm");
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");

@@ -22,6 +22,7 @@ import {
 } from "@/lib/channels";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { recusaPorRecurso } from "@/lib/entitlements/exigir-na-rota";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,9 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
   if (!activeOrg) {
     return fail("no_active_org", t("No active organization."), 403, { requestId });
   }
+  // Recurso do plano (0275): depois da sessão e da organização, antes de qualquer dado.
+  const recusa = await recusaPorRecurso(activeOrg.orgId, "inbox", { requestId, resource: "messages", actorUserId: authUser?.id ?? null });
+  if (recusa) return recusa;
 
   // Client de sessão: RLS garante que a mensagem pertence a uma org do usuário.
   // Filtro explícito de organization_id por doutrina (defense-in-depth).

@@ -28,6 +28,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   // Sessão de navegador OU token de servidor: é o passo que antecede o envio,
   // e quem envia por token precisa poder resolver a conversa pelo telefone.
   const authz = await resolveAuthDual(req, {
+    feature: "inbox",
     requestId,
     resource: "conversations",
     role: "agent",

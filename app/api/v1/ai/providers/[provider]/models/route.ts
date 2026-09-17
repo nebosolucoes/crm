@@ -14,6 +14,7 @@ import { ehProvedorSuportado } from "@/lib/ai/pontos/provedores";
 import { traduzirCatalogo } from "@/lib/ai/catalogo/openrouter";
 import { buscarCatalogoOpenRouter } from "@/lib/ai/catalogo/buscar-openrouter";
 import { logger } from "@/lib/logger";
+import { recusaPorRecurso } from "@/lib/entitlements/exigir-na-rota";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,9 @@ export async function GET(
   if (!activeOrg) {
     return fail("forbidden_tenant", "Sem organização ativa.", 403, { requestId });
   }
+  // Recurso do plano (0275): depois da sessão e da organização, antes de qualquer dado.
+  const recusa = await recusaPorRecurso(activeOrg.orgId, "ai_agents", { requestId, resource: "ai_providers", actorUserId: authUser.id });
+  if (recusa) return recusa;
 
   const supabase = await createClient();
   const { data, error } = await supabase

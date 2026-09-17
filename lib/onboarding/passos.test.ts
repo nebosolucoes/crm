@@ -16,8 +16,8 @@ import {
 } from "@/lib/onboarding/passos";
 import type { OnboardingState } from "@/lib/schemas/onboarding";
 
-const SEM_LOJA: ContextoDoPasso = { lojaLigada: false };
-const COM_LOJA: ContextoDoPasso = { lojaLigada: true };
+const SEM_LOJA: ContextoDoPasso = { lojaLigada: false, iaLigada: true, crmLigado: true };
+const COM_LOJA: ContextoDoPasso = { lojaLigada: true, iaLigada: true, crmLigado: true };
 
 const VAZIO: OnboardingState = {};
 
@@ -114,5 +114,33 @@ describe("resumo final", () => {
     expect(rotulos).toContain("O telefone dele");
     expect(rotulos).toContain("Treinar");
     expect(rotulos).not.toContain("IA");
+  });
+});
+
+describe("o plano da organização decide os passos (migration 0275)", () => {
+  const SEM_IA: ContextoDoPasso = { lojaLigada: false, iaLigada: false, crmLigado: true };
+  const SEM_CRM: ContextoDoPasso = { lojaLigada: false, iaLigada: true, crmLigado: false };
+  const SO_ATENDIMENTO: ContextoDoPasso = { lojaLigada: false, iaLigada: false, crmLigado: false };
+
+  it("sem Agentes de IA, 'Treinar' e 'Ver ele atender' não existem — o wizard não pede um funcionário que não foi contratado", () => {
+    const segs = passosVisiveis(SEM_IA).map((p) => p.segmento);
+    expect(segs).not.toContain("setup-ai");
+    expect(segs).not.toContain("testar");
+    expect(segs).toContain("funil");
+  });
+
+  it("sem CRM, 'Onde ele organiza' não existe", () => {
+    const segs = passosVisiveis(SEM_CRM).map((p) => p.segmento);
+    expect(segs).not.toContain("funil");
+    expect(segs).toContain("setup-ai");
+  });
+
+  it("um Starter (só Atendimento) vai do telefone direto para a equipe, e o resumo não acusa o que nunca pediu", () => {
+    expect(passosVisiveis(SO_ATENDIMENTO).map((p) => p.segmento)).toEqual(["welcome", "connect-whatsapp", "invite-team"]);
+    const depoisDoTelefone = proximoPasso({ welcome: { accepted_at: "x" }, whatsapp: { skipped: true } } as never, SO_ATENDIMENTO);
+    expect(depoisDoTelefone?.segmento).toBe("invite-team");
+    const rotulos = resumoDoOnboarding(VAZIO, SO_ATENDIMENTO).map((i) => i.rotulo);
+    expect(rotulos).not.toContain("Treinar");
+    expect(rotulos).not.toContain("Onde ele organiza");
   });
 });

@@ -3,11 +3,14 @@ import { requireAuth } from "@/lib/auth/server";
 import { traduzir } from "@/lib/i18n/dicionario";
 
 import { ActivityReportClient } from "./_components/ActivityReportClient";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Atividades" };
 
 export default async function ActivitiesReportPage() {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("analytics");
   const user = await requireAuth();
   // `t` local e não o hook: componente de SERVIDOR — o idioma já vem resolvido
   // pela cadeia pessoa → organização → padrão em `lib/auth/server.ts`.

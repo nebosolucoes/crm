@@ -73,7 +73,7 @@ const filtrosDaQuery = z.object({
 });
 
 export async function GET(req: NextRequest): Promise<Response> {
-  const authz = await requireRole("manager", { resource: "ai_runs" });
+  const authz = await requireRole("manager", { feature: "ai_agents", resource: "ai_runs" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org } = authz;

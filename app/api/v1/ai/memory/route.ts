@@ -25,7 +25,7 @@ const postSchema = z.object({ content: z.string().min(1).max(50_000) });
 
 export async function GET(_req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "org_memory" });
+  const authz = await requireRole("agent", { feature: "ai_agents", requestId, resource: "org_memory" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org } = authz;
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("admin", { requestId, resource: "org_memory" });
+  const authz = await requireRole("admin", { feature: "ai_agents", requestId, resource: "org_memory" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org } = authz;

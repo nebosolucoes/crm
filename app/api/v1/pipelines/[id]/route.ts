@@ -81,7 +81,7 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "crm_pipelines" });
+  const authz = await requireRole("manager", { feature: "crm", requestId, resource: "crm_pipelines" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const orgId = authz.org.orgId;
@@ -254,7 +254,7 @@ export async function DELETE(req: NextRequest, ctx: RouteCtx): Promise<Response>
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "crm_pipelines" });
+  const authz = await requireRole("manager", { feature: "crm", requestId, resource: "crm_pipelines" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const orgId = authz.org.orgId;

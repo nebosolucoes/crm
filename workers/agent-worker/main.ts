@@ -113,6 +113,18 @@ import {
   type JobKind,
   type JobRow,
 } from "@/lib/agent-engine/queue/queue";
+import { avisarBloqueioPorRecursoPg } from "@/lib/entitlements/aviso-na-central";
+import { orgTemRecursoPg } from "@/lib/entitlements/resolver-pg";
+
+/** Os JobKind que são o AGENTE trabalhando — os que o plano `ai_agents` governa. */
+const KINDS_DE_IA: ReadonlySet<JobKind> = new Set<JobKind>([
+  "inbound_turn",
+  "followup_turn",
+  "watchdog",
+  "flywheel",
+  "case_reply_turn",
+  "operator_turn",
+]);
 
 export interface JobHandlerContext {
   workerId: string;
@@ -423,7 +435,44 @@ export async function startWorker(
     cacheHitAlertMinRuns: env.CACHE_HIT_ALERT_MIN_RUNS,
   };
 
+  const jobBarradoPeloPlano = async (job: JobRow): Promise<boolean> => {
+    if (!KINDS_DE_IA.has(job.kind)) return false;
+    let tem: boolean;
+    try {
+      tem = await orgTemRecursoPg(pool, job.organization_id, "ai_agents");
+    } catch (err) {
+      log.warn("plano não pôde ser conferido — job segue", { job_id: job.id, error: errMsg(err) });
+      return false;
+    }
+    if (tem) return false;
+    const { rowCount } = await pool.query(
+      `update job_queue
+          set status = 'done', locked_by = null, locked_at = null, last_error = $3
+        where id = $1 and locked_by = $2 and status = 'running'`,
+      [job.id, workerId, "feature_not_entitled: ai_agents não está no plano da organização"],
+    );
+    log.info("job pulado — organização sem Agentes de IA no plano", {
+      job_id: job.id,
+      kind: job.kind,
+      organization_id: job.organization_id,
+      settled: rowCount === 1,
+    });
+    try {
+      await avisarBloqueioPorRecursoPg(pool, job.organization_id, "ai_agents", "Uma tarefa do assistente");
+    } catch (err) {
+      log.warn("aviso de plano na Central não gravado", { job_id: job.id, error: errMsg(err) });
+    }
+    return true;
+  };
+
   const runJob = async (job: JobRow): Promise<void> => {
+    // O PLANO (migration 0275), logo depois do claim e antes de qualquer
+    // handler: um job de IA de organização sem Agentes de IA termina `done` com
+    // o motivo em `last_error` (aparece em Execuções) e um aviso na Central —
+    // nunca `dead` (não é falha) nem `pending` (voltaria a cada rodada). Vale
+    // para todo JobKind de IA; entregas transacionais e respostas aprovadas por
+    // gente são do Atendimento e seguem. Falha da consulta NÃO pula o job.
+    if (await jobBarradoPeloPlano(job)) return;
     try {
       const handler = handlers.get(job.kind);
       if (!handler) {

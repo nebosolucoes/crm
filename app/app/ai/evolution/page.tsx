@@ -4,6 +4,7 @@ import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { EvolutionClient } from "./_client";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,8 @@ function ultimosTrintaDiasUtc(): { from: string; to: string } {
 }
 
 export default async function EvolutionPage() {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("analytics");
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");

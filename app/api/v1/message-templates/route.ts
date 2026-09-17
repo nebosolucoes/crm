@@ -27,7 +27,7 @@ const ENDPOINT = "/api/v1/message-templates";
 
 export async function GET(_req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "message_templates" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "message_templates" });
   if (!authz.ok) return authz.response;
   const { org } = authz;
 
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "message_templates" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "message_templates" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org } = authz;

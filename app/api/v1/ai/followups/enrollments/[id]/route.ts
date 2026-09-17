@@ -139,7 +139,7 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const { id } = await ctx.params;
   if (!UUID_RX.test(id)) return fail("invalid_request", "id inválido.", 400, { requestId });
 
-  const authz = await requireRole("viewer", { requestId, resource: "followup_enrollments" });
+  const authz = await requireRole("viewer", { feature: "ai_agents", requestId, resource: "followup_enrollments" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org } = authz;

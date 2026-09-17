@@ -22,6 +22,7 @@ import { createChannelSchema } from "@/lib/schemas/channels";
 import { createClient } from "@/lib/supabase/server";
 import { getWahaClient } from "@/lib/waha/client";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { recusaPorLimite } from "@/lib/entitlements/exigir-na-rota";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +81,15 @@ export async function POST(req: NextRequest): Promise<Response> {
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org: activeOrg } = authz;
   if (await mfaEmDivida()) return fail("mfa_required", t("Confirme a verificação em duas etapas."), 403, { requestId });
+
+  // Limite do plano (etapa 8): o teto de canais barra ANTES de falar com o WAHA.
+  const noTeto = await recusaPorLimite(activeOrg.orgId, "max_channels", {
+    admin: createAdminClient(),
+    requestId,
+    resource: "channel_sessions",
+    actorUserId: user.id,
+  });
+  if (noTeto) return noTeto;
 
   const waha = getWahaClient();
   if (!waha) {

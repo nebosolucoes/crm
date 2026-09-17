@@ -15,11 +15,17 @@
  *     função SECURITY DEFINER que as policies RLS usam (fonte única de
  *     verdade); falha fechada se membership foi revogado.
  *  4. Rank insuficiente → audit `authz.denied` (fire-and-forget) + 403.
+ *  5. `feature` (migration 0275) — a ORGANIZAÇÃO tem o recurso? Vem por último,
+ *     depois do papel e da MFA, para a resposta não revelar o plano a quem nem
+ *     teria papel. Falta → 403 `feature_not_entitled` + `authz.denied`
+ *     (`reason: "feature_not_entitled"`). Ver `lib/entitlements/exigir-na-rota.ts`.
  */
 import type { NextResponse } from "next/server";
 
 import { fail, type ApiError } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
+import { recusaPorRecurso } from "@/lib/entitlements/exigir-na-rota";
+import type { Recurso } from "@/lib/entitlements/recursos";
 import { loadAuthUser, mfaEmDivida, resolveActiveOrg } from "@/lib/auth/server";
 import { ROLE_RANK, type ActiveOrg, type AuthUser, type Role } from "@/lib/auth/types";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -43,6 +49,13 @@ interface RequireRoleOpts {
    * NUNCA do body. O role vem de `fn_user_role_in_org(p_org)` nessa org.
    */
   organizationId?: string;
+  /**
+   * O recurso do plano que a rota exige (`lib/entitlements/recursos.ts`).
+   * Ausente = rota do produto, nunca gateada por plano (Organização, Canais,
+   * a Central). A cerca `tests/unit/rotas-declaram-recurso.test.ts` cobra a
+   * declaração em toda rota de diretório vendável.
+   */
+  feature?: Recurso;
 }
 
 /**
@@ -50,7 +63,7 @@ interface RequireRoleOpts {
  * `if (!authz.ok) return authz.response;`
  */
 export async function requireRole(min: Role, opts: RequireRoleOpts = {}): Promise<RoleCheck> {
-  const { requestId, resource, allowPlatformAdmin = false, organizationId } = opts;
+  const { requestId, resource, allowPlatformAdmin = false, organizationId, feature } = opts;
 
   const user = await loadAuthUser();
   if (!user) {
@@ -86,6 +99,12 @@ export async function requireRole(min: Role, opts: RequireRoleOpts = {}): Promis
   }
 
   if (allowPlatformAdmin && user.is_platform_admin && !user.support) {
+    // O platform admin bypassa o PAPEL, nunca o plano: entitlement é da
+    // organização, e quem a acompanha vê o que ela vê.
+    if (feature) {
+      const recusa = await recusaPorRecurso(org.orgId, feature, { requestId, resource, actorUserId: user.id });
+      if (recusa) return { ok: false, response: recusa };
+    }
     return { ok: true, user, org };
   }
 
@@ -150,6 +169,11 @@ export async function requireRole(min: Role, opts: RequireRoleOpts = {}): Promis
         requestId,
       }),
     };
+  }
+
+  if (feature) {
+    const recusa = await recusaPorRecurso(org.orgId, feature, { requestId, resource, actorUserId: user.id });
+    if (recusa) return { ok: false, response: recusa };
   }
 
   return { ok: true, user, org: { ...org, role: effectiveRole as Role } };

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { NavHub } from "@/components/shell/NavHub";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
+import { entitlementsDaOrg } from "@/lib/entitlements/resolver";
+import { serializarEntitlements } from "@/lib/entitlements/tipos";
 import { traduzir } from "@/lib/i18n/dicionario";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +28,10 @@ export const metadata: Metadata = { title: "Configurações" };
 export default async function SettingsHubPage() {
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
+  // Mesma memória por request do layout (`react.cache`): nenhuma ida a mais.
+  const entitlements = activeOrg
+    ? serializarEntitlements(await entitlementsDaOrg(activeOrg.orgId))
+    : null;
   const idioma = user.idioma;
 
   return (
@@ -34,6 +40,7 @@ export default async function SettingsHubPage() {
       isPlatformAdmin={user.is_platform_admin && !user.support}
       role={activeOrg?.role ?? null}
       interfaceSettings={activeOrg?.interface_settings}
+      entitlements={entitlements}
       title={traduzir("Configurações", idioma)}
       subtitle={traduzir("Sua conta, os dados da empresa e quem tem acesso ao quê.", idioma)}
       locale={idioma}

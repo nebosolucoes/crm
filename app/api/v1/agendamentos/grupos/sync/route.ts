@@ -27,7 +27,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "scheduled_whatsapp_groups" });
+  const authz = await requireRole("manager", { feature: "broadcast", requestId, resource: "scheduled_whatsapp_groups" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 

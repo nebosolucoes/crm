@@ -33,6 +33,7 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { camposDoFunil, settingsDoEmbed } from "@/lib/leads/campos-do-funil";
 import { createClient } from "@/lib/supabase/server";
 import { nomesDosAtendentes } from "@/lib/users/nome-do-atendente";
+import { recusaPorRecurso } from "@/lib/entitlements/exigir-na-rota";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +91,9 @@ export async function GET(
     .select("organization_id").eq("id", contactId).maybeSingle();
   if (scopeError) return fail("internal_error", scopeError.message, 500, { requestId });
   if (!contactScope) return fail("not_found", "Contato não encontrado.", 404, { requestId });
+  // Recurso do plano (0275): depois da sessão e da organização, antes de qualquer dado.
+  const recusa = await recusaPorRecurso(contactScope.organization_id, "crm", { requestId, resource: "contacts", actorUserId: user.id });
+  if (recusa) return recusa;
   const [leads, orders, activities, demandas, fatos, historico] = await Promise.all([
     supabase
       .from("crm_leads")

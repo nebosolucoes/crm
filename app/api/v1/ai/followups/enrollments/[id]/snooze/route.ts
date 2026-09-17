@@ -37,7 +37,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const invalido = validaIdDaRota(id, requestId);
   if (invalido) return invalido;
 
-  const authz = await requireRole("manager", { requestId, resource: "followup_enrollments" });
+  const authz = await requireRole("manager", { feature: "ai_agents", requestId, resource: "followup_enrollments" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org } = authz;

@@ -25,7 +25,7 @@ const querySchema = z.object({
 
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "agent_cases" });
+  const authz = await requireRole("agent", { feature: "ai_agents", requestId, resource: "agent_cases" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org } = authz;

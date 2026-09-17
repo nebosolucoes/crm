@@ -7,6 +7,7 @@ import { ROLE_RANK } from "@/lib/auth/types";
 import { createClient } from "@/lib/supabase/server";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { FunisClient, type FunilDaLista } from "./_client";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Funis" };
@@ -31,6 +32,8 @@ export const metadata: Metadata = { title: "Funis" };
  * botão que o servidor recusaria seria prometer o que não se cumpre.
  */
 export default async function KanbanPickerPage() {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("crm");
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");

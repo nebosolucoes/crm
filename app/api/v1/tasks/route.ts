@@ -66,7 +66,7 @@ const listaSchema = z.object({
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
 
-  const authz = await requireRole("viewer", { requestId, resource: "crm_tasks" });
+  const authz = await requireRole("viewer", { feature: "crm", requestId, resource: "crm_tasks" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
 
   // `agent` e não `manager`: criar tarefa é o gesto de quem ATENDE, todo dia.
-  const authz = await requireRole("agent", { requestId, resource: "crm_tasks" });
+  const authz = await requireRole("agent", { feature: "crm", requestId, resource: "crm_tasks" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 

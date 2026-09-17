@@ -43,6 +43,9 @@ const redirects: string[] = [];
 let responder: (c: Consulta) => Resposta;
 let responderRpc: (nome: string, args: Record<string, unknown>) => Resposta;
 
+// O plano da organização (migration 0275): a action recusa sem Agentes de IA;
+// aqui a organização fictícia tem tudo, como o legado.
+vi.mock("@/lib/entitlements/resolver", () => ({ orgTemRecurso: async () => true }));
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => {
     redirects.push(url);

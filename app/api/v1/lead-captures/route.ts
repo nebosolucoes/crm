@@ -31,6 +31,7 @@ const COLUNAS =
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
   const authz = await requireRole("manager", {
+    feature: "crm",
     requestId,
     resource: "lead_captures",
     allowPlatformAdmin: true,

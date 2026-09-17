@@ -14,7 +14,7 @@ import type { z } from "zod";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { auditMcpToolCall } from "./audit";
-import { ensureRole, ensureScope, type McpAuthResult } from "./auth";
+import { ensureRecurso, ensureRole, ensureScope, type McpAuthResult } from "./auth";
 import { allTools } from "./tools";
 import { higienizarUuidsDeAterro } from "./uuid-de-aterro";
 import type { McpContext } from "./types";
@@ -72,6 +72,8 @@ export function createMcpServer(auth: McpAuthResult, requestId: string): McpServ
         try {
           ensureScope(auth.scopes, tool.requiresScope);
           ensureRole(auth.role, tool.requiresRole);
+          // O plano da organização DO TOKEN (migration 0275) — depois do papel.
+          await ensureRecurso(auth.organizationId, tool.name);
 
           const result = await tool.handler(args as never, ctx);
           const durationMs = Date.now() - startedAt;

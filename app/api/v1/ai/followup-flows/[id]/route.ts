@@ -35,7 +35,7 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
     return fail("invalid_request", "id inválido.", 400, { requestId });
   }
 
-  const authz = await requireRole("viewer", { requestId, resource: "followup_flows" });
+  const authz = await requireRole("viewer", { feature: "ai_agents", requestId, resource: "followup_flows" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org: activeOrg } = authz;
@@ -93,7 +93,7 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
     return fail("invalid_request", "id inválido.", 400, { requestId });
   }
 
-  const authz = await requireRole("manager", { requestId, resource: "followup_flows" });
+  const authz = await requireRole("manager", { feature: "ai_agents", requestId, resource: "followup_flows" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org: activeOrg } = authz;
@@ -179,7 +179,7 @@ export async function DELETE(_req: NextRequest, ctx: RouteCtx): Promise<Response
     return fail("invalid_request", "id inválido.", 400, { requestId });
   }
 
-  const authz = await requireRole("manager", { requestId, resource: "followup_flows" });
+  const authz = await requireRole("manager", { feature: "ai_agents", requestId, resource: "followup_flows" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org: activeOrg } = authz;

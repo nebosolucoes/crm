@@ -44,7 +44,7 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
     return fail("invalid_request", "id inválido.", 400, { requestId });
   }
 
-  const authz = await requireRole("agent", { requestId, resource: "ai_routers" });
+  const authz = await requireRole("agent", { feature: "ai_agents", requestId, resource: "ai_routers" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org } = authz;
@@ -91,7 +91,7 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
     return fail("invalid_request", "id inválido.", 400, { requestId });
   }
 
-  const authz = await requireRole("admin", { requestId, resource: "ai_routers" });
+  const authz = await requireRole("admin", { feature: "ai_agents", requestId, resource: "ai_routers" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org } = authz;
@@ -179,7 +179,7 @@ export async function DELETE(_req: NextRequest, ctx: RouteCtx): Promise<Response
     return fail("invalid_request", "id inválido.", 400, { requestId });
   }
 
-  const authz = await requireRole("admin", { requestId, resource: "ai_routers" });
+  const authz = await requireRole("admin", { feature: "ai_agents", requestId, resource: "ai_routers" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org } = authz;

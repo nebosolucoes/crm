@@ -69,6 +69,19 @@ DeskcommCRM é um sistema operacional de vendas open source com agentes de IA na
   - **⚠️ CADASTRAR e PROVAR são perguntas diferentes.** A política decide o cadastro. Já `mfaEmDivida()` — o 403 `mfa_required` das rotas — NÃO consulta a política: quem TEM fator prova na sessão, sempre. Ligá-lo à política faria quem ativa a verificação por vontade própria ter o fator ignorado
   - Ligar/desligar vive em **Configurações › Segurança**; desligar o próprio fator exige sessão `aal2` (senão uma sessão roubada desliga a proteção com um clique)
 - Permissão por pipeline (`user_pipeline_access`) **NÃO** entra no MVP
+- **Plano é o segundo eixo (migration 0275): organização possui recurso + usuário possui papel = acesso.**
+  Vocabulário em `lib/entitlements/recursos.ts` (`channels`, `inbox`, `broadcast`, `crm`, `ai_agents`,
+  `analytics`); a resposta é UMA função SQL, `fn_org_entitlements(org)`, lida por `requireRole({ feature })`,
+  `exigirRecurso()` nas páginas, pelo MCP e pelos dois workers (`resolver.ts` e `resolver-pg.ts` só dão
+  forma ao jsonb). **Nunca `if (plan === "pro")`** — plano é dado (`platform_plans`), recurso é código.
+  `channels` não é dado, é lei: não é linha em `platform_plan_features`, a função o une sempre, e um CHECK
+  recusa desligá-lo. `organizations.plan_id` só muda por `fn_definir_plano_da_organizacao` (trigger recusa
+  o resto); `settings.plan` é chave morta. Rota vendável declara `feature:`, página vendável chama
+  `exigirRecurso()` — as cercas `tests/unit/rotas-declaram-recurso.test.ts` e
+  `tests/unit/paginas-exigem-recurso.test.ts` reprovam omissão. Falha do resolvedor é 500, nunca "sem
+  recurso"; só a AUSÊNCIA da função (banco sem a 0275) degrada para tudo ligado, com log e Sentry.
+  O que o worker pula por plano vira `skipped`/`done` com motivo e um aviso na Central — nunca silêncio.
+  Receita para recurso novo: cabeçalho de `recursos.ts`. Spec: `docs/specs/01` §5.1
 
 ### Audit log
 - Toda mutação POST/PATCH/DELETE bem-sucedida → 1 entrada em `api_audit_log` (fire-and-forget, p99 ≤500ms)

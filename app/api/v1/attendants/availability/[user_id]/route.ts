@@ -3,7 +3,7 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
  * PATCH /api/v1/attendants/availability/[user_id] — grava disponibilidade.
  *
  * Autz (spec 13 §5): o PRÓPRIO atendente muda a sua; manager+ muda de qualquer
- * membro da org. requireRole("agent") + checagem (user_id == auth.uid() OR
+ * membro da org. requireRole("agent", { feature: "inbox" }) + checagem (user_id == auth.uid() OR
  * role>=manager). A RLS de attendant_availability (own OR manager) é backstop.
  *
  * Persistência do <AttendantStatusToggle> (spec 04 §8). A chave diz a INTENÇÃO
@@ -44,7 +44,7 @@ export async function PATCH(
   const requestId = randomUUID();
   const { user_id: targetUserId } = await ctx.params;
 
-  const authz = await requireRole("agent", { requestId, resource: "attendant_availability" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "attendant_availability" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org: activeOrg } = authz;

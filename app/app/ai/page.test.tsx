@@ -9,6 +9,20 @@ const { requireAuthMock, resolveActiveOrgMock } = vi.hoisted(() => ({
 vi.mock("@/lib/auth/server", () => ({
   requireAuth: requireAuthMock,
   resolveActiveOrg: resolveActiveOrgMock,
+  // `exigirRecurso` (migration 0275) resolve a sessão por aqui também.
+  loadAuthUser: requireAuthMock,
+}));
+// O plano da organização: o hub de IA exige `ai_agents`; aqui a organização
+// fictícia tem tudo, como o legado.
+vi.mock("@/lib/entitlements/resolver", () => ({
+  orgTemRecurso: async () => true,
+  entitlementsDaOrg: async () => ({
+    plan: null,
+    origem: "atribuido",
+    features: new Set(["channels", "inbox", "broadcast", "crm", "ai_agents", "analytics"]),
+    limits: {},
+    overrides: [],
+  }),
 }));
 
 vi.mock("@/components/shell/NavHub", () => ({

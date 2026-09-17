@@ -16,7 +16,7 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { auditMcpToolCall } from "@/lib/mcp/audit";
-import { McpAuthError, ensureRole, ensureScope } from "@/lib/mcp/auth";
+import { MCP_CODE_FEATURE_NOT_ENTITLED, McpAuthError, ensureRecurso, ensureRole, ensureScope } from "@/lib/mcp/auth";
 import type { McpAuthResult } from "@/lib/mcp/auth";
 import { logger } from "@/lib/logger";
 import { allTools, getToolByName } from "@/lib/mcp/tools";
@@ -97,6 +97,9 @@ function wrapMcpTool(
       try {
         ensureScope(input.auth.scopes, def.requiresScope);
         ensureRole(input.auth.role, def.requiresRole);
+        // O plano da organização (migration 0275): um agente de organização
+        // sem CRM não move funil, mesmo tendo IA. Depois do papel, como na API.
+        await ensureRecurso(input.ctx.organizationId, def.name);
 
         // ── ESCOPO DE FUNIL (spec 17 passo 3) ────────────────────────────────
         //
@@ -221,7 +224,12 @@ function wrapMcpTool(
         // mensagem original continua no log e na observabilidade acima, onde
         // serve; para o modelo vai uma instrução que já sabe o que é.
         if (err instanceof McpAuthError) {
-          return { error: recusaDeCapacidadeParaOModelo(def.name) };
+          return {
+            error: recusaDeCapacidadeParaOModelo(
+              def.name,
+              err.mcpCode === MCP_CODE_FEATURE_NOT_ENTITLED ? "fora_do_plano" : undefined,
+            ),
+          };
         }
         // Return error to the model rather than throwing — keeps the loop alive.
         return { error: message };

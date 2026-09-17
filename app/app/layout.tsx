@@ -4,6 +4,8 @@ import { cookies } from "next/headers";
 import { isMfaEnrolled, loadAuthUser, requiresMfa, resolveActiveOrg } from "@/lib/auth/server";
 import { DEFAULT_VISIBILITY_MODE, type VisibilityMode } from "@/lib/auth/types";
 import { clientePelaAgendaLigado } from "@/lib/schemas/settings";
+import { entitlementsDaOrg } from "@/lib/entitlements/resolver";
+import { serializarEntitlements } from "@/lib/entitlements/tipos";
 import { AuthProvider } from "@/hooks/auth/AuthProvider";
 import { AppShell } from "./_components/AppShell";
 import { MfaEnrollGate } from "@/components/auth/MfaEnrollGate";
@@ -70,7 +72,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
      *    este layout — a cerca anterior lia o texto-fonte e reprovava esta
      *    refatoração sem que nada tivesse quebrado.
      */
-    const [orgRes, conexoes, isEnrolled, mfaRequired] = await Promise.all([
+    // A quinta consulta entra no MESMO `Promise.all`, pelo mesmo motivo das
+    // outras quatro: independente, e paga por toda página. Erro dela LANÇA
+    // (ver `lib/entitlements/resolver.ts`) — uma falha de banco não pode chegar
+    // ao cliente como "seu plano perdeu o CRM".
+    const [orgRes, conexoes, isEnrolled, mfaRequired, entitlements] = await Promise.all([
       admin
         .from("organizations")
         .select("onboarded_at, status, settings")
@@ -84,6 +90,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         user.id,
         activeOrg.orgId,
       ),
+      entitlementsDaOrg(activeOrg.orgId),
     ]);
 
     const orgRow = orgRes.data;
@@ -102,6 +109,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       visibility_mode: mode ?? DEFAULT_VISIBILITY_MODE,
       // Mesma linha de `settings` já lida acima — nenhuma consulta a mais.
       cliente_pela_agenda: clientePelaAgendaLigado(orgRow?.settings),
+      // O que a organização pode usar, para o Sidebar/hubs/⌘K não desenharem o
+      // que a API recusa. Não é autorização — ver `ActiveOrg.entitlements`.
+      entitlements: serializarEntitlements(entitlements),
     };
 
     // Marca visual é global da instalação. `organizations.settings.branding`

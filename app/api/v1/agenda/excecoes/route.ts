@@ -18,7 +18,7 @@
  * nunca o admin: a policy `calendar_availability_exceptions_write` já diz que
  * escreve quem é dono da agenda (`user_id = auth.uid()`) ou manager+. Repetir
  * essa regra em TypeScript criaria uma segunda fonte da mesma verdade, e a que
- * roda aqui seria a pior das duas. `requireRole("agent")` é só a borda de
+ * roda aqui seria a pior das duas. `requireRole("agent", { feature: "inbox" })` é só a borda de
  * autenticação.
  *
  * **`user_id` não vem do corpo quando é o próprio.** Ele existe como campo
@@ -65,7 +65,7 @@ const criarSchema = z
 
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "agenda" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "agenda" });
   if (!authz.ok) return authz.response;
 
   const url = new URL(req.url);
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "agenda" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "agenda" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 
@@ -160,7 +160,7 @@ export async function DELETE(req: NextRequest): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "agenda" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "agenda" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 

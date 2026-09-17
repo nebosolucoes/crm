@@ -833,6 +833,35 @@ create unique index idx_recovery_unique on public.user_recovery_codes(user_id, c
 
 **Implementação**: middleware `requirePermission(resource, action)` checa role via `fn_user_role_in_org(orgId)` + `fn_is_platform_admin()`. Falha → 403 com `error.code='forbidden_role'`.
 
+### 5.1 O segundo eixo: entitlement da organização (migration 0275)
+
+A matriz acima responde **quem** pode; ela pressupõe que a organização **tem** o módulo.
+Desde a 0275 isso é uma pergunta à parte, e as duas somam:
+
+```
+organização possui recurso  (fn_org_entitlements / fn_org_has_feature)
++ usuário possui papel       (matriz acima)
+= acesso
+```
+
+| Conceito | Onde vive | Natureza |
+|---|---|---|
+| Plano | `platform_plans` (+ `platform_plan_features`, `limits jsonb`) | dado — nasce pela tela do admin, sem deploy |
+| Recurso | `RECURSOS` em `lib/entitlements/recursos.ts` (`channels`, `inbox`, `broadcast`, `crm`, `ai_agents`, `analytics`) | código — o banco só o espelha em CHECK |
+| Atribuição | `organizations.plan_id` (só muda por `fn_definir_plano_da_organizacao`; trigger recusa o resto) | fonte da verdade; `settings.plan` é chave morta |
+| Override | `organization_feature_overrides` (`enable`/`disable`, `starts_at`/`ends_at`, `limits`, `revoked_at`) | liberação/bloqueio por organização; expiração passiva |
+| Entitlement | `fn_org_entitlements(org)` → `{plan, origem, features[], limits{}, overrides[]}` | a resposta, resolvida uma vez, em SQL |
+
+Regras que o banco garante (`tests/invariants/entitlements-planos.test.ts`): `channels` entra sempre
+(fora do CHECK de `platform_plan_features`, união incondicional na função, CHECK
+`ofo_canais_nunca_desligam`); `disable` ativo vence `enable` ativo; plano inativo não recebe
+organização nova e não derruba quem já está nele; o padrão (`is_default`, um só) não pode ser
+desativado; organização nova nasce no padrão por trigger; sem plano e sem padrão a resposta é só
+`channels` com `origem = 'nenhum'`. Falha do resolvedor é 500, nunca "sem recurso". Recusa por
+recurso na API: 403 `feature_not_entitled` (auditado como `authz.denied` com
+`metadata.reason = "feature_not_entitled"`). O vocabulário e a receita para recurso novo estão no
+cabeçalho de `recursos.ts`; a decisão de manter CHECK em vez de catálogo com FK, na migration.
+
 ---
 
 ## 6. Audit log: lista canônica de actions

@@ -62,7 +62,7 @@ export async function PATCH(
   const requestId = randomUUID();
   const { id } = await ctx.params;
 
-  const authz = await requireRole("agent", { requestId, resource: "demandas" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "demandas" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org: activeOrg, user } = authz;

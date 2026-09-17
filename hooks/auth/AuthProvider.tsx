@@ -11,6 +11,8 @@ import {
 import { Providers } from "@/app/providers";
 import { createClient, resetRealtimeAuthentication } from "@/lib/supabase/browser";
 import type { AuthUser, ActiveOrg, Role } from "@/lib/auth/types";
+import type { Recurso } from "@/lib/entitlements/recursos";
+import { temRecurso } from "@/lib/entitlements/tipos";
 import { ROLE_RANK } from "@/lib/auth/types";
 
 interface AuthCtx {
@@ -102,6 +104,19 @@ export function useUser(): AuthUser {
 
 export function useActiveOrg(): ActiveOrg | null {
   return useAuth().activeOrg;
+}
+
+/**
+ * A organização ativa PODE USAR este recurso (plano + overrides)?
+ *
+ * Lê o que o layout de `/app` resolveu (`activeOrg.entitlements`). NÃO é
+ * autorização — a API recusa sozinha com 403 `feature_not_entitled`, e a
+ * página com `exigirRecurso()`; isto serve para a tela não oferecer um botão
+ * que a API vai recusar. Sem organização ativa, ou antes de o contexto chegar,
+ * responde fechado para o vendável e aberto para `channels`.
+ */
+export function useRecurso(recurso: Recurso): boolean {
+  return temRecurso(useAuth().activeOrg?.entitlements ?? null, recurso);
 }
 
 /**

@@ -27,11 +27,14 @@ import { existeConexaoDeLeitura } from "@/lib/plataformas-de-anuncio/credenciais
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { MetaAdsClient } from "./_components/MetaAdsClient";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const metadata = { title: "Meta Ads" };
 export const dynamic = "force-dynamic";
 
 export default async function MetaAdsPage() {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("analytics");
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");

@@ -14,7 +14,7 @@ const COLUNAS =
 
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("viewer", { requestId, resource: "scheduled_group_message_runs" });
+  const authz = await requireRole("viewer", { feature: "broadcast", requestId, resource: "scheduled_group_message_runs" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 

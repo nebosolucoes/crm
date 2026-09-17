@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { NavHub } from "@/components/shell/NavHub";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
+import { entitlementsDaOrg } from "@/lib/entitlements/resolver";
+import { serializarEntitlements } from "@/lib/entitlements/tipos";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "CRM" };
@@ -23,8 +26,14 @@ export const metadata: Metadata = { title: "CRM" };
  * título, o subtítulo e as seções em espanhol, e não uma tela meio traduzida.
  */
 export default async function CrmHubPage() {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("crm");
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
+  // Mesma memória por request do layout (`react.cache`): nenhuma ida a mais.
+  const entitlements = activeOrg
+    ? serializarEntitlements(await entitlementsDaOrg(activeOrg.orgId))
+    : null;
   const idioma = user.idioma;
 
   return (
@@ -33,6 +42,7 @@ export default async function CrmHubPage() {
       isPlatformAdmin={user.is_platform_admin && !user.support}
       role={activeOrg?.role ?? null}
       interfaceSettings={activeOrg?.interface_settings}
+      entitlements={entitlements}
       title={traduzir("CRM", idioma)}
       subtitle={traduzir(
         "Onde a venda acontece — e o que você define uma vez para ela funcionar.",

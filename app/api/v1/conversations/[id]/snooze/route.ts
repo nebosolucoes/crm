@@ -34,7 +34,7 @@ export async function POST(req: NextRequest, { params }: RouteParams): Promise<R
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "conversations" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "conversations" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org } = authz;
@@ -81,7 +81,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams): Promis
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "conversations" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "conversations" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org } = authz;

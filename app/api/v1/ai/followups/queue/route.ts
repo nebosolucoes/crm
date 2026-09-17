@@ -132,7 +132,7 @@ function sortCompare(a: { next_fire_at: string | null; id: string }, b: { next_f
 
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("viewer", { requestId, resource: "followup_queue" });
+  const authz = await requireRole("viewer", { feature: "ai_agents", requestId, resource: "followup_queue" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org: activeOrg } = authz;

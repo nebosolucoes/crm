@@ -7,6 +7,7 @@ import {
   type ChannelSessionRef,
 } from "@/lib/channels/session-ref";
 import type { ChannelProvider } from "@/lib/channels/types";
+import { avisarBloqueioPorRecurso } from "@/lib/entitlements/aviso-na-central";
 import { logger } from "@/lib/logger";
 import type { createAdminClient } from "@/lib/supabase/admin";
 
@@ -118,12 +119,44 @@ function mensagemDeErro(err: unknown): string {
   return err instanceof Error ? err.message : String(err ?? "erro_desconhecido");
 }
 
+/**
+ * A organização tem Disparo no plano (migration 0275)? Uma consulta por
+ * organização por rodada. Erro da consulta NÃO bloqueia o envio — um disparo
+ * agendado por quem tem o recurso não pode deixar de sair por um blip do
+ * banco (`null` = não deu para saber → segue).
+ */
+async function organizacaoTemDisparo(
+  admin: AdminClient,
+  memoria: Map<string, boolean>,
+  organizationId: string,
+  requestId: string,
+): Promise<boolean | null> {
+  const lembrado = memoria.get(organizationId);
+  if (lembrado !== undefined) return lembrado;
+  const { data, error } = await admin.rpc("fn_org_has_feature", {
+    p_org: organizationId,
+    p_feature: "broadcast",
+  });
+  if (error) {
+    logger.warn("[scheduled-group-messages] plano não pôde ser conferido — seguindo com o envio", {
+      organization_id: organizationId,
+      error: error.message,
+      requestId,
+    });
+    return null;
+  }
+  const tem = data === true;
+  memoria.set(organizationId, tem);
+  return tem;
+}
+
 export async function executarAgendamentosDeGrupo(
   admin: AdminClient,
   now: Date,
   requestId: string,
   limite = LIMITE_PADRAO,
 ): Promise<ResultadoDoWorkerDeAgendamentosDeGrupo> {
+  const planoPorOrg = new Map<string, boolean>();
   const sendingPresoAntesDe = new Date(now.getTime() - LIMITE_SENDING_PRESO_MS).toISOString();
   const { error: sendingPresoError } = await admin
     .from("scheduled_group_message_runs")
@@ -307,6 +340,15 @@ export async function executarAgendamentosDeGrupo(
       if (status === "skipped") resultado.skipped += 1;
       else resultado.failed += 1;
     };
+
+    // O plano ANTES do grupo e da conexão: é a condição mais barata e a que a
+    // organização inteira compartilha. `skipped`, não `failed` — nada quebrou;
+    // e o relógio avança, senão a mesma ocorrência voltaria a cada minuto.
+    if ((await organizacaoTemDisparo(admin, planoPorOrg, agendamento.organization_id, requestId)) === false) {
+      await falhar("feature_not_entitled", "Disparo não está incluído no plano da organização.", "skipped");
+      void avisarBloqueioPorRecurso(admin, agendamento.organization_id, "broadcast", "Um disparo programado");
+      continue;
+    }
 
     if (!agendamento.scheduled_whatsapp_groups?.is_active) {
       await falhar("group_inactive", "Grupo inativo no cadastro de agendamentos.", "skipped");

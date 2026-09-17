@@ -27,6 +27,12 @@ export const ApiErrorCodes = {
   forbidden_role: "forbidden_role",
   forbidden_tenant: "forbidden_tenant",
   lgpd_anonymization_irreversible: "lgpd_anonymization_irreversible",
+  // A ORGANIZAÇÃO não tem o recurso no plano (nem por override) — distinto de
+  // `forbidden_role`, que é sobre a PESSOA. A tela precisa da diferença: um pede
+  // falar com quem administra a organização, o outro pede falar com quem vende
+  // o plano. Emitido só por `requireRole({ feature })` e pelo MCP; `details`
+  // leva `{ feature }`. Vocabulário em `lib/entitlements/recursos.ts`.
+  feature_not_entitled: "feature_not_entitled",
 
   // 404
   not_found: "not_found",
@@ -57,6 +63,11 @@ export const ApiErrorCodes = {
   // 409 — conflito
   idempotency_conflict: "idempotency_conflict",
   state_conflict: "state_conflict",
+  // O teto de um limite do plano foi alcançado (`lib/entitlements/limites.ts`).
+  // `details` leva `{ limite, teto, uso }`. Declarado junto com
+  // `feature_not_entitled` para o contrato nascer inteiro; só passa a ser
+  // emitido quando a chave tiver `enforced: true` (etapa 8).
+  limit_reached: "limit_reached",
   invalid_state: "invalid_state", // resposta a um agent_case que saiu de awaiting_human (spec 15 §7)
   tenant_already_exists: "tenant_already_exists",
   // POST /api/v1/contacts com telefone já cadastrado na mesma organização

@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("viewer", { requestId, resource: "catalog_products" });
+  const authz = await requireRole("viewer", { feature: "crm", requestId, resource: "catalog_products" });
   if (!authz.ok) return authz.response;
 
   const busca = req.nextUrl.searchParams.get("busca")?.trim() ?? "";
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "catalog_products" });
+  const authz = await requireRole("manager", { feature: "crm", requestId, resource: "catalog_products" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 

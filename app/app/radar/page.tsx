@@ -4,11 +4,14 @@ import { redirect } from "next/navigation";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { RiskRadarList } from "./_components/RiskRadarList";
+import { exigirRecurso } from "@/lib/entitlements/exigir";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Radar" };
 
 export default async function RadarPage() {
+  // O plano da organização (migration 0275): antes de qualquer dado.
+  await exigirRecurso("inbox");
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");

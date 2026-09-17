@@ -12,6 +12,7 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { loadAuthUser, resolveActiveOrg } from "@/lib/auth/server";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { createClient } from "@/lib/supabase/server";
+import { recusaPorRecurso } from "@/lib/entitlements/exigir-na-rota";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,9 @@ export async function GET(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
   if (!activeOrg) {
     return fail("no_active_org", t("No active organization."), 403, { requestId });
   }
+  // Recurso do plano (0275): depois da sessão e da organização, antes de qualquer dado.
+  const recusa = await recusaPorRecurso(activeOrg.orgId, "inbox", { requestId, resource: "conversations", actorUserId: authUser?.id ?? null });
+  if (recusa) return recusa;
 
   const { data: conv, error: convErr } = await supabase
     .from("conversations")

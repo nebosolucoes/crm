@@ -145,7 +145,7 @@ export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
 
   // `viewer`: olhar a agenda é o menor privilégio desta feature.
-  const authz = await requireRole("viewer", { requestId, resource: "agenda" });
+  const authz = await requireRole("viewer", { feature: "inbox", requestId, resource: "agenda" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org: activeOrg } = authz;
@@ -304,7 +304,7 @@ async function despachar<T>(
 ): Promise<Response> {
   const requestId = randomUUID();
 
-  const authz = await requireRole("agent", { requestId, resource: "agenda" });
+  const authz = await requireRole("agent", { feature: "inbox", requestId, resource: "agenda" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org: activeOrg, user } = authz;

@@ -39,7 +39,7 @@ export async function POST(_req: NextRequest, ctx: Ctx): Promise<Response> {
   }
 
   // Publicar versão é ato de admin — mesmo rank da rota de publish existente.
-  const authz = await requireRole("admin", { requestId, resource: "flywheel_proposals" });
+  const authz = await requireRole("admin", { feature: "ai_agents", requestId, resource: "flywheel_proposals" });
   if (!authz.ok) return authz.response;
   const { user: authUser, org } = authz;
 

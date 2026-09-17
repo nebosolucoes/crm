@@ -80,7 +80,7 @@ export async function POST(req: NextRequest, { params }: RouteParams): Promise<R
   if (supportDenied) return supportDenied;
 
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "agent_cases" });
+  const authz = await requireRole("agent", { feature: "ai_agents", requestId, resource: "agent_cases" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { org, user } = authz;

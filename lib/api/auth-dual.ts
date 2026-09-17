@@ -30,6 +30,8 @@ import { type NextRequest } from "next/server";
 import type { Actor } from "@/lib/api/handlers/types";
 import { fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
+import { recusaPorRecurso } from "@/lib/entitlements/exigir-na-rota";
+import type { Recurso } from "@/lib/entitlements/recursos";
 import type { Role } from "@/lib/auth/types";
 import type { Idioma } from "@/lib/i18n/idiomas";
 import {
@@ -63,6 +65,8 @@ export interface AuthDualOptions {
   role: Role;
   /** Scope exigido do token. Rotas de escrita usam `mcp:write`. */
   scope: string;
+  /** O recurso do plano que a rota exige, nos DOIS modos. Ver `requireRole`. */
+  feature?: Recurso;
 }
 
 /**
@@ -71,7 +75,7 @@ export interface AuthDualOptions {
  */
 export async function resolveAuthDual(
   req: NextRequest,
-  { requestId, resource, role, scope }: AuthDualOptions,
+  { requestId, resource, role, scope, feature }: AuthDualOptions,
 ): Promise<AuthDual> {
   const authHeader = req.headers.get("authorization");
 
@@ -108,6 +112,14 @@ export async function resolveAuthDual(
     }
 
     // organization_id vem do TOKEN (fonte confiável), nunca do cliente.
+    if (feature) {
+      const recusa = await recusaPorRecurso(auth.organizationId, feature, {
+        requestId,
+        resource,
+        actorApiTokenId: auth.actor.type === "api_token" ? auth.actor.id : null,
+      });
+      if (recusa) return { ok: false, response: recusa };
+    }
     return {
       ok: true,
       organizationId: auth.organizationId,
@@ -117,7 +129,7 @@ export async function resolveAuthDual(
     };
   }
 
-  const authz = await requireRole(role, { requestId, resource });
+  const authz = await requireRole(role, { requestId, resource, feature });
   if (!authz.ok) return { ok: false, response: authz.response };
   return {
     ok: true,

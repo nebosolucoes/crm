@@ -29,7 +29,7 @@ export async function DELETE(
   const requestId = randomUUID();
   const { id } = await ctx.params;
 
-  const authz = await requireRole("admin", { requestId, resource: "ai_credentials" });
+  const authz = await requireRole("admin", { feature: "ai_agents", requestId, resource: "ai_credentials" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user: authUser, org: activeOrg } = authz;
