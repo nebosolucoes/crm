@@ -11,7 +11,7 @@
 #
 # Por que não é o update.sh: ele faz checkout da maior tag `v*` e grava no .env
 # as imagens de `ghcr.io/melgarafael` — as do UPSTREAM. Este script segue a
-# branch do fork e as imagens que o `.env` já aponta (ghcr.io/lucasrenz/...),
+# branch do fork e as imagens que o `.env` já aponta (ghcr.io/nebosolucoes/...),
 # reaproveitando as mesmas funções do kit (backup, baseline, proxy, saúde).
 #
 # Ciclo completo: push na `nebo-custom` → Actions › "Publicar imagem Docker
@@ -19,7 +19,7 @@
 # (ou este script à mão por SSH).
 
 BRANCH="${DEPLOY_BRANCH:-nebo-custom}"
-NS_DO_FORK="${DEPLOY_IMG_NS:-ghcr.io/lucasrenz}"
+NS_DO_FORK="${DEPLOY_IMG_NS:-ghcr.io/nebosolucoes}"
 
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
 source "$RAIZ/hostgator-setup-kit/_common.sh"

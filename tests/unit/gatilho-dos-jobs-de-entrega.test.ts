@@ -207,7 +207,7 @@ const GATILHO_ESPERADO: Record<string, { condicao: string | null; efeito: string
       "(`vars.RELOGIO_LIGADO`), não uma adaptação de fork — mas ela fica no mapa para " +
       "que trocar a variável por outra coisa continue passando por revisão.",
   },
-  // --- só do fork (lucasrenz/nebo_CRM): não vai para o upstream ---------------
+  // --- só do fork (nebosolucoes/crm): não vai para o upstream ---------------
   "deploy-vps.yml::deploy": {
     condicao: null,
     efeito:
