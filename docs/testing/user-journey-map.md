@@ -861,12 +861,12 @@ esta jornada prende.
 | Seed antigo restaurado (`git show HEAD~1`) e re-semeado | `agenda-escopo` reprova como no CI | **reprovou** com `não terminou` + `element(s) not found`, literal |
 ## J18 — O follow-up anda em hospedagem sem agendador `[P0]`
 
-**Por que P0:** para quem **não tem** o `scheduler` da VPS — o plano gratuito da
-Vercel é o caso comum, e é o cenário inteiro do runbook
-[`vercel-hobby-relogio.md`](../runbooks/vercel-hobby-relogio.md) — o relógio
-externo não é conveniência: é o **único** motor do follow-up. E a falha dele é
-silenciosa: os follow-ups não andam, ninguém recebe erro, e a instalação parece
-saudável.
+**Por que P0:** para quem **não tem** o `scheduler` da VPS — hospedagem sem cron
+de minuto, ou instalação em que o serviço não subiu; é o cenário inteiro do
+runbook [`relogio-http.md`](../runbooks/relogio-http.md) — o
+relógio externo não é conveniência: é o **único** motor do follow-up. E a falha
+dele é silenciosa: os follow-ups não andam, ninguém recebe erro, e a instalação
+parece saudável.
 
 **O que existia media TEXTO.** `tests/unit/relogio-hobby-workflow.test.ts`
 confere que o `.yml` cita o caminho do tick, a variável e o `exit 1` — ancora o
@@ -1004,7 +1004,7 @@ respeitá-lo. `label`/`segmento` são display-only (dependem da tela).
 
 ---
 
-## J24 — Planos comerciais: o que o cliente pode usar `[P0]`
+## J27 — Planos comerciais: o que o cliente pode usar `[P0]`
 
 **Por que P0:** é a primeira impressão de quem COMPRA, não só de quem instala — o
 revendedor cria o plano, atribui ao cliente, e o cliente abre o app e vê exatamente
@@ -1019,20 +1019,20 @@ e aba Plano de `/admin/tenants/[id]`; cliente em `/app/settings/billing`.
 
 | # | Caso | Expectativa | Cobertura |
 |---|---|---|---|
-| J24.1 | Instalação fresca, sem tocar em plano | tudo como antes: toda org no `legado`, menu completo | **INVARIANTE** — `entitlements-planos.test.ts` "organização nova nasce no padrão"; **E2E** — caso (2) parte de "Legado" |
-| J24.2 | Dono cria plano só com Atendimento; Canais vem travado | linha aparece no catálogo sem CRM; `channels` não é escolha | **E2E** — `planos-e-entitlements.spec.ts` (1); **ROTA** — `plans/route.test.ts` recusa `channels` como recurso |
-| J24.3 | Dono atribui o plano ao cliente, com motivo | tabela plano \| override \| efetivo; audit `tenant.plan_changed`; Central do cliente avisada | **E2E** (2); **ROTA** — `tenants/[id]/plan/route.test.ts` |
-| J24.4 | Cliente abre o app num plano Starter | menu sem Funis/Agentes/Desempenho; `/app/kanban` digitado → tela "não está incluído no seu plano" | **E2E** (3); **CERCA** — `paginas-exigem-recurso.test.ts` |
-| J24.5 | Cliente chama a API de negócios pelo navegador | 403 `feature_not_entitled` com `details.feature`; a de conversas segue 200 | **E2E** (3) via `page.request`; **UNIT** — `require-role.test.ts` "feature" |
-| J24.6 | Dono libera IA por 30 dias | cliente vê o grupo IA e "Liberado até dd/mm" no Billing | **E2E** (4); **INVARIANTE** — "override enable ativo"; **ROTA** — `overrides/route.test.ts` |
-| J24.7 | Dono encerra a liberação | cliente perde IA; `/app/ai/agents` cai na tela de recurso indisponível | **E2E** (5); **INVARIANTE** — "revogado NÃO conta" |
-| J24.8 | Prazo da liberação passa | plano volta a valer sozinho, sem cron | **INVARIANTE** — "override vencido, futuro ou revogado NÃO conta" |
-| J24.9 | Alguém tenta desligar Canais (override disable) | 23514 no banco, 422 na rota, opção desabilitada na tela | **INVARIANTE** — "camada 3"; **ROTA** — `overrides/route.test.ts` |
-| J24.10 | Disparo agendado numa org que perdeu Disparo | run `skipped` `feature_not_entitled` no Histórico, relógio avança, Central avisada | **UNIT** — `worker.plano.test.ts` |
-| J24.11 | Mensagem chega numa org sem IA | drain não enfileira; job já claimado termina `done` com motivo | **UNIT** — `drain.test.ts` (mocks de plano); código em `agent-worker/main.ts` |
-| J24.12 | Regra de automação com `send_ai_message` numa org sem IA | a ação vira `skipped` na aba Atividade; as irmãs rodam | **UNIT** — `gate-do-plano.test.ts` |
-| J24.13 | Plano com teto de agentes atingido | `POST /ai/agents` → 409 `limit_reached` antes de gravar | **UNIT** — `limites-barram-a-criacao.test.ts` |
-| J24.14 | Banco sem a migration 0275 (clone com `update.sh` que engoliu o apêndice) | tudo ligado como antes, `origem: sem_schema`, aviso no Billing, erro no log/Sentry | **UNIT** — `resolver.test.ts` "PGRST202/42883" |
+| J27.1 | Instalação fresca, sem tocar em plano | tudo como antes: toda org no `legado`, menu completo | **INVARIANTE** — `entitlements-planos.test.ts` "organização nova nasce no padrão"; **E2E** — caso (2) parte de "Legado" |
+| J27.2 | Dono cria plano só com Atendimento; Canais vem travado | linha aparece no catálogo sem CRM; `channels` não é escolha | **E2E** — `planos-e-entitlements.spec.ts` (1); **ROTA** — `plans/route.test.ts` recusa `channels` como recurso |
+| J27.3 | Dono atribui o plano ao cliente, com motivo | tabela plano \| override \| efetivo; audit `tenant.plan_changed`; Central do cliente avisada | **E2E** (2); **ROTA** — `tenants/[id]/plan/route.test.ts` |
+| J27.4 | Cliente abre o app num plano Starter | menu sem Funis/Agentes/Desempenho; `/app/kanban` digitado → tela "não está incluído no seu plano" | **E2E** (3); **CERCA** — `paginas-exigem-recurso.test.ts` |
+| J27.5 | Cliente chama a API de negócios pelo navegador | 403 `feature_not_entitled` com `details.feature`; a de conversas segue 200 | **E2E** (3) via `page.request`; **UNIT** — `require-role.test.ts` "feature" |
+| J27.6 | Dono libera IA por 30 dias | cliente vê o grupo IA e "Liberado até dd/mm" no Billing | **E2E** (4); **INVARIANTE** — "override enable ativo"; **ROTA** — `overrides/route.test.ts` |
+| J27.7 | Dono encerra a liberação | cliente perde IA; `/app/ai/agents` cai na tela de recurso indisponível | **E2E** (5); **INVARIANTE** — "revogado NÃO conta" |
+| J27.8 | Prazo da liberação passa | plano volta a valer sozinho, sem cron | **INVARIANTE** — "override vencido, futuro ou revogado NÃO conta" |
+| J27.9 | Alguém tenta desligar Canais (override disable) | 23514 no banco, 422 na rota, opção desabilitada na tela | **INVARIANTE** — "camada 3"; **ROTA** — `overrides/route.test.ts` |
+| J27.10 | Disparo agendado numa org que perdeu Disparo | run `skipped` `feature_not_entitled` no Histórico, relógio avança, Central avisada | **UNIT** — `worker.plano.test.ts` |
+| J27.11 | Mensagem chega numa org sem IA | drain não enfileira; job já claimado termina `done` com motivo | **UNIT** — `drain.test.ts` (mocks de plano); código em `agent-worker/main.ts` |
+| J27.12 | Regra de automação com `send_ai_message` numa org sem IA | a ação vira `skipped` na aba Atividade; as irmãs rodam | **UNIT** — `gate-do-plano.test.ts` |
+| J27.13 | Plano com teto de agentes atingido | `POST /ai/agents` → 409 `limit_reached` antes de gravar | **UNIT** — `limites-barram-a-criacao.test.ts` |
+| J27.14 | Banco sem a migration 0275 (clone com `update.sh` que engoliu o apêndice) | tudo ligado como antes, `origem: sem_schema`, aviso no Billing, erro no log/Sentry | **UNIT** — `resolver.test.ts` "PGRST202/42883" |
 
 **NÃO MEDIDO nesta rodada:** `channel-sessions`/`channels/official`/`channels/partner` no teto
 (mesmo helper das rotas provadas; o fake teria de carregar WAHA e cifra); Disparo pulado
@@ -2182,6 +2182,96 @@ Testes: `tests/e2e/agenda-google-meet.spec.ts`, `tests/invariants/agenda-meet.te
 - [P1] Pausar e retomar: ponteiro publicado permanece; assistência manual continua. Troca de modo em voo impede efeitos automáticos obsoletos.
 - Provas Task9 em preparação: `tests/invariants/autonomia-replies.test.ts`, `lib/agent-engine/agent/preview.test.ts`. Evidência browser será registrada após revisão e aplicação da migration0227 no QA.
 
+## J25 — Instalar e usar uma extensão declarativa publicada após o build `[P0]`
+
+Specs: `tests/e2e/extensoes-declarativas.spec.ts` e `tests/e2e/extensoes-recuperacao.spec.ts`.
+Estado: **as duas passaram inteiras em 16/09/2026**, sobre o build `mpuyz81eEv5s9QLf96iqr` gerado do
+commit `2bce4b7ec` — a branch já integrada com a `main` —, a principal em 39,1 s e a de recuperação em
+16,6 s, rodando sozinhas depois de duas tentativas mortas por ambiente (a fixture recebeu
+`Processing this request timed out` com a máquina em load 53; depois o servidor de teste foi morto
+com 0,06 GB livres). A primeira vez que passaram inteiras foi em 15/09, sobre o build
+`ALAqeLI0VQJi4bpWWFbUL` do commit `5a19ce8fa`. Foram sete
+rodadas até lá: quatro defeitos da própria prova (espera por URL que a aba já tinha, seletor
+`data-slot` que o Card do repositório não tem, clique no cabeçalho rolado para fora da vista, prazo
+de 5 s em asserções que dependem de duas idas ao servidor) e um defeito de produto que só ela achou
+(a aba original não recarregava depois que outra aba reconciliava o recibo). Entre `5a19ce8fa` e o
+HEAD, `git diff --stat b4b186219..HEAD -- app lib components` só mostra arquivos de voz vindos da
+`main`, um comentário e as frases de voz no dicionário — nada do caminho das extensões. A fixture
+recusa credenciais fora das portas locais dedicadas, cria usuários e organizações exclusivos,
+publica dois pacotes pelo CLI depois de encontrar `.next/BUILD_ID` e inicia o catálogo HTTP real em
+`127.0.0.1:56331`, com SQLite e PID próprios.
+
+| Caso | Prioridade | Prova prevista |
+|---|---|---|
+| Admitir arquivo revisado e instalar pela UI | P0 | Catálogo exportado pelo CLI; origem, revisão, SHA-256, instante e bytes conferidos no SQLite, no HTTP e no banco do CRM |
+| Resposta da instalação perdida depois do commit | P0 | `route.fetch()` completa a rota real e só a resposta ao navegador é abortada; o recibo local reconcilia uma única instalação persistida |
+| Pacote alterado após exportar o catálogo | P0 | O SQLite troca um byte depois da exportação e antes da admissão pela UI, preservando o tamanho; o HTTP entrega SHA divergente do arquivo admitido, o recibo guarda `extension_digest_mismatch` e nenhuma instalação nasce |
+| Storage indisponível antes do pedido | P0 | Falha restrita ao namespace dos recibos bloqueia a UI antes de qualquer POST ou nova operação; após restaurar o Storage e recarregar, a instalação volta a estar disponível |
+| Resposta perdida reconciliada em outra aba | P0 | O UUID aparece no namespace ator+organização antes do fetch; outra aba lê a conclusão e remove o mesmo recibo, com um único POST e uma instalação |
+| Cancelar durante download real | P0 | A segunda aba vê o recibo `preparing` e cancela enquanto metade do corpo continua aberta; a entrega tardia termina como `cancelled` e não publica instalação |
+| Socket interrompido | P0 | O receiver entrega parte dos bytes publicados e encerra o socket; a UI mostra falha e próxima tentativa, o recibo guarda `extension_download_failed` e nenhuma instalação nasce |
+| Configurar e ativar somente na organização A | P0 | Densidade compacta e descrição oculta persistem; B não recebe vínculo, card ou acesso direto ao guia |
+| Troca concorrente entre abas | P0 | Uma aba carregada em A envia a organização esperada; após outra aba trocar a sessão para B, o salvamento recebe 409, recarrega o contexto e não cria vínculo em B nem altera A |
+| Usar o guia até o núcleo | P0 | Card do hub CRM abre o guia; Enter no botão revalidado abre Tarefas; tarefa criada e concluída pela UI pertence somente a A |
+| Desativar, revalidar aba antiga e reativar | P0 | URL e ação já abertas passam a recusar; reativação preserva a configuração anterior |
+| Trocar A/B pelo seletor e desligar o catálogo | P0 | `tenant-switcher-item-<id>` muda o contexto; conteúdo instalado continua vindo do banco local com o catálogo indisponível |
+| Papéis sem gestão | P0 | `agent` e `viewer` veem a tela sem controles de mutação; POST/PUT diretos respondem 403 sem criar operação |
+| Desktop, móvel e teclado | P1 | Capturas em `.superpowers/evidence/extensoes-integracao/e2e/`, viewport móvel de 390 px, sem overflow horizontal nem erro de console; trace ligado |
+| Tema escuro e espanhol | P1 | Controles reais mudam tema e idioma; tela em espanhol mantém o aviso explícito quando um texto do pacote usa fallback português, sem overflow; capturas complementares ficam em `e2e/recuperacao/` |
+| Auditoria visível | P0 | Banco identifica ator e organização nas ações `extension.*`; `/admin/audit` filtra pelos controles canônicos e mostra `extension.configured` |
+
+Limite declarado: esta jornada prova o perfil declarativo e o catálogo local de ensaio. Não prova
+marketplace público, autoria criptográfica nem execução de código de pacote. Atualizar, desfazer,
+remover e reinstalar são o J26, abaixo. A escrita SQL direta sob RLS pertence à suíte de
+invariantes de banco desta integração.
+
+
+## J26 — Atualizar, desfazer a última troca, remover e reinstalar uma extensão `[P0]`
+
+Spec: `tests/e2e/extensoes-versao.spec.ts`. Fixture: `criarCatalogoDeVersoes` em
+`tests/e2e/fixtures/catalogo-extensoes.ts`, que publica a MESMA identidade em 1.0.0 e 1.1.0 depois
+de encontrar `.next/BUILD_ID`, serve pelo processo HTTP real em `127.0.0.1:56331` e sabe desligar e
+religar o catálogo no meio da jornada. Evidência: `evidence/extensoes/versao/` (oito capturas e o
+catálogo daquela rodada).
+
+Estado: **passou inteira em 16/09/2026**, em 28,3 s, sobre o build `mpuyz81eEv5s9QLf96iqr` (do
+commit `2bce4b7ec`, a branch já integrada com a `main`), na mesma rodada das duas specs do J25. As
+capturas abaixo são dessa rodada. Antes dela: seis rodadas até a primeira vez inteira (sobre o build
+`FL9GZvWqPoj8aE9XSY2E_`, commit `213dee0d4`), cujos defeitos da própria prova estão listados abaixo,
+e duas repetições mortas por ambiente — uma na fixture com a máquina em load 53, outra com o servidor
+de teste morto por falta de memória.
+
+| Caso | Prioridade | Prova |
+|---|---|---|
+| Admitir o catálogo com as duas versões e instalar a 1.0.0 | P0 | O catálogo oferece "Instalar versão revisada" para a 1.0.0 e "Atualizar para 1.1.0" para a mesma identidade, nunca uma segunda instalação; banco com revisão 1 e sem anterior |
+| Ativar em A; B sem nada | P0 | Vínculo de A ativo, revisão 1; B sem vínculo; o bloco "Em todas as organizações" diz "1 organização está com esta extensão ativa." |
+| Atualizar para 1.1.0 | P0 | O diálogo diz "1 organização tem esta extensão ativa e continua com ela ativa" (`evidence/extensoes/versao/1-confirmar-atualizacao.png`); banco em 1.1.0, revisão 2, com anterior; o vínculo de A segue ativo e com a mesma revisão; o guia de A mostra o card novo da 1.1.0 e o card estável (`evidence/extensoes/versao/2-guia-na-1.1.0.png`) |
+| Desfazer com o catálogo desligado | P0 | O processo do catálogo é encerrado antes; o diálogo nomeia a versão de destino e a contagem; banco volta à 1.0.0, revisão 3, sem nenhum download |
+| Aba antiga recusada | P0 | Outra sessão aberta antes do desfazer ainda mostra "volta para 1.0.0"; ao confirmar, recebe "A extensão mudou em outra sessão" e recarrega para "volta para 1.1.0" (`evidence/extensoes/versao/3-aba-antiga-recusada.png`); o banco continua na revisão 3 |
+| Remover | P0 | O diálogo diz "1 organização com ela ativa deixa de ver os guias agora" (`evidence/extensoes/versao/4-confirmar-remocao.png`); banco com `removed_at`, vínculo de A desligado com a marca da remoção; o guia aberto de A diz "removeu esta extensão de todas as organizações", sem "desativada nesta organização" e sem "Tentar novamente" (`evidence/extensoes/versao/5-guia-removido.png`); a gestão de A mostra "Removida"; a auditoria de A tem exatamente uma `extension.deactivated_by_removal` com `reason = installation_removed`, visível em `/app/audit` (`evidence/extensoes/versao/6-auditoria-da-organizacao.png`) |
+| Religar o catálogo, reinstalar e reativar em A | P0 | O catálogo oferece "Reinstalar versão 1.0.0"; o diálogo diz "1 organização a usava e não volta a vê-la sozinha"; banco sem remoção e sem anterior, revisão 5, na MESMA instalação; o card de A diz "Estava ativa até ser removida… Ative de novo" (`evidence/extensoes/versao/7-reinstalada-por-ativar.png`); ativar apaga a marca |
+| Atualização que falha no download | P0 | Com o catálogo desligado, o recibo desta identidade fica "Atualização · Falhou" com o motivo (`evidence/extensoes/versao/8-atualizacao-falhou.png`); banco com `extension_download_failed` e a instalação intacta; um `dispatched` do atualizador do core é aceito em seguida e encerrado na hora |
+
+Defeitos da própria prova, medidos antes de mexer:
+
+- página em segundo plano não anima no Chromium sem janela: depois de abrir o guia em outra página
+  do mesmo contexto, o clique na gestão esperava "estável" para sempre;
+- gravar o trace de uma jornada longa acontecia depois do corpo e estourava os 30 s globais: o
+  contexto da aba antiga passou a fechar no próprio passo, e o arquivo tem prazo próprio;
+- com a máquina em carga 100, o aviso de 4 s saía antes de o Playwright olhar: os avisos são
+  registrados ao entrar na página e conferidos pelo texto;
+- a Atividade recente lista recibos de rodadas anteriores, e um "Atualização · Falhou" antigo
+  satisfazia o filtro antes de a falha desta rodada existir: os filtros exigem a identidade;
+- com o Supabase sintético sobrecarregado (autenticação em 504, papel em 500), a gestão caía no
+  estado "Tentar novamente" e a prova esperava uma aba que só volta com esse clique: ela agora
+  clica como uma pessoa faria, registra cada nova tentativa como anotação e desiste depois de três.
+
+Limite declarado: prova o perfil declarativo e o catálogo local de ensaio, com um só responsável
+pela instalação. Não prova duas pessoas administrando a instalação ao mesmo tempo (pedido de outro
+responsável, cancelamento cruzado); isso está nos testes de unidade da gestão e no invariante de
+banco `tests/invariants/extensoes-declarativas.test.ts`.
+
+
 
 ## Comunidade 360 — aceite integrado de 2026-09-06
 
@@ -2458,16 +2548,16 @@ grupo trouxe.
 **A seção "Lote 12 · G2" acima deixa de estar PENDENTE POR EXECUÇÃO**: os três
 casos dela (L12.G2.1, G2.2 e G2.3) estão provados nas linhas acima.
 
-## J25 — Disparo programado em grupo `[P1]`
+## J28 — Disparo programado em grupo `[P1]`
 
 | # | Caso | Expectativa |
 |---|------|-------------|
-| J25.1 | Criar disparo de texto para um grupo e aguardar o horário | o scheduler de um minuto cria a execução como **Pendente** antes do transporte e a lista atualiza sem recarregar a página — **PASS ao vivo em 2026-09-17**: canal `subscribed`, badge "Enviando" → "Enviado" 1,2 s após o `sent_at`, zero navegações (migration 0266; antes disso a tela só mudava no polling de 15 s) |
-| J25.2 | Transporte aceita o envio | a última execução muda para **Enviado**, guarda o id externo e o agendamento sem recorrência fica concluído |
-| J25.3 | Grupo inativo, conexão indisponível ou erro de transporte | a ocorrência fica **Ignorada** ou **Falhou**, com motivo visível; nunca permanece apenas como "Agendado" depois do horário |
-| J25.4 | Falha num disparo recorrente | o desfecho fica no histórico e o próximo horário avança; o mesmo slot não é reenviado a cada tick |
-| J25.5 | Anexar foto ou vídeo | a tela mostra prévia/remoção, guarda o arquivo no bucket privado e o worker cria URL assinada somente ao enviar |
-| J25.6 | Abrir em desktop e largura estreita | conteúdo usa a área disponível sem `max-width` próprio, sem dupla margem e sem elemento vazando horizontalmente |
+| J28.1 | Criar disparo de texto para um grupo e aguardar o horário | o scheduler de um minuto cria a execução como **Pendente** antes do transporte e a lista atualiza sem recarregar a página — **PASS ao vivo em 2026-09-17**: canal `subscribed`, badge "Enviando" → "Enviado" 1,2 s após o `sent_at`, zero navegações (migration 0266; antes disso a tela só mudava no polling de 15 s) |
+| J28.2 | Transporte aceita o envio | a última execução muda para **Enviado**, guarda o id externo e o agendamento sem recorrência fica concluído |
+| J28.3 | Grupo inativo, conexão indisponível ou erro de transporte | a ocorrência fica **Ignorada** ou **Falhou**, com motivo visível; nunca permanece apenas como "Agendado" depois do horário |
+| J28.4 | Falha num disparo recorrente | o desfecho fica no histórico e o próximo horário avança; o mesmo slot não é reenviado a cada tick |
+| J28.5 | Anexar foto ou vídeo | a tela mostra prévia/remoção, guarda o arquivo no bucket privado e o worker cria URL assinada somente ao enviar |
+| J28.6 | Abrir em desktop e largura estreita | conteúdo usa a área disponível sem `max-width` próprio, sem dupla margem e sem elemento vazando horizontalmente |
 
 Cobertura automática desta entrega: `tests/unit/scheduled-group-worker-query.test.ts`,
 `tests/unit/disparo-midia.test.ts`, `tests/unit/disparo-navegacao.test.ts` e os gates

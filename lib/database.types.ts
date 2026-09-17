@@ -4470,6 +4470,218 @@ export type Database = {
           },
         ]
       }
+      extension_artifacts: {
+        Row: {
+          byte_length: number
+          created_at: string
+          document: string
+          id: string
+          manifest: Json
+          sha256: string
+        }
+        Insert: {
+          byte_length: number
+          created_at?: string
+          document: string
+          id?: string
+          manifest: Json
+          sha256: string
+        }
+        Update: {
+          byte_length?: number
+          created_at?: string
+          document?: string
+          id?: string
+          manifest?: Json
+          sha256?: string
+        }
+        Relationships: []
+      }
+      extension_catalogs: {
+        Row: {
+          admitted_at: string
+          admitted_by: string | null
+          digest: string
+          id: string
+          origin: string
+          revision: number
+          snapshot: Json
+        }
+        Insert: {
+          admitted_at?: string
+          admitted_by?: string | null
+          digest: string
+          id?: string
+          origin: string
+          revision: number
+          snapshot: Json
+        }
+        Update: {
+          admitted_at?: string
+          admitted_by?: string | null
+          digest?: string
+          id?: string
+          origin?: string
+          revision?: number
+          snapshot?: Json
+        }
+        Relationships: []
+      }
+      extension_installations: {
+        Row: {
+          artifact_id: string
+          catalog_id: string
+          id: string
+          installed_at: string
+          installed_by: string | null
+          name: string
+          previous_artifact_id: string | null
+          publisher: string
+          removed_at: string | null
+          removed_by: string | null
+          revision: number
+          version: string
+        }
+        Insert: {
+          artifact_id: string
+          catalog_id: string
+          id?: string
+          installed_at?: string
+          installed_by?: string | null
+          name: string
+          previous_artifact_id?: string | null
+          publisher: string
+          removed_at?: string | null
+          removed_by?: string | null
+          revision?: number
+          version: string
+        }
+        Update: {
+          artifact_id?: string
+          catalog_id?: string
+          id?: string
+          installed_at?: string
+          installed_by?: string | null
+          name?: string
+          previous_artifact_id?: string | null
+          publisher?: string
+          removed_at?: string | null
+          removed_by?: string | null
+          revision?: number
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extension_installations_artifact_id_fkey"
+            columns: ["artifact_id"]
+            isOneToOne: false
+            referencedRelation: "extension_artifacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extension_installations_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "extension_catalogs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extension_installations_previous_artifact_id_fkey"
+            columns: ["previous_artifact_id"]
+            isOneToOne: false
+            referencedRelation: "extension_artifacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      extension_operations: {
+        Row: {
+          actor_id: string | null
+          admission_digest: string | null
+          admission_revision: number | null
+          catalog_id: string | null
+          created_at: string
+          entry: Json | null
+          error_code: string | null
+          id: string
+          installation_id: string | null
+          kind: string
+          name: string | null
+          organization_id: string | null
+          publisher: string | null
+          request: Json
+          request_fingerprint: string
+          result: Json | null
+          status: string
+          updated_at: string
+          version: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          admission_digest?: string | null
+          admission_revision?: number | null
+          catalog_id?: string | null
+          created_at?: string
+          entry?: Json | null
+          error_code?: string | null
+          id: string
+          installation_id?: string | null
+          kind: string
+          name?: string | null
+          organization_id?: string | null
+          publisher?: string | null
+          request: Json
+          request_fingerprint: string
+          result?: Json | null
+          status: string
+          updated_at?: string
+          version?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          admission_digest?: string | null
+          admission_revision?: number | null
+          catalog_id?: string | null
+          created_at?: string
+          entry?: Json | null
+          error_code?: string | null
+          id?: string
+          installation_id?: string | null
+          kind?: string
+          name?: string | null
+          organization_id?: string | null
+          publisher?: string | null
+          request?: Json
+          request_fingerprint?: string
+          result?: Json | null
+          status?: string
+          updated_at?: string
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extension_operations_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "extension_catalogs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extension_operations_installation_id_fkey"
+            columns: ["installation_id"]
+            isOneToOne: false
+            referencedRelation: "extension_installations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extension_operations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       flywheel_distiller_proposals: {
         Row: {
           applied_at: string | null
@@ -6204,6 +6416,54 @@ export type Database = {
           },
         ]
       }
+      organization_extensions: {
+        Row: {
+          configuration: Json
+          deactivated_by_removal_at: string | null
+          enabled: boolean
+          installation_id: string
+          organization_id: string
+          revision: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          configuration: Json
+          deactivated_by_removal_at?: string | null
+          enabled: boolean
+          installation_id: string
+          organization_id: string
+          revision: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          configuration?: Json
+          deactivated_by_removal_at?: string | null
+          enabled?: boolean
+          installation_id?: string
+          organization_id?: string
+          revision?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_extensions_installation_id_fkey"
+            columns: ["installation_id"]
+            isOneToOne: false
+            referencedRelation: "extension_installations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_extensions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_feature_overrides: {
         Row: {
           created_at: string
@@ -6915,297 +7175,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "reentry_template_versions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      scheduled_group_message_runs: {
-        Row: {
-          attempt: number
-          channel_session_id: string
-          claimed_at: string | null
-          created_at: string
-          error_code: string | null
-          error_message: string | null
-          external_message_id: string | null
-          group_id: string
-          id: string
-          metadata: Json
-          organization_id: string
-          scheduled_for: string
-          scheduled_message_id: string
-          sent_at: string | null
-          started_at: string | null
-          status: string
-          updated_at: string
-          worker_id: string | null
-        }
-        Insert: {
-          attempt?: number
-          channel_session_id: string
-          claimed_at?: string | null
-          created_at?: string
-          error_code?: string | null
-          error_message?: string | null
-          external_message_id?: string | null
-          group_id: string
-          id?: string
-          metadata?: Json
-          organization_id: string
-          scheduled_for: string
-          scheduled_message_id: string
-          sent_at?: string | null
-          started_at?: string | null
-          status?: string
-          updated_at?: string
-          worker_id?: string | null
-        }
-        Update: {
-          attempt?: number
-          channel_session_id?: string
-          claimed_at?: string | null
-          created_at?: string
-          error_code?: string | null
-          error_message?: string | null
-          external_message_id?: string | null
-          group_id?: string
-          id?: string
-          metadata?: Json
-          organization_id?: string
-          scheduled_for?: string
-          scheduled_message_id?: string
-          sent_at?: string | null
-          started_at?: string | null
-          status?: string
-          updated_at?: string
-          worker_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "scheduled_group_message_runs_channel_org_fkey"
-            columns: ["organization_id", "channel_session_id"]
-            isOneToOne: false
-            referencedRelation: "channel_sessions"
-            referencedColumns: ["organization_id", "id"]
-          },
-          {
-            foreignKeyName: "scheduled_group_message_runs_channel_session_id_fkey"
-            columns: ["channel_session_id"]
-            isOneToOne: false
-            referencedRelation: "channel_sessions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "scheduled_group_message_runs_group_id_fkey"
-            columns: ["group_id"]
-            isOneToOne: false
-            referencedRelation: "scheduled_whatsapp_groups"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "scheduled_group_message_runs_group_org_channel_fkey"
-            columns: ["organization_id", "channel_session_id", "group_id"]
-            isOneToOne: false
-            referencedRelation: "scheduled_whatsapp_groups"
-            referencedColumns: ["organization_id", "channel_session_id", "id"]
-          },
-          {
-            foreignKeyName: "scheduled_group_message_runs_message_org_fkey"
-            columns: ["organization_id", "scheduled_message_id"]
-            isOneToOne: false
-            referencedRelation: "scheduled_group_messages"
-            referencedColumns: ["organization_id", "id"]
-          },
-          {
-            foreignKeyName: "scheduled_group_message_runs_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "scheduled_group_message_runs_scheduled_message_id_fkey"
-            columns: ["scheduled_message_id"]
-            isOneToOne: false
-            referencedRelation: "scheduled_group_messages"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      scheduled_group_messages: {
-        Row: {
-          body: string
-          cancel_reason: string | null
-          cancelled_at: string | null
-          cancelled_by: string | null
-          channel_session_id: string
-          created_at: string
-          created_by: string | null
-          group_id: string
-          id: string
-          last_run_at: string | null
-          max_runs: number | null
-          metadata: Json
-          next_run_at: string | null
-          organization_id: string
-          recurrence_config: Json
-          recurrence_kind: string
-          repeat_until: string | null
-          starts_at: string
-          status: string
-          timezone: string
-          title: string | null
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          body: string
-          cancel_reason?: string | null
-          cancelled_at?: string | null
-          cancelled_by?: string | null
-          channel_session_id: string
-          created_at?: string
-          created_by?: string | null
-          group_id: string
-          id?: string
-          last_run_at?: string | null
-          max_runs?: number | null
-          metadata?: Json
-          next_run_at?: string | null
-          organization_id: string
-          recurrence_config?: Json
-          recurrence_kind?: string
-          repeat_until?: string | null
-          starts_at: string
-          status?: string
-          timezone?: string
-          title?: string | null
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          body?: string
-          cancel_reason?: string | null
-          cancelled_at?: string | null
-          cancelled_by?: string | null
-          channel_session_id?: string
-          created_at?: string
-          created_by?: string | null
-          group_id?: string
-          id?: string
-          last_run_at?: string | null
-          max_runs?: number | null
-          metadata?: Json
-          next_run_at?: string | null
-          organization_id?: string
-          recurrence_config?: Json
-          recurrence_kind?: string
-          repeat_until?: string | null
-          starts_at?: string
-          status?: string
-          timezone?: string
-          title?: string | null
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "scheduled_group_messages_channel_org_fkey"
-            columns: ["organization_id", "channel_session_id"]
-            isOneToOne: false
-            referencedRelation: "channel_sessions"
-            referencedColumns: ["organization_id", "id"]
-          },
-          {
-            foreignKeyName: "scheduled_group_messages_channel_session_id_fkey"
-            columns: ["channel_session_id"]
-            isOneToOne: false
-            referencedRelation: "channel_sessions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "scheduled_group_messages_group_id_fkey"
-            columns: ["group_id"]
-            isOneToOne: false
-            referencedRelation: "scheduled_whatsapp_groups"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "scheduled_group_messages_group_org_channel_fkey"
-            columns: ["organization_id", "channel_session_id", "group_id"]
-            isOneToOne: false
-            referencedRelation: "scheduled_whatsapp_groups"
-            referencedColumns: ["organization_id", "channel_session_id", "id"]
-          },
-          {
-            foreignKeyName: "scheduled_group_messages_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      scheduled_whatsapp_groups: {
-        Row: {
-          channel_session_id: string
-          created_at: string
-          created_by: string | null
-          external_group_id: string
-          id: string
-          is_active: boolean
-          last_seen_at: string | null
-          metadata: Json
-          name: string
-          organization_id: string
-          updated_at: string
-        }
-        Insert: {
-          channel_session_id: string
-          created_at?: string
-          created_by?: string | null
-          external_group_id: string
-          id?: string
-          is_active?: boolean
-          last_seen_at?: string | null
-          metadata?: Json
-          name: string
-          organization_id: string
-          updated_at?: string
-        }
-        Update: {
-          channel_session_id?: string
-          created_at?: string
-          created_by?: string | null
-          external_group_id?: string
-          id?: string
-          is_active?: boolean
-          last_seen_at?: string | null
-          metadata?: Json
-          name?: string
-          organization_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "scheduled_whatsapp_groups_channel_org_fkey"
-            columns: ["organization_id", "channel_session_id"]
-            isOneToOne: false
-            referencedRelation: "channel_sessions"
-            referencedColumns: ["organization_id", "id"]
-          },
-          {
-            foreignKeyName: "scheduled_whatsapp_groups_channel_session_id_fkey"
-            columns: ["channel_session_id"]
-            isOneToOne: false
-            referencedRelation: "channel_sessions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "scheduled_whatsapp_groups_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -8145,6 +8114,90 @@ export type Database = {
           p_key: string
           p_onboarding?: boolean
           p_org: string
+        }
+        Returns: Json
+      }
+      fn_extensions_admit_catalog: {
+        Args: {
+          p_actor: string
+          p_digest: string
+          p_operation: string
+          p_snapshot: Json
+        }
+        Returns: Json
+      }
+      fn_extensions_assert_actor: {
+        Args: { p_actor: string; p_organization?: string }
+        Returns: undefined
+      }
+      fn_extensions_cancel_install: {
+        Args: { p_actor: string; p_operation: string }
+        Returns: Json
+      }
+      fn_extensions_configure: {
+        Args: {
+          p_actor: string
+          p_configuration: Json
+          p_enabled: boolean
+          p_expected_revision: number
+          p_installation: string
+          p_operation: string
+          p_organization: string
+        }
+        Returns: Json
+      }
+      fn_extensions_core_update_in_progress: { Args: never; Returns: boolean }
+      fn_extensions_fail_install: {
+        Args: { p_actor: string; p_error_code: string; p_operation: string }
+        Returns: Json
+      }
+      fn_extensions_fingerprint: { Args: { p_request: Json }; Returns: string }
+      fn_extensions_finish_install: {
+        Args: {
+          p_actor: string
+          p_byte_length: number
+          p_document: string
+          p_manifest: Json
+          p_operation: string
+          p_sha256: string
+        }
+        Returns: Json
+      }
+      fn_extensions_installation_counts: {
+        Args: { p_actor: string }
+        Returns: {
+          active_organizations: number
+          awaiting_reactivation: number
+          installation_id: string
+        }[]
+      }
+      fn_extensions_prepare_install: {
+        Args: {
+          p_actor: string
+          p_catalog: string
+          p_expected_installation_revision: number
+          p_name: string
+          p_operation: string
+          p_publisher: string
+          p_version: string
+        }
+        Returns: Json
+      }
+      fn_extensions_remove_installation: {
+        Args: {
+          p_actor: string
+          p_expected_installation_revision: number
+          p_installation: string
+          p_operation: string
+        }
+        Returns: Json
+      }
+      fn_extensions_revert_install: {
+        Args: {
+          p_actor: string
+          p_expected_installation_revision: number
+          p_installation: string
+          p_operation: string
         }
         Returns: Json
       }

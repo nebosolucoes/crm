@@ -73,6 +73,8 @@ export const RECURSO_POR_ROTA: ReadonlyArray<readonly [prefixo: string, recurso:
   ["tags", null],
   ["notifications", null],
   ["marca", null],
+  // Extensões declarativas (0271): instalar/configurar é operação da organização, não módulo do plano.
+  ["extensions", null],
 ];
 
 /**

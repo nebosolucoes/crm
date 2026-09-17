@@ -3,6 +3,9 @@ import { NavHub } from "@/components/shell/NavHub";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { entitlementsDaOrg } from "@/lib/entitlements/resolver";
 import { serializarEntitlements } from "@/lib/entitlements/tipos";
+import { loadCrmExtensions } from "@/lib/extensions/service";
+import { logger } from "@/lib/logger";
+import type { ExtensionGuideView } from "@/lib/extensions/view";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { exigirRecurso } from "@/lib/entitlements/exigir";
 
@@ -35,6 +38,24 @@ export default async function CrmHubPage() {
     ? serializarEntitlements(await entitlementsDaOrg(activeOrg.orgId))
     : null;
   const idioma = user.idioma;
+  let extensionGuides: ExtensionGuideView[] = [];
+  let extensionsUnavailable = false;
+
+  if (activeOrg) {
+    try {
+      extensionGuides = await loadCrmExtensions(activeOrg.orgId);
+    } catch (error) {
+      // O hub continua útil sem extensões, mas a falha precisa ser distinguível
+      // de uma lista legitimamente vazia. A gestão oferece a reconciliação — e o
+      // log diz que o hub degradou, para a falha não existir só na tela.
+      const code = (error as { code?: unknown } | null)?.code;
+      logger.warn("[crm] hub aberto sem as orientações das extensões", {
+        organization_id: activeOrg.orgId,
+        error_code: typeof code === "string" ? code : null,
+      });
+      extensionsUnavailable = true;
+    }
+  }
 
   return (
     <NavHub
@@ -49,6 +70,8 @@ export default async function CrmHubPage() {
         idioma,
       )}
       locale={idioma}
+      extensionGuides={extensionGuides}
+      extensionsUnavailable={extensionsUnavailable}
     />
   );
 }

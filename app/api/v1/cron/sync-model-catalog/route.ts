@@ -36,6 +36,7 @@
 import { randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
 
+import { autorizaCron } from "@/lib/auth/cron-auth";
 import { fail, ok } from "@/lib/api/wrappers";
 import {
   FONTE_OPENROUTER,
@@ -48,7 +49,6 @@ import {
   type ModeloExistente,
 } from "@/lib/ai/catalogo/sincronizar";
 import { buscarCatalogoOpenRouter } from "@/lib/ai/catalogo/buscar-openrouter";
-import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -111,15 +111,19 @@ export async function sincronizarCatalogo(
   };
 }
 
-function autorizado(req: NextRequest): boolean {
-  const esperado = env.INTERNAL_CRON_SECRET || env.INTERNAL_SECRET;
-  if (!esperado) return false; // fail-closed
-  return req.headers.get("authorization") === `Bearer ${esperado}`;
-}
+// Esta rota aceitava SÓ o primeiro segredo definido (`INTERNAL_CRON_SECRET ||
+// INTERNAL_SECRET`), e era a única das rotas de cron a fazer isso. O efeito era
+// 401 em toda instalação do kit: o `install.sh` gera os DOIS segredos com valores
+// diferentes e o `crond` do serviço `scheduler` manda `Bearer $INTERNAL_SECRET`
+// (`docker/scheduler/entrypoint.sh`), que não era o esperado aqui. O `curl` do
+// crontab descarta a saída, então o 401 diário não aparecia em lugar nenhum.
+// Agora usa o mesmo portão das outras: `lib/auth/cron-auth.ts`, que confere o
+// Bearer (ou `x-cron-secret`) contra os dois segredos e falha fechado sem nenhum.
+// A cerca contra o padrão voltar é `tests/unit/cron-aceita-os-dois-segredos.test.ts`.
 
 async function handler(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
-  if (!autorizado(req)) {
+  if (!autorizaCron(req)) {
     return fail("unauthorized", "cron secret ausente ou inválido", 401, { requestId });
   }
   try {
