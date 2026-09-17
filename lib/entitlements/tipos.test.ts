@@ -84,6 +84,11 @@ describe("temRecurso", () => {
     expect(temRecurso(e, "broadcast")).toBe(false);
     const s = serializarEntitlements(e);
     expect(Array.isArray(s.features)).toBe(true);
+    // O motivo do override não vai ao navegador de todo membro.
+    const comOverride = serializarEntitlements(
+      lerEntitlements({ overrides: [{ id: "o", feature: "crm", mode: "enable", starts_at: "2026-09-01T00:00:00Z", reason: "desconto negociado" }] }),
+    );
+    expect(comOverride.overrides[0]!.reason).toBe("");
     expect(temRecurso(s, "crm")).toBe(true);
     expect(temRecurso(s, "ai_agents")).toBe(false);
   });

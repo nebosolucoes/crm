@@ -8,6 +8,7 @@ import {
 } from "@/lib/channels/session-ref";
 import type { ChannelProvider } from "@/lib/channels/types";
 import { avisarBloqueioPorRecurso } from "@/lib/entitlements/aviso-na-central";
+import { isScheduledMediaPathOwnedBy } from "@/lib/messaging/media/upload-validation";
 import { logger } from "@/lib/logger";
 import type { createAdminClient } from "@/lib/supabase/admin";
 
@@ -373,6 +374,14 @@ export async function executarAgendamentosDeGrupo(
         | { url: string; mime: string; filename?: string | null; caption?: string | null }
         | undefined;
       if (media) {
+        // A API já recusa caminho fora de `${org}/scheduled-groups/` ao gravar,
+        // mas a linha também é gravável por PostgREST (manager+ pela RLS). O
+        // worker assina com service role, então confere o prefixo DE NOVO antes
+        // de assinar: uma chave de outra organização nunca vira URL enviável.
+        if (!isScheduledMediaPathOwnedBy(media.storage_path, agendamento.organization_id)) {
+          await falhar("media_path_invalid", "A mídia agendada não pertence a esta organização.");
+          continue;
+        }
         const { data: signed, error: signError } = await admin.storage
           .from("whatsapp-media")
           .createSignedUrl(media.storage_path, 600);

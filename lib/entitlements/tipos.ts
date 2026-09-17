@@ -155,8 +155,17 @@ export function temRecurso(
   return f instanceof Set ? f.has(recurso) : (f as readonly Recurso[]).includes(recurso);
 }
 
+/**
+ * A forma que atravessa para o NAVEGADOR de todo membro. O `reason` de um
+ * override é nota de quem vende ("desconto negociado com…") e não interessa
+ * a quem atende — fica no servidor; a aba Plano do admin lê por outra rota.
+ */
 export function serializarEntitlements(e: Entitlements): EntitlementsSerializados {
-  return { ...e, features: Array.from(e.features) };
+  return {
+    ...e,
+    features: Array.from(e.features),
+    overrides: e.overrides.map((o) => ({ ...o, reason: "" })),
+  };
 }
 
 /** Os overrides que valem para UM recurso — a tela de plano mostra "IA liberada até dd/mm" a partir daqui. */
