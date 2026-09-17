@@ -2428,7 +2428,7 @@ casos dela (L12.G2.1, G2.2 e G2.3) estão provados nas linhas acima.
 
 | # | Caso | Expectativa |
 |---|------|-------------|
-| J25.1 | Criar disparo de texto para um grupo e aguardar o horário | o scheduler de um minuto cria a execução como **Pendente** antes do transporte e a lista atualiza sem recarregar a página |
+| J25.1 | Criar disparo de texto para um grupo e aguardar o horário | o scheduler de um minuto cria a execução como **Pendente** antes do transporte e a lista atualiza sem recarregar a página — **PASS ao vivo em 2026-09-17**: canal `subscribed`, badge "Enviando" → "Enviado" 1,2 s após o `sent_at`, zero navegações (migration 0266; antes disso a tela só mudava no polling de 15 s) |
 | J25.2 | Transporte aceita o envio | a última execução muda para **Enviado**, guarda o id externo e o agendamento sem recorrência fica concluído |
 | J25.3 | Grupo inativo, conexão indisponível ou erro de transporte | a ocorrência fica **Ignorada** ou **Falhou**, com motivo visível; nunca permanece apenas como "Agendado" depois do horário |
 | J25.4 | Falha num disparo recorrente | o desfecho fica no histórico e o próximo horário avança; o mesmo slot não é reenviado a cada tick |

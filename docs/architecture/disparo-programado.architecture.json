@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Disparo programado — do horário ao desfecho visível",
+    "subtitle": "A ocorrência nasce pendente antes do efeito externo e sempre fecha ou deixa rastro",
+    "output": "disparo-programado.html",
+    "quality_profile": "standard"
+  },
+  "lanes": [
+    {
+      "id": "operacao",
+      "label": "Operação"
+    },
+    {
+      "id": "api",
+      "label": "API e relógio"
+    },
+    {
+      "id": "dados",
+      "label": "Dados"
+    },
+    {
+      "id": "canal",
+      "label": "Canal"
+    }
+  ],
+  "mainPath": [
+    "tela",
+    "api-agendamentos",
+    "agendamento",
+    "scheduler",
+    "worker",
+    "execucao",
+    "adapter"
+  ],
+  "nodes": [
+    {
+      "id": "tela",
+      "lane": "operacao",
+      "col": 0,
+      "type": "ui",
+      "label": "Disparo — criar, anexar mídia e ver última execução"
+    },
+    {
+      "id": "api-agendamentos",
+      "lane": "api",
+      "col": 1,
+      "type": "service",
+      "label": "REST /api/v1/agendamentos — escopo da organização"
+    },
+    {
+      "id": "upload",
+      "lane": "api",
+      "col": 2,
+      "type": "service",
+      "label": "Upload de foto/vídeo — valida tipo, tamanho e posse"
+    },
+    {
+      "id": "agendamento",
+      "lane": "dados",
+      "col": 2,
+      "type": "database",
+      "label": "scheduled_group_messages — próximo horário e ciclo"
+    },
+    {
+      "id": "midia",
+      "lane": "dados",
+      "col": 3,
+      "type": "database",
+      "label": "whatsapp-media privado — URL curta só no envio"
+    },
+    {
+      "id": "scheduler",
+      "lane": "api",
+      "col": 3,
+      "type": "service",
+      "label": "Scheduler da VPS — tick a cada minuto"
+    },
+    {
+      "id": "worker",
+      "lane": "api",
+      "col": 4,
+      "type": "service",
+      "label": "Worker — claim pendente, envio e avanço do relógio"
+    },
+    {
+      "id": "execucao",
+      "lane": "dados",
+      "col": 4,
+      "type": "database",
+      "label": "scheduled_group_message_runs — pendente, enviando, enviado, falhou"
+    },
+    {
+      "id": "adapter",
+      "lane": "canal",
+      "col": 5,
+      "type": "external",
+      "label": "Adapter de canal — texto, foto ou vídeo"
+    },
+    {
+      "id": "realtime",
+      "lane": "dados",
+      "col": 4,
+      "type": "database",
+      "label": "Publicação supabase_realtime — as duas tabelas que mudam de estado"
+    }
+  ],
+  "edges": [
+    {
+      "id": "tela-cria",
+      "from": "tela",
+      "to": "api-agendamentos",
+      "label": "cria, edita e lista com latest_execution"
+    },
+    {
+      "id": "tela-upload",
+      "from": "tela",
+      "to": "upload",
+      "label": "multipart da foto ou vídeo"
+    },
+    {
+      "id": "upload-midia",
+      "from": "upload",
+      "to": "midia",
+      "label": "grava sob organization_id/scheduled-groups"
+    },
+    {
+      "id": "api-grava",
+      "from": "api-agendamentos",
+      "to": "agendamento",
+      "label": "organization_id confiável e próxima execução"
+    },
+    {
+      "id": "scheduler-chama",
+      "from": "scheduler",
+      "to": "worker",
+      "label": "a cada minuto, com secret interno"
+    },
+    {
+      "id": "worker-le",
+      "from": "agendamento",
+      "to": "worker",
+      "label": "status scheduled e next_run_at <= agora"
+    },
+    {
+      "id": "worker-registra",
+      "from": "worker",
+      "to": "execucao",
+      "label": "pending antes de qualquer chamada externa"
+    },
+    {
+      "id": "worker-assina",
+      "from": "midia",
+      "to": "worker",
+      "label": "URL assinada por dez minutos"
+    },
+    {
+      "id": "worker-envia",
+      "from": "worker",
+      "to": "adapter",
+      "label": "efeito externo depois do rastro"
+    },
+    {
+      "id": "worker-fecha",
+      "from": "execucao",
+      "to": "agendamento",
+      "label": "enviado, falhou ou ignorado avança a ocorrência"
+    },
+    {
+      "id": "tela-le-status",
+      "from": "execucao",
+      "to": "tela",
+      "label": "última execução e erro visíveis; evento de realtime rebusca em < 2 s, polling de 60 s como refetch de segurança"
+    },
+    {
+      "from": "execucao",
+      "to": "realtime",
+      "label": "INSERT/UPDATE de cada tentativa (migration 0266)"
+    },
+    {
+      "from": "agendamento",
+      "to": "realtime",
+      "label": "o pai avança (completed / próximo horário)"
+    },
+    {
+      "from": "realtime",
+      "to": "tela",
+      "label": "postgres_changes filtrado por organization_id; RLS filtra do outro lado"
+    }
+  ]
+}

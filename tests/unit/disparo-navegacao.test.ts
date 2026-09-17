@@ -18,5 +18,11 @@ describe("Disparo usa portas reais de navegação", () => {
     expect(fonte).toContain("Última execução:");
     expect(fonte).toContain("flex h-full min-h-0 w-full");
     expect(fonte).not.toContain("max-w-6xl");
+    // A lista reage ao banco (migration 0266): as duas tabelas que mudam de estado,
+    // filtradas pela organização, e a recarga silenciosa que elas disparam.
+    expect(fonte).toContain('table: "scheduled_group_message_runs"');
+    expect(fonte).toContain('table: "scheduled_group_messages"');
+    expect(fonte).toContain("filter: `organization_id=eq.${orgId}`");
+    expect(fonte).toContain("carregar({ silencioso: true })");
   });
 });

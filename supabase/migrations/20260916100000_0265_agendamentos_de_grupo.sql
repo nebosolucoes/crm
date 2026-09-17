@@ -1,4 +1,4 @@
--- 0263 — agendamentos de envio para grupos WhatsApp
+-- 0265 — agendamentos de envio para grupos WhatsApp
 --
 -- Escopo deliberado: grupos sao DESTINO de envio, nao origem de conversa.
 -- O inbound continua ignorado pelo WAHA/CRM; este schema guarda apenas grupos

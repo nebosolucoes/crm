@@ -108,7 +108,7 @@ beforeAll(() => {
       foreach v_org in array array['${ORG_A}'::uuid, '${ORG_B}'::uuid] loop
         select id into v_sess from public.channel_sessions where organization_id = v_org limit 1;
 
-        -- 0263: o destino, a intenção agendada e a execução carregam dados
+        -- 0265: o destino, a intenção agendada e a execução carregam dados
         -- operacionais privados. As três linhas existem nos dois tenants para
         -- que os casos abaixo provem a cerca pelo caminho real de JWT/RLS.
         select id into v_group from public.scheduled_whatsapp_groups
@@ -364,7 +364,7 @@ export const TABLES = [
   // aceitou o risco do segundo aparelho vinculado: vazar entre organizacoes
   // diria a uma empresa quem, na outra, ligou a feature e quando.
   "org_voice_calls",
-  // migration 0263 — grupos autorizados, conteúdo programado e histórico de
+  // migration 0265 — grupos autorizados, conteúdo programado e histórico de
   // execução. O usuário `agent` tem leitura para acompanhar o que ocorreu; a
   // escrita exige manager e é guardada separadamente pelas policies de write.
   "scheduled_whatsapp_groups",

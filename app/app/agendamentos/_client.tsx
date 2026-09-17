@@ -9,8 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useActiveOrg } from "@/hooks/auth/AuthProvider";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { useT } from "@/hooks/i18n/useT";
+import { useRealtimeChannel } from "@/hooks/realtime/useRealtimeChannel";
 import {
   Select,
   SelectContent,
@@ -201,6 +203,7 @@ export function AgendamentosClient({
   const aba = abaInicial;
   const t = useT();
   const tagDoIdioma = useTagDeIdioma();
+  const orgId = useActiveOrg()?.orgId ?? null;
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [buscandoGrupos, setBuscandoGrupos] = useState(false);
@@ -318,8 +321,14 @@ export function AgendamentosClient({
     [],
   );
 
-  async function carregar() {
-    setCarregando(true);
+  /**
+   * `silencioso` é a recarga que o banco pede (evento de realtime ou o refetch
+   * de segurança): ela não acende o spinner nem trava o botão Atualizar —
+   * quem está lendo a lista não pediu nada, e a tela só troca os dados.
+   */
+  async function carregar(opcoes?: { silencioso?: boolean }) {
+    const silencioso = opcoes?.silencioso === true;
+    if (!silencioso) setCarregando(true);
     setErro(null);
     try {
       const [sess, groups, schedules, runs] = await Promise.all([
@@ -334,19 +343,74 @@ export function AgendamentosClient({
       setGrupos(groups.data.groups);
       setAgendamentos(schedules.data.schedules);
       setExecucoes(runs.data.runs);
-      if (!grupoId && groups.data.groups[0]) setGrupoId(groups.data.groups[0].id);
+      // Só preenche o grupo se AINDA estiver vazio no momento de aplicar. A
+      // forma anterior lia `grupoId` do fechamento de quando a carga começou:
+      // quem escolhia um grupo enquanto a lista ainda carregava tinha a escolha
+      // sobrescrita pelo primeiro da lista — e o disparo saía para o grupo errado.
+      const primeiro = groups.data.groups[0];
+      if (primeiro) setGrupoId((atual) => atual || primeiro.id);
     } catch {
       setErro("Não foi possível carregar os agendamentos.");
     } finally {
-      setCarregando(false);
+      if (!silencioso) setCarregando(false);
     }
   }
+
+  /**
+   * O banco avisa; a tela rebusca. Uma execução gera vários eventos em
+   * sequência (INSERT pending → UPDATE sending → UPDATE sent, e o UPDATE do
+   * agendamento pai), então os avisos são juntados numa recarga só, 400 ms
+   * depois do último — o suficiente para a lista mostrar "Enviado" de uma vez,
+   * sem quatro idas à API.
+   *
+   * Na aba "Agendar" os canais ficam fechados de propósito: recarregar
+   * `agendamentos` ali re-hidrata o formulário de edição (efeito de
+   * `?editar=`) por cima do que a pessoa está digitando.
+   */
+  const recargaPendente = useRef<number | null>(null);
+  const escutaOBanco = aba !== "agendar" && !!orgId;
+  function agendarRecarga() {
+    if (recargaPendente.current !== null) window.clearTimeout(recargaPendente.current);
+    recargaPendente.current = window.setTimeout(() => {
+      recargaPendente.current = null;
+      void carregar({ silencioso: true });
+    }, 400);
+  }
+  useEffect(
+    () => () => {
+      if (recargaPendente.current !== null) window.clearTimeout(recargaPendente.current);
+    },
+    [],
+  );
+  const canalDasExecucoes = useRealtimeChannel({
+    name: orgId ? `disparo-execucoes-${orgId}` : "disparo-execucoes-desligado",
+    postgresChanges: orgId
+      ? {
+          event: "*",
+          table: "scheduled_group_message_runs",
+          filter: `organization_id=eq.${orgId}`,
+        }
+      : undefined,
+    onChange: agendarRecarga,
+    enabled: escutaOBanco,
+  });
+  useRealtimeChannel({
+    name: orgId ? `disparo-agendamentos-${orgId}` : "disparo-agendamentos-desligado",
+    postgresChanges: orgId
+      ? {
+          event: "*",
+          table: "scheduled_group_messages",
+          filter: `organization_id=eq.${orgId}`,
+        }
+      : undefined,
+    onChange: agendarRecarga,
+    enabled: escutaOBanco,
+  });
 
   useEffect(() => {
     // A primeira carga é a semente da tela; recarregar fica no botão Atualizar.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void carregar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -358,10 +422,12 @@ export function AgendamentosClient({
   }, [agendamentos, editandoIdNaUrl]);
 
   useEffect(() => {
+    // Refetch de segurança: o Realtime não guarda o que aconteceu enquanto o
+    // canal esteve fora, então a lista ainda se confere sozinha de tempos em
+    // tempos — sem spinner, porque ninguém pediu.
     if (aba === "agendar") return;
-    const intervalo = window.setInterval(() => void carregar(), 15_000);
+    const intervalo = window.setInterval(() => void carregar({ silencioso: true }), 60_000);
     return () => window.clearInterval(intervalo);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aba]);
 
   function selecionarConexao(id: string) {
@@ -538,7 +604,7 @@ export function AgendamentosClient({
           variant="outline"
           size="sm"
           className="h-9 gap-1.5 text-xs"
-          onClick={carregar}
+          onClick={() => void carregar()}
           disabled={carregando}
         >
           <ArrowsClockwise size={14} className={cn(carregando && "animate-spin")} aria-hidden />
@@ -806,7 +872,10 @@ export function AgendamentosClient({
         )}
 
         {aba === "agendamentos" && (
-          <div className="overflow-hidden rounded-lg border bg-surface shadow-xs">
+          <div
+            className="overflow-hidden rounded-lg border bg-surface shadow-xs"
+            data-realtime-status={canalDasExecucoes.status}
+          >
             {agendamentos.length === 0 ? (
               <EstadoVazio texto={t("Nenhum agendamento criado ainda.")} />
             ) : (
@@ -1036,7 +1105,10 @@ export function AgendamentosClient({
         )}
 
         {aba === "historico" && (
-          <div className="overflow-hidden rounded-lg border bg-surface shadow-xs">
+          <div
+            className="overflow-hidden rounded-lg border bg-surface shadow-xs"
+            data-realtime-status={canalDasExecucoes.status}
+          >
             {execucoes.length === 0 ? (
               <EstadoVazio texto={t("Nenhuma execução registrada ainda.")} />
             ) : (
