@@ -12,6 +12,7 @@ import { visaoEmVigor } from "@/lib/ai/pontos/capacidade-em-vigor";
 import { resolveOrgLlmConfig, type LlmEdgeConfig } from "@/lib/agent-engine/edge/llm/credentials";
 import { createDefaultRegistry } from "@/lib/agent-engine/edge/llm/providers";
 import { createPool } from "@/lib/agent-engine/db/pool";
+import { env } from "@/lib/env";
 import type { EventRow, HandlerResult } from "@/lib/event-log/dispatcher";
 import { deriveMediaText, type DeriveDeps } from "@/lib/messaging/media/derive";
 import { TIPOS_DERIVAVEIS } from "@/lib/messaging/media/derivable";
@@ -442,7 +443,7 @@ function buildDeriveDeps(
     servico: NonNullable<DeriveDeps["transcriber"]>,
   ): DeriveDeps["transcriber"] => ({
     transcribe: async (audio, mime) => {
-      const enderecoDoServico = process.env.TRANSCRIPTION_BASE_URL;
+      const enderecoDoServico = env.TRANSCRIPTION_BASE_URL;
       const recusa = enderecoDoServico
         ? await motivoDaRecusaDeDestino(enderecoDoServico)
         : null;
@@ -459,13 +460,19 @@ function buildDeriveDeps(
       return servico.transcribe(audio, mime);
     },
   });
-  const chaveDeTranscricao = process.env.TRANSCRIPTION_API_KEY;
+  // As três chaves da transcrição vêm do `env` — a MESMA régua do app
+  // (`lib/env.ts`), não do `process.env` cru: o schema é quem dá o default e
+  // quem recusa valor malformado, e uma leitura paralela aqui divergiria no dia
+  // em que a régua mudasse — sem ninguém ver, porque este arquivo roda no
+  // worker, não no Next. Não é dependência nova: o worker já carrega o módulo
+  // por `lib/supabase/admin`.
+  const chaveDeTranscricao = env.TRANSCRIPTION_API_KEY;
   const transcriber: DeriveDeps["transcriber"] = chaveDeTranscricao
     ? transcriberDeServico(
         apiTranscriptionProvider({
           apiKey: chaveDeTranscricao,
-          baseUrl: process.env.TRANSCRIPTION_BASE_URL || undefined,
-          model: process.env.TRANSCRIPTION_MODEL || undefined,
+          baseUrl: env.TRANSCRIPTION_BASE_URL || undefined,
+          model: env.TRANSCRIPTION_MODEL || undefined,
         }),
       )
     : transcricaoPadrao;

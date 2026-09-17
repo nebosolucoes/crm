@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
+import { useT } from "@/hooks/i18n/useT";
 import {
   Select,
   SelectContent,
@@ -17,14 +20,18 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { apiClient } from "@/lib/api/client";
+import { capabilitiesOf } from "@/lib/channels/capabilities";
+import type { ChannelProvider } from "@/lib/channels/types";
 import {
   ArrowsClockwise,
   CalendarDots,
   CheckCircle,
+  ImageSquare,
   Pause,
   PencilSimple,
   Play,
   Plus,
+  Trash,
   Warning,
   X,
 } from "@/lib/ui/icons";
@@ -32,7 +39,25 @@ import { cn } from "@/lib/utils";
 
 type StatusAgendamento = "draft" | "scheduled" | "paused" | "cancelled" | "completed";
 type Recorrencia = "none" | "daily" | "weekly" | "monthly" | "custom";
-type StatusExecucao = "pending" | "sending" | "sent" | "failed" | "skipped";
+type StatusExecucao = "pending" | "sending" | "sent" | "failed" | "skipped" | "cancelled";
+
+interface MidiaAgendada {
+  kind: "image" | "video";
+  storage_path: string;
+  mime: string;
+  size_bytes: number;
+  filename?: string | null;
+}
+
+interface UltimaExecucao {
+  id: string;
+  scheduled_for: string;
+  status: StatusExecucao;
+  attempt: number;
+  sent_at: string | null;
+  error_code: string | null;
+  error_message: string | null;
+}
 
 interface GrupoSalvo {
   id: string;
@@ -66,6 +91,8 @@ interface Agendamento {
   max_runs: number | null;
   next_run_at: string | null;
   last_run_at: string | null;
+  media: MidiaAgendada | null;
+  latest_execution: UltimaExecucao | null;
   scheduled_whatsapp_groups?: { name: string | null; external_group_id: string | null } | null;
 }
 
@@ -86,7 +113,6 @@ interface ChannelSession {
   display_name?: string | null;
   name?: string | null;
   phone_number?: string | null;
-  waha_session_name?: string | null;
   provider?: string | null;
   status?: string | null;
 }
@@ -104,9 +130,10 @@ const STATUS_LABEL: Record<StatusAgendamento, string> = {
 const EXECUCAO_LABEL: Record<StatusExecucao, string> = {
   pending: "Pendente",
   sending: "Enviando",
-  sent: "Entregue",
+  sent: "Enviado",
   failed: "Falhou",
   skipped: "Ignorado",
+  cancelled: "Cancelado",
 };
 
 function agoraLocal(): string {
@@ -126,9 +153,9 @@ function inputDeIso(value: string): string {
   return `${data.getFullYear()}-${dois(data.getMonth() + 1)}-${dois(data.getDate())}T${dois(data.getHours())}:${dois(data.getMinutes())}`;
 }
 
-function dataCurta(value: string | null): string {
-  if (!value) return "Sem próxima execução";
-  return new Intl.DateTimeFormat("pt-BR", {
+function dataCurta(value: string | null, tagDoIdioma: string, vazio: string): string {
+  if (!value) return vazio;
+  return new Intl.DateTimeFormat(tagDoIdioma, {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
@@ -141,14 +168,14 @@ function nomeDaConexao(c: ChannelSession): string {
     c.display_name?.trim() ||
     c.name?.trim() ||
     c.phone_number?.trim() ||
-    c.waha_session_name?.trim() ||
     c.provider?.trim() ||
     `Conexão ${c.id.slice(0, 8)}`
   );
 }
 
 function conexaoTemGrupos(c: ChannelSession): boolean {
-  return c.provider === "waha";
+  if (!c.provider) return false;
+  return capabilitiesOf(c.provider as ChannelProvider).groups !== "none";
 }
 
 function badgeStatus(status: StatusAgendamento) {
@@ -172,6 +199,8 @@ export function AgendamentosClient({
   abaInicial?: Aba;
 }) {
   const aba = abaInicial;
+  const t = useT();
+  const tagDoIdioma = useTagDeIdioma();
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [buscandoGrupos, setBuscandoGrupos] = useState(false);
@@ -194,15 +223,17 @@ export function AgendamentosClient({
   const [intervaloCustom, setIntervaloCustom] = useState("60");
   const [maxRuns, setMaxRuns] = useState("");
   const [repeatUntil, setRepeatUntil] = useState("");
+  const [arquivoMidia, setArquivoMidia] = useState<File | null>(null);
+  const [midiaAtual, setMidiaAtual] = useState<MidiaAgendada | null>(null);
+  const [previewMidia, setPreviewMidia] = useState<string | null>(null);
   const [editandoId, setEditandoId] = useState<string | null>(null);
+  const inputMidiaRef = useRef<HTMLInputElement>(null);
+  const previewMidiaRef = useRef<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const editandoIdNaUrl = searchParams.get("editar");
 
-  const conexoesComGrupos = useMemo(
-    () => conexoes.filter(conexaoTemGrupos),
-    [conexoes],
-  );
+  const conexoesComGrupos = useMemo(() => conexoes.filter(conexaoTemGrupos), [conexoes]);
 
   const grupoSelecionado = useMemo(
     () => grupos.find((g) => g.id === grupoId) ?? null,
@@ -231,6 +262,40 @@ export function AgendamentosClient({
     setIntervaloCustom(String(agendamento.recurrence_config.interval_minutes ?? 60));
     setMaxRuns(agendamento.max_runs === null ? "" : String(agendamento.max_runs));
     setRepeatUntil(agendamento.repeat_until ? inputDeIso(agendamento.repeat_until) : "");
+    setArquivoMidia(null);
+    setMidiaAtual(agendamento.media);
+    limparPreviewMidia();
+  }
+
+  function limparPreviewMidia() {
+    if (previewMidiaRef.current) URL.revokeObjectURL(previewMidiaRef.current);
+    previewMidiaRef.current = null;
+    setPreviewMidia(null);
+  }
+
+  function removerMidia() {
+    limparPreviewMidia();
+    setArquivoMidia(null);
+    setMidiaAtual(null);
+    if (inputMidiaRef.current) inputMidiaRef.current.value = "";
+  }
+
+  function selecionarMidia(file: File | null) {
+    if (!file) return;
+    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+      toast.error("Escolha uma foto ou um vídeo.");
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("O arquivo deve ter no máximo 50 MB.");
+      return;
+    }
+    limparPreviewMidia();
+    const url = URL.createObjectURL(file);
+    previewMidiaRef.current = url;
+    setPreviewMidia(url);
+    setArquivoMidia(file);
+    setMidiaAtual(null);
   }
 
   function limparFormulario() {
@@ -243,7 +308,15 @@ export function AgendamentosClient({
     setIntervaloCustom("60");
     setMaxRuns("");
     setRepeatUntil("");
+    removerMidia();
   }
+
+  useEffect(
+    () => () => {
+      if (previewMidiaRef.current) URL.revokeObjectURL(previewMidiaRef.current);
+    },
+    [],
+  );
 
   async function carregar() {
     setCarregando(true);
@@ -251,7 +324,9 @@ export function AgendamentosClient({
     try {
       const [sess, groups, schedules, runs] = await Promise.all([
         apiClient.get<{ data: ChannelSession[] }>("/api/v1/channel-sessions"),
-        apiClient.get<{ data: { groups: GrupoSalvo[] } }>("/api/v1/agendamentos/grupos?active=true"),
+        apiClient.get<{ data: { groups: GrupoSalvo[] } }>(
+          "/api/v1/agendamentos/grupos?active=true",
+        ),
         apiClient.get<{ data: { schedules: Agendamento[] } }>("/api/v1/agendamentos?limit=100"),
         apiClient.get<{ data: { runs: Execucao[] } }>("/api/v1/agendamentos/execucoes?limit=100"),
       ]);
@@ -359,6 +434,24 @@ export function AgendamentosClient({
     }
     setSalvando(true);
     try {
+      let media = midiaAtual;
+      if (arquivoMidia) {
+        const form = new FormData();
+        form.append("file", arquivoMidia);
+        const response = await fetch("/api/v1/agendamentos/media", {
+          method: "POST",
+          body: form,
+          credentials: "same-origin",
+        });
+        const json = (await response.json()) as {
+          data?: { media?: MidiaAgendada };
+          error?: { message?: string };
+        };
+        if (!response.ok || !json.data?.media) {
+          throw new Error(json.error?.message || "Não foi possível enviar a mídia.");
+        }
+        media = json.data.media;
+      }
       const recurrence_config =
         recorrencia === "custom"
           ? { interval_minutes: Math.max(1, Number(intervaloCustom) || 60) }
@@ -375,6 +468,7 @@ export function AgendamentosClient({
         recurrence_config,
         repeat_until: repeatUntil ? isoDeInput(repeatUntil) : null,
         max_runs: maxRuns ? Math.max(1, Number(maxRuns)) : null,
+        media,
       };
       if (editandoId) {
         await apiClient.patch(`/api/v1/agendamentos/${editandoId}`, payload);
@@ -386,8 +480,12 @@ export function AgendamentosClient({
       limparFormulario();
       await carregar();
       router.push("/app/disparo/lista");
-    } catch {
-      toast.error("Não foi possível criar o agendamento.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error && error.message
+          ? error.message
+          : "Não foi possível criar o agendamento.",
+      );
     } finally {
       setSalvando(false);
     }
@@ -408,7 +506,13 @@ export function AgendamentosClient({
     try {
       const body = acao === "cancel" ? { reason: "Cancelado pela tela de agendamentos." } : {};
       await apiClient.post(`/api/v1/agendamentos/${id}/${acao}`, body);
-      toast.success(acao === "pause" ? "Agendamento pausado." : acao === "resume" ? "Agendamento retomado." : "Agendamento cancelado.");
+      toast.success(
+        acao === "pause"
+          ? "Agendamento pausado."
+          : acao === "resume"
+            ? "Agendamento retomado."
+            : "Agendamento cancelado.",
+      );
       await carregar();
     } catch {
       toast.error("Não foi possível atualizar o agendamento.");
@@ -422,24 +526,45 @@ export function AgendamentosClient({
   const falhas = execucoes.filter((e) => e.status === "failed").length;
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 sm:p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="flex h-full min-h-0 w-full flex-col gap-6 overflow-y-auto">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Disparo</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("Disparo")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Envios programados para grupos salvos, com recorrência e histórico de execução.
+            {t("Envios programados para grupos salvos, com recorrência e histórico de execução.")}
           </p>
         </div>
-        <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs" onClick={carregar} disabled={carregando}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 gap-1.5 text-xs"
+          onClick={carregar}
+          disabled={carregando}
+        >
           <ArrowsClockwise size={14} className={cn(carregando && "animate-spin")} aria-hidden />
-          Atualizar
+          {t("Atualizar")}
         </Button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Resumo titulo="Agendados" valor={agendados} detalhe="Próximos disparos" icone={<CalendarDots size={18} />} />
-        <Resumo titulo="Entregues" valor={entregues} detalhe="Execuções enviadas" icone={<CheckCircle size={18} />} />
-        <Resumo titulo="Falhas" valor={falhas} detalhe="Precisam de revisão" icone={<Warning size={18} />} />
+      <div className="grid gap-4 md:grid-cols-3">
+        <Resumo
+          titulo={t("Agendados")}
+          valor={agendados}
+          detalhe={t("Próximos disparos")}
+          icone={<CalendarDots size={18} />}
+        />
+        <Resumo
+          titulo={t("Enviados")}
+          valor={entregues}
+          detalhe={t("Execuções enviadas")}
+          icone={<CheckCircle size={18} />}
+        />
+        <Resumo
+          titulo={t("Falhas")}
+          valor={falhas}
+          detalhe={t("Precisam de revisão")}
+          icone={<Warning size={18} />}
+        />
       </div>
 
       {erro ? (
@@ -450,144 +575,320 @@ export function AgendamentosClient({
 
       <div className="space-y-4">
         {aba === "agendar" && (
-          <div className="grid gap-4 rounded-lg border bg-card p-4 lg:grid-cols-[1fr_1fr]">
-            <div className="space-y-4">
-              <Campo label="Grupo">
-                <Select value={grupoId} onValueChange={setGrupoId} disabled={!podeEditar || grupos.length === 0}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um grupo salvo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {grupos.map((g) => (
-                      <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Campo>
-              <Campo label="Título interno">
-                <Input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Promoção de sexta" disabled={!podeEditar} />
-              </Campo>
-              <Campo label="Mensagem">
-                <Textarea
-                  value={mensagem}
-                  onChange={(e) => setMensagem(e.target.value)}
-                  placeholder="Escreva a mensagem que será enviada ao grupo"
-                  className="min-h-36"
-                  disabled={!podeEditar}
-                />
-              </Campo>
-            </div>
-
-            <div className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Campo label="Quando">
-                  <Input type="datetime-local" value={quando} onChange={(e) => setQuando(e.target.value)} disabled={!podeEditar} />
-                </Campo>
-                <Campo label="Status">
-                  <Select value={status} onValueChange={(v) => setStatus(v as "scheduled" | "draft")} disabled={!podeEditar}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+          <Card>
+            <CardHeader className="border-b pb-5">
+              <CardTitle>
+                {editandoId ? t("Editar disparo") : t("Novo disparo programado")}
+              </CardTitle>
+              <CardDescription>
+                {t(
+                  "Defina o conteúdo, o destino e quando o envio deve acontecer. A execução aparecerá na lista assim que o horário chegar.",
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-6 pt-6 xl:grid-cols-2">
+              <div className="space-y-5">
+                <Campo label={t("Grupo")}>
+                  <Select
+                    value={grupoId}
+                    onValueChange={setGrupoId}
+                    disabled={!podeEditar || grupos.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t("Selecione um grupo salvo")} />
+                    </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="scheduled">Agendado</SelectItem>
-                      <SelectItem value="draft">Rascunho</SelectItem>
+                      {grupos.map((g) => (
+                        <SelectItem key={g.id} value={g.id}>
+                          {g.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </Campo>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Campo label="Recorrência">
-                  <Select value={recorrencia} onValueChange={(v) => setRecorrencia(v as Recorrencia)} disabled={!podeEditar}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Não repetir</SelectItem>
-                      <SelectItem value="daily">Diária</SelectItem>
-                      <SelectItem value="weekly">Semanal</SelectItem>
-                      <SelectItem value="monthly">Mensal</SelectItem>
-                      <SelectItem value="custom">Personalizada</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Campo>
-                <Campo label="Intervalo custom">
+                <Campo label={t("Título interno")}>
                   <Input
-                    type="number"
-                    min={1}
-                    value={intervaloCustom}
-                    onChange={(e) => setIntervaloCustom(e.target.value)}
-                    disabled={!podeEditar || recorrencia !== "custom"}
+                    value={titulo}
+                    onChange={(e) => setTitulo(e.target.value)}
+                    placeholder={t("Promoção de sexta")}
+                    disabled={!podeEditar}
                   />
                 </Campo>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Campo label="Máximo de envios">
-                  <Input type="number" min={1} value={maxRuns} onChange={(e) => setMaxRuns(e.target.value)} disabled={!podeEditar} />
+                <Campo label={t("Mensagem")}>
+                  <Textarea
+                    value={mensagem}
+                    onChange={(e) => setMensagem(e.target.value)}
+                    placeholder={t("Escreva a mensagem que será enviada ao grupo")}
+                    className="min-h-36"
+                    disabled={!podeEditar}
+                  />
                 </Campo>
-                <Campo label="Repetir até">
-                  <Input type="datetime-local" value={repeatUntil} onChange={(e) => setRepeatUntil(e.target.value)} disabled={!podeEditar} />
+                <Campo label={t("Foto ou vídeo")}>
+                  <input
+                    ref={inputMidiaRef}
+                    type="file"
+                    accept="image/*,video/*"
+                    className="sr-only"
+                    onChange={(event) => selecionarMidia(event.target.files?.[0] ?? null)}
+                    disabled={!podeEditar || salvando}
+                  />
+                  {arquivoMidia || midiaAtual ? (
+                    <div className="overflow-hidden rounded-lg border bg-muted/30">
+                      {arquivoMidia && previewMidia ? (
+                        arquivoMidia.type.startsWith("image/") ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- preview local de arquivo ainda não enviado
+                          <img
+                            src={previewMidia}
+                            alt={t("Prévia da foto selecionada")}
+                            className="max-h-72 w-full object-contain"
+                          />
+                        ) : (
+                          <video
+                            src={previewMidia}
+                            controls
+                            className="max-h-72 w-full bg-black object-contain"
+                          />
+                        )
+                      ) : null}
+                      <div className="flex items-center justify-between gap-3 p-3">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <ImageSquare size={18} className="shrink-0 text-primary" aria-hidden />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">
+                              {arquivoMidia?.name || midiaAtual?.filename || t("Mídia anexada")}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {(arquivoMidia?.type || midiaAtual?.mime)?.startsWith("video/")
+                                ? t("Vídeo")
+                                : t("Foto")}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1.5 text-destructive"
+                          onClick={removerMidia}
+                          disabled={!podeEditar || salvando}
+                        >
+                          <Trash size={15} aria-hidden /> {t("Remover")}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-24 w-full flex-col gap-2 border-dashed"
+                      onClick={() => inputMidiaRef.current?.click()}
+                      disabled={!podeEditar || salvando}
+                    >
+                      <ImageSquare size={22} className="text-primary" aria-hidden />
+                      {t("Adicionar foto ou vídeo")}
+                      <span className="text-xs font-normal text-muted-foreground">
+                        {t("Até 50 MB")}
+                      </span>
+                    </Button>
+                  )}
                 </Campo>
               </div>
-              <div className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
-                {grupoSelecionado ? (
-                  <span>
-                    Grupo: <strong className="text-foreground">{grupoSelecionado.name}</strong>
-                    {conexaoDoGrupo ? ` · ${nomeDaConexao(conexaoDoGrupo)}` : ""}
-                  </span>
-                ) : (
-                  "Salve um grupo antes de criar o primeiro agendamento."
-                )}
-              </div>
-              <div className="flex gap-2">
-                {editandoId ? (
-                  <Button type="button" variant="outline" className="flex-1" onClick={cancelarEdicao} disabled={salvando}>
-                    Cancelar edição
+
+              <div className="space-y-5">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Campo label={t("Quando")}>
+                    <Input
+                      type="datetime-local"
+                      value={quando}
+                      onChange={(e) => setQuando(e.target.value)}
+                      disabled={!podeEditar}
+                    />
+                  </Campo>
+                  <Campo label={t("Status")}>
+                    <Select
+                      value={status}
+                      onValueChange={(v) => setStatus(v as "scheduled" | "draft")}
+                      disabled={!podeEditar}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="scheduled">{t("Agendado")}</SelectItem>
+                        <SelectItem value="draft">{t("Rascunho")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Campo>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Campo label={t("Recorrência")}>
+                    <Select
+                      value={recorrencia}
+                      onValueChange={(v) => setRecorrencia(v as Recorrencia)}
+                      disabled={!podeEditar}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">{t("Não repetir")}</SelectItem>
+                        <SelectItem value="daily">{t("Diária")}</SelectItem>
+                        <SelectItem value="weekly">{t("Semanal")}</SelectItem>
+                        <SelectItem value="monthly">{t("Mensal")}</SelectItem>
+                        <SelectItem value="custom">{t("Personalizada")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Campo>
+                  <Campo label={t("Intervalo personalizado")}>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={intervaloCustom}
+                      onChange={(e) => setIntervaloCustom(e.target.value)}
+                      disabled={!podeEditar || recorrencia !== "custom"}
+                    />
+                  </Campo>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Campo label={t("Máximo de envios")}>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={maxRuns}
+                      onChange={(e) => setMaxRuns(e.target.value)}
+                      disabled={!podeEditar}
+                    />
+                  </Campo>
+                  <Campo label={t("Repetir até")}>
+                    <Input
+                      type="datetime-local"
+                      value={repeatUntil}
+                      onChange={(e) => setRepeatUntil(e.target.value)}
+                      disabled={!podeEditar}
+                    />
+                  </Campo>
+                </div>
+                <div className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+                  {grupoSelecionado ? (
+                    <span>
+                      {t("Grupo")}:{" "}
+                      <strong className="text-foreground">{grupoSelecionado.name}</strong>
+                      {conexaoDoGrupo ? ` · ${nomeDaConexao(conexaoDoGrupo)}` : ""}
+                    </span>
+                  ) : (
+                    t("Salve um grupo antes de criar o primeiro agendamento.")
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  {editandoId ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={cancelarEdicao}
+                      disabled={salvando}
+                    >
+                      {t("Cancelar edição")}
+                    </Button>
+                  ) : null}
+                  <Button
+                    className="flex-1 gap-1.5"
+                    onClick={criarAgendamento}
+                    disabled={!podeEditar || salvando || carregando}
+                  >
+                    <Plus size={16} aria-hidden />
+                    {editandoId ? t("Salvar alterações") : t("Criar agendamento")}
                   </Button>
-                ) : null}
-                <Button className="flex-1 gap-1.5" onClick={criarAgendamento} disabled={!podeEditar || salvando || carregando}>
-                <Plus size={16} aria-hidden />
-                {editandoId ? "Salvar alterações" : "Criar agendamento"}
-                </Button>
+                </div>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         )}
 
         {aba === "agendamentos" && (
-          <div className="overflow-hidden rounded-lg border bg-card">
+          <div className="overflow-hidden rounded-lg border bg-surface shadow-xs">
             {agendamentos.length === 0 ? (
-              <EstadoVazio texto="Nenhum agendamento criado ainda." />
+              <EstadoVazio texto={t("Nenhum agendamento criado ainda.")} />
             ) : (
               <div className="divide-y">
                 {agendamentos.map((a) => (
-                  <div key={a.id} className="grid gap-3 p-4 lg:grid-cols-[1fr_auto] lg:items-center">
+                  <div
+                    key={a.id}
+                    className="grid gap-3 p-4 lg:grid-cols-[1fr_auto] lg:items-center"
+                  >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="truncate text-sm font-medium">{a.title || "Agendamento sem título"}</h2>
-                        <Badge variant={badgeStatus(a.status)}>{STATUS_LABEL[a.status]}</Badge>
-                        {a.recurrence_kind !== "none" ? <Badge variant="outline">Recorrente</Badge> : null}
+                        <h2 className="truncate text-sm font-medium">
+                          {a.title || t("Agendamento sem título")}
+                        </h2>
+                        <Badge variant={badgeStatus(a.status)}>{t(STATUS_LABEL[a.status])}</Badge>
+                        {a.latest_execution ? (
+                          <Badge variant={badgeExecucao(a.latest_execution.status)}>
+                            {t("Última execução:")} {t(EXECUCAO_LABEL[a.latest_execution.status])}
+                          </Badge>
+                        ) : null}
+                        {a.recurrence_kind !== "none" ? (
+                          <Badge variant="outline">{t("Recorrente")}</Badge>
+                        ) : null}
+                        {a.media ? <Badge variant="outline">{t("Com mídia")}</Badge> : null}
                       </div>
                       <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{a.body}</p>
                       <p className="mt-2 text-xs text-muted-foreground">
-                        {a.scheduled_whatsapp_groups?.name ?? "Grupo"} · Próximo: {dataCurta(a.next_run_at)} · Último: {dataCurta(a.last_run_at)}
+                        {a.scheduled_whatsapp_groups?.name ?? t("Grupo")} {t("· Próximo:")}{" "}
+                        {dataCurta(a.next_run_at, tagDoIdioma, t("Sem próxima execução"))}{" "}
+                        {t("· Último:")}{" "}
+                        {dataCurta(a.last_run_at, tagDoIdioma, t("Ainda não executado"))}
                       </p>
+                      {a.latest_execution?.error_message ? (
+                        <p className="mt-1 text-xs text-destructive">
+                          {a.latest_execution.error_message}
+                        </p>
+                      ) : null}
                     </div>
                     {podeEditar ? (
                       <div className="flex flex-wrap gap-2">
                         {a.status !== "cancelled" && a.status !== "completed" ? (
-                          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => editarAgendamento(a)} disabled={salvando}>
-                            <PencilSimple size={14} aria-hidden /> Editar
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 text-xs"
+                            onClick={() => editarAgendamento(a)}
+                            disabled={salvando}
+                          >
+                            <PencilSimple size={14} aria-hidden /> {t("Editar")}
                           </Button>
                         ) : null}
                         {a.status === "scheduled" || a.status === "draft" ? (
-                          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => acaoAgendamento(a.id, "pause")} disabled={salvando}>
-                            <Pause size={14} aria-hidden /> Pausar
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 text-xs"
+                            onClick={() => acaoAgendamento(a.id, "pause")}
+                            disabled={salvando}
+                          >
+                            <Pause size={14} aria-hidden /> {t("Pausar")}
                           </Button>
                         ) : null}
                         {a.status === "paused" ? (
-                          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => acaoAgendamento(a.id, "resume")} disabled={salvando}>
-                            <Play size={14} aria-hidden /> Retomar
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 text-xs"
+                            onClick={() => acaoAgendamento(a.id, "resume")}
+                            disabled={salvando}
+                          >
+                            <Play size={14} aria-hidden /> {t("Retomar")}
                           </Button>
                         ) : null}
                         {a.status !== "cancelled" && a.status !== "completed" ? (
-                          <Button variant="outline" size="sm" className="gap-1.5 text-xs text-destructive" onClick={() => acaoAgendamento(a.id, "cancel")} disabled={salvando}>
-                            <X size={14} aria-hidden /> Cancelar
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 text-xs text-destructive"
+                            onClick={() => acaoAgendamento(a.id, "cancel")}
+                            disabled={salvando}
+                          >
+                            <X size={14} aria-hidden /> {t("Cancelar")}
                           </Button>
                         ) : null}
                       </div>
@@ -601,91 +902,131 @@ export function AgendamentosClient({
 
         {aba === "grupos" && (
           <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
-            <div className="space-y-3 rounded-lg border bg-card p-4">
-              <h2 className="text-sm font-semibold">Salvar grupo</h2>
-              <Campo label="Conexão">
-                <Select value={grupoConexaoId} onValueChange={selecionarConexao} disabled={!podeEditar || conexoesComGrupos.length === 0 || buscandoGrupos}>
-                  <SelectTrigger aria-label="Conexão do WhatsApp"><SelectValue placeholder="Selecione a conta conectada" /></SelectTrigger>
+            <div className="space-y-3 rounded-lg border bg-surface p-4 shadow-xs">
+              <h2 className="text-sm font-semibold">{t("Salvar grupo")}</h2>
+              <Campo label={t("Conexão")}>
+                <Select
+                  value={grupoConexaoId}
+                  onValueChange={selecionarConexao}
+                  disabled={!podeEditar || conexoesComGrupos.length === 0 || buscandoGrupos}
+                >
+                  <SelectTrigger aria-label={t("Conexão do WhatsApp")}>
+                    <SelectValue placeholder={t("Selecione a conta conectada")} />
+                  </SelectTrigger>
                   <SelectContent>
                     {conexoesComGrupos.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{nomeDaConexao(c)}</SelectItem>
+                      <SelectItem key={c.id} value={c.id}>
+                        {nomeDaConexao(c)}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </Campo>
-              <Button className="w-full gap-1.5" onClick={() => void buscarGrupos()} disabled={!podeEditar || !grupoConexaoId || buscandoGrupos}>
-                <ArrowsClockwise size={16} className={cn(buscandoGrupos && "animate-spin")} aria-hidden />
-                {buscandoGrupos ? "Listando grupos…" : "Listar grupos da conexão"}
+              <Button
+                className="w-full gap-1.5"
+                onClick={() => void buscarGrupos()}
+                disabled={!podeEditar || !grupoConexaoId || buscandoGrupos}
+              >
+                <ArrowsClockwise
+                  size={16}
+                  className={cn(buscandoGrupos && "animate-spin")}
+                  aria-hidden
+                />
+                {buscandoGrupos ? t("Listando grupos…") : t("Listar grupos da conexão")}
               </Button>
               <p className="text-xs text-muted-foreground">
-                Selecione a conta do WhatsApp e clique no botão. Depois, salve os grupos que aparecerem.
+                {t(
+                  "Selecione a conta do WhatsApp e clique no botão. Depois, salve os grupos que aparecerem.",
+                )}
               </p>
               {conexoesComGrupos.length === 0 && (
                 <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
-                  Nenhuma conexão WhatsApp WAHA com suporte a grupos foi encontrada. Conecte ou ative uma conta WAHA em Conexões e volte para listar os grupos.
+                  {t(
+                    "Nenhuma conexão com suporte a grupos foi encontrada. Conecte ou ative uma conta compatível em Conexões e volte para listar os grupos.",
+                  )}
                 </p>
               )}
             </div>
-            <div className="overflow-hidden rounded-lg border bg-card">
+            <div className="overflow-hidden rounded-lg border bg-surface shadow-xs">
               {gruposEncontrados.length > 0 ? (
                 <div>
                   <div className="flex flex-col gap-2 border-b bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between">
                     <Input
                       value={filtroGrupos}
                       onChange={(event) => setFiltroGrupos(event.target.value)}
-                      placeholder="Pesquisar grupo pelo nome…"
-                      aria-label="Pesquisar grupo pelo nome"
+                      placeholder={t("Pesquisar grupo pelo nome…")}
+                      aria-label={t("Pesquisar grupo pelo nome")}
                     />
                     <p className="shrink-0 text-xs text-muted-foreground">
                       {gruposEncontradosVisiveis.length} de {gruposEncontrados.length} grupo(s)
                     </p>
                   </div>
                   {gruposEncontradosVisiveis.length === 0 ? (
-                    <EstadoVazio texto="Nenhum grupo corresponde à pesquisa." />
+                    <EstadoVazio texto={t("Nenhum grupo corresponde à pesquisa.")} />
                   ) : (
                     <div className="divide-y">
-                  {gruposEncontradosVisiveis.map((g) => (
-                    <div key={g.externalId} className="grid gap-2 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="truncate text-sm font-medium">{g.name}</h3>
-                          <Badge variant={g.groupKind === "announcement" ? "secondary" : "outline"}>
-                            {g.groupKind === "announcement"
-                              ? "Grupo de avisos"
-                              : g.groupKind === "community"
-                                ? "Comunidade"
-                                : "Grupo normal"}
-                          </Badge>
+                      {gruposEncontradosVisiveis.map((g) => (
+                        <div
+                          key={g.externalId}
+                          className="grid gap-2 p-4 sm:grid-cols-[1fr_auto] sm:items-center"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="truncate text-sm font-medium">{g.name}</h3>
+                              <Badge
+                                variant={g.groupKind === "announcement" ? "secondary" : "outline"}
+                              >
+                                {g.groupKind === "announcement"
+                                  ? t("Grupo de avisos")
+                                  : g.groupKind === "community"
+                                    ? t("Comunidade")
+                                    : t("Grupo normal")}
+                              </Badge>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {g.participantCount === null
+                                ? t("Participantes não informados")
+                                : `${g.participantCount} ${t("participante(s)")}`}
+                            </p>
+                            <p className="mt-1 truncate text-xs text-muted-foreground">
+                              {g.externalId}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => void salvarGrupoEncontrado(g)}
+                            disabled={!podeEditar || salvando}
+                          >
+                            {t("Salvar")}
+                          </Button>
                         </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {g.participantCount === null
-                            ? "Participantes não informados"
-                            : `${g.participantCount} participante(s)`}
-                        </p>
-                        <p className="mt-1 truncate text-xs text-muted-foreground">{g.externalId}</p>
-                      </div>
-                      <Button size="sm" onClick={() => void salvarGrupoEncontrado(g)} disabled={!podeEditar || salvando}>
-                        Salvar
-                      </Button>
-                    </div>
-                  ))}
+                      ))}
                     </div>
                   )}
                 </div>
               ) : grupos.length === 0 ? (
-                <EstadoVazio texto="Nenhum grupo salvo ainda." />
+                <EstadoVazio texto={t("Nenhum grupo salvo ainda.")} />
               ) : (
                 <div className="divide-y">
                   {grupos.map((g) => (
-                    <div key={g.id} className="grid gap-2 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
+                    <div
+                      key={g.id}
+                      className="grid gap-2 p-4 sm:grid-cols-[1fr_auto] sm:items-center"
+                    >
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <h3 className="truncate text-sm font-medium">{g.name}</h3>
-                          <Badge variant={g.is_active ? "default" : "secondary"}>{g.is_active ? "Ativo" : "Inativo"}</Badge>
+                          <Badge variant={g.is_active ? "default" : "secondary"}>
+                            {g.is_active ? t("Ativo") : t("Inativo")}
+                          </Badge>
                         </div>
-                        <p className="mt-1 truncate text-xs text-muted-foreground">{g.external_group_id}</p>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                          {g.external_group_id}
+                        </p>
                       </div>
-                      <p className="text-xs text-muted-foreground">{dataCurta(g.last_seen_at)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {dataCurta(g.last_seen_at, tagDoIdioma, t("Sem atividade registrada"))}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -695,26 +1036,38 @@ export function AgendamentosClient({
         )}
 
         {aba === "historico" && (
-          <div className="overflow-hidden rounded-lg border bg-card">
+          <div className="overflow-hidden rounded-lg border bg-surface shadow-xs">
             {execucoes.length === 0 ? (
-              <EstadoVazio texto="Nenhuma execução registrada ainda." />
+              <EstadoVazio texto={t("Nenhuma execução registrada ainda.")} />
             ) : (
               <div className="divide-y">
                 {execucoes.map((e) => (
-                  <div key={e.id} className="grid gap-2 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
+                  <div
+                    key={e.id}
+                    className="grid gap-2 p-4 sm:grid-cols-[1fr_auto] sm:items-center"
+                  >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="truncate text-sm font-medium">
-                          {e.scheduled_group_messages?.title || "Envio agendado"}
+                          {e.scheduled_group_messages?.title || t("Envio agendado")}
                         </h3>
-                        <Badge variant={badgeExecucao(e.status)}>{EXECUCAO_LABEL[e.status]}</Badge>
+                        <Badge variant={badgeExecucao(e.status)}>
+                          {t(EXECUCAO_LABEL[e.status])}
+                        </Badge>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {e.scheduled_whatsapp_groups?.name ?? "Grupo"} · Programado para {dataCurta(e.scheduled_for)}
+                        {e.scheduled_whatsapp_groups?.name ?? t("Grupo")} {t("· Programado para")}{" "}
+                        {dataCurta(e.scheduled_for, tagDoIdioma, t("Sem data"))}
                       </p>
-                      {e.error_message ? <p className="mt-1 text-xs text-destructive">{e.error_message}</p> : null}
+                      {e.error_message ? (
+                        <p className="mt-1 text-xs text-destructive">{e.error_message}</p>
+                      ) : null}
                     </div>
-                    <p className="text-xs text-muted-foreground">{e.sent_at ? `Enviado ${dataCurta(e.sent_at)}` : e.error_code ?? ""}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {e.sent_at
+                        ? `${t("Enviado")} ${dataCurta(e.sent_at, tagDoIdioma, t("Sem data"))}`
+                        : (e.error_code ?? "")}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -735,18 +1088,30 @@ function Campo({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Resumo({ titulo, valor, detalhe, icone }: { titulo: string; valor: number; detalhe: string; icone: React.ReactNode }) {
+function Resumo({
+  titulo,
+  valor,
+  detalhe,
+  icone,
+}: {
+  titulo: string;
+  valor: number;
+  detalhe: string;
+  icone: React.ReactNode;
+}) {
   return (
-    <div className="rounded-lg border bg-card p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs text-muted-foreground">{titulo}</p>
-          <p className="mt-1 text-2xl font-semibold">{valor}</p>
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs text-muted-foreground">{titulo}</p>
+            <p className="mt-1 text-2xl font-semibold">{valor}</p>
+          </div>
+          <div className="rounded-md border bg-muted p-2 text-muted-foreground">{icone}</div>
         </div>
-        <div className="rounded-md border bg-muted p-2 text-muted-foreground">{icone}</div>
-      </div>
-      <p className="mt-3 text-xs text-muted-foreground">{detalhe}</p>
-    </div>
+        <p className="mt-3 text-xs text-muted-foreground">{detalhe}</p>
+      </CardContent>
+    </Card>
   );
 }
 

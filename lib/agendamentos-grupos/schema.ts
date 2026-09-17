@@ -19,9 +19,52 @@ export const STATUS_DA_EXECUCAO_DE_GRUPO = [
 
 export const RECORRENCIAS_DE_GRUPO = ["none", "daily", "weekly", "monthly", "custom"] as const;
 
+export const TIPOS_DE_MIDIA_AGENDADA = ["image", "video"] as const;
+
+export const midiaAgendadaSchema = z.object({
+  kind: z.enum(TIPOS_DE_MIDIA_AGENDADA),
+  storage_path: z.string().trim().min(1).max(500),
+  mime: z.string().trim().min(1).max(160),
+  size_bytes: z.number().int().positive(),
+  filename: z.string().trim().min(1).max(255).nullable().optional(),
+});
+
+export type MidiaAgendada = z.infer<typeof midiaAgendadaSchema>;
+
+const CHAVE_DA_MIDIA_AGENDADA = "scheduled_media";
+
+function objetoJson(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? { ...(value as Record<string, unknown>) }
+    : {};
+}
+
+/**
+ * O jsonb continua encapsulado aqui: API, worker e UI não conhecem a chave
+ * interna. Isso evita transformar `metadata.scheduled_media` num contrato
+ * espalhado — o anti-pattern de jsonb lock-in da doutrina do repositório.
+ */
+export function midiaAgendadaDoMetadata(metadata: unknown): MidiaAgendada | null {
+  const parsed = midiaAgendadaSchema.safeParse(objetoJson(metadata)[CHAVE_DA_MIDIA_AGENDADA]);
+  return parsed.success ? parsed.data : null;
+}
+
+export function metadataComMidiaAgendada(
+  metadata: unknown,
+  media: MidiaAgendada | null,
+): Record<string, unknown> {
+  const proximo = objetoJson(metadata);
+  if (media) proximo[CHAVE_DA_MIDIA_AGENDADA] = media;
+  else delete proximo[CHAVE_DA_MIDIA_AGENDADA];
+  return proximo;
+}
+
 export const grupoDoWhatsappSchema = z.object({
   channel_session_id: z.string().uuid(),
-  external_group_id: z.string().trim().regex(/@g\.us$/),
+  external_group_id: z
+    .string()
+    .trim()
+    .regex(/@g\.us$/),
   name: z.string().trim().min(1).max(160),
   is_active: z.boolean().optional(),
   last_seen_at: z.string().datetime({ offset: true }).nullable().optional(),
@@ -50,6 +93,7 @@ export const criarAgendamentoDeGrupoSchema = z.object({
   recurrence_config: z.record(z.string(), z.unknown()).default({}),
   repeat_until: z.string().datetime({ offset: true }).nullable().optional(),
   max_runs: z.number().int().positive().nullable().optional(),
+  media: midiaAgendadaSchema.nullable().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 

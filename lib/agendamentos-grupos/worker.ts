@@ -10,7 +10,7 @@ import type { ChannelProvider } from "@/lib/channels/types";
 import { logger } from "@/lib/logger";
 import type { createAdminClient } from "@/lib/supabase/admin";
 
-import { proximaExecucaoRecorrente } from "./schema";
+import { midiaAgendadaDoMetadata, proximaExecucaoRecorrente } from "./schema";
 import type { RECORRENCIAS_DE_GRUPO } from "./schema";
 
 const LIMITE_PADRAO = 50;
@@ -25,6 +25,7 @@ interface AgendamentoVencido {
   channel_session_id: string;
   group_id: string;
   body: string;
+  metadata: Record<string, unknown>;
   next_run_at: string;
   recurrence_kind: Recorrencia;
   recurrence_config: Record<string, unknown>;
@@ -34,12 +35,14 @@ interface AgendamentoVencido {
     external_group_id: string;
     is_active: boolean;
   } | null;
-  channel_sessions: (ChannelSessionRef & {
-    id: string;
-    organization_id: string;
-    status: string;
-    archived_at: string | null;
-  }) | null;
+  channel_sessions:
+    | (ChannelSessionRef & {
+        id: string;
+        organization_id: string;
+        status: string;
+        archived_at: string | null;
+      })
+    | null;
 }
 
 export interface ResultadoDoWorkerDeAgendamentosDeGrupo {
@@ -50,8 +53,65 @@ export interface ResultadoDoWorkerDeAgendamentosDeGrupo {
   skipped: number;
 }
 
+type AdminClient = ReturnType<typeof createAdminClient>;
+
+async function contarEnviosConcluidos(
+  admin: AdminClient,
+  agendamento: Pick<AgendamentoVencido, "id" | "organization_id">,
+): Promise<number> {
+  const { count, error } = await admin
+    .from("scheduled_group_message_runs")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", agendamento.organization_id)
+    .eq("scheduled_message_id", agendamento.id)
+    .eq("status", "sent");
+  if (error) throw new Error(`scheduled_group_sent_count_failed: ${error.message}`);
+  return count ?? 0;
+}
+
+async function avancarAgendamentoDepoisDaTentativa(
+  admin: AdminClient,
+  agendamento: AgendamentoVencido,
+  scheduledFor: string,
+  finishedAt: string,
+  runsCount: number,
+  requestId: string,
+): Promise<void> {
+  const nextRun = proximaExecucaoRecorrente({
+    recurrence_kind: agendamento.recurrence_kind,
+    recurrence_config: jsonObject(agendamento.recurrence_config),
+    scheduled_for: scheduledFor,
+    repeat_until: agendamento.repeat_until,
+    runs_count: runsCount,
+    max_runs: agendamento.max_runs,
+  });
+
+  const { error } = await admin
+    .from("scheduled_group_messages")
+    .update({
+      status: nextRun ? "scheduled" : "completed",
+      next_run_at: nextRun,
+      last_run_at: finishedAt,
+      updated_at: finishedAt,
+    })
+    .eq("id", agendamento.id)
+    .eq("organization_id", agendamento.organization_id)
+    .eq("status", "scheduled")
+    .eq("next_run_at", scheduledFor);
+
+  if (error) {
+    logger.error("[scheduled-group-messages] atualizar agendamento falhou", {
+      error: error.message,
+      scheduled_message_id: agendamento.id,
+      requestId,
+    });
+  }
+}
+
 function jsonObject(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 function mensagemDeErro(err: unknown): string {
@@ -59,7 +119,7 @@ function mensagemDeErro(err: unknown): string {
 }
 
 export async function executarAgendamentosDeGrupo(
-  admin: ReturnType<typeof createAdminClient>,
+  admin: AdminClient,
   now: Date,
   requestId: string,
   limite = LIMITE_PADRAO,
@@ -70,10 +130,10 @@ export async function executarAgendamentosDeGrupo(
     .update({
       status: "failed",
       error_code: "worker_timeout",
-      error_message: "A execução ficou presa em envio e foi liberada para nova tentativa.",
+      error_message: "A execução ficou presa e foi encerrada sem reenvio automático.",
       updated_at: now.toISOString(),
     })
-    .eq("status", "sending")
+    .in("status", ["pending", "sending"])
     .not("claimed_at", "is", null)
     .lte("claimed_at", sendingPresoAntesDe);
 
@@ -84,7 +144,7 @@ export async function executarAgendamentosDeGrupo(
   const { data, error } = await admin
     .from("scheduled_group_messages")
     .select(
-      `id, organization_id, channel_session_id, group_id, body, next_run_at, recurrence_kind, recurrence_config, repeat_until, max_runs,
+      `id, organization_id, channel_session_id, group_id, body, metadata, next_run_at, recurrence_kind, recurrence_config, repeat_until, max_runs,
        scheduled_whatsapp_groups!scheduled_group_messages_group_id_fkey(external_group_id, is_active),
        channel_sessions!scheduled_group_messages_channel_org_fkey(id, organization_id, status, archived_at, ${CHANNEL_SESSION_REF_COLUMNS})`,
     )
@@ -112,7 +172,7 @@ export async function executarAgendamentosDeGrupo(
     for (let claimAttempt = 0; claimAttempt < TENTATIVAS_DE_CLAIM; claimAttempt += 1) {
       const { data: latestRun, error: latestRunError } = await admin
         .from("scheduled_group_message_runs")
-        .select("attempt")
+        .select("attempt, status")
         .eq("organization_id", agendamento.organization_id)
         .eq("scheduled_message_id", agendamento.id)
         .eq("scheduled_for", scheduledFor)
@@ -129,6 +189,30 @@ export async function executarAgendamentosDeGrupo(
         break;
       }
 
+      if (latestRun?.status === "pending" || latestRun?.status === "sending") {
+        // Outra rodada já é dona desta ocorrência. Não inventa um attempt novo
+        // enquanto o primeiro ainda pode produzir um efeito irreversível.
+        break;
+      }
+      if (
+        latestRun?.status === "sent" ||
+        latestRun?.status === "failed" ||
+        latestRun?.status === "skipped" ||
+        latestRun?.status === "cancelled"
+      ) {
+        // A tentativa terminou, mas o update do agendamento pai pode ter
+        // falhado. Repara o relógio sem reenviar a mesma ocorrência.
+        await avancarAgendamentoDepoisDaTentativa(
+          admin,
+          agendamento,
+          scheduledFor,
+          new Date().toISOString(),
+          await contarEnviosConcluidos(admin, agendamento),
+          requestId,
+        );
+        break;
+      }
+
       const attempt = (latestRun?.attempt ?? 0) + 1;
       const { data: run, error: claimError } = await admin
         .from("scheduled_group_message_runs")
@@ -139,10 +223,9 @@ export async function executarAgendamentosDeGrupo(
           group_id: agendamento.group_id,
           scheduled_for: scheduledFor,
           attempt,
-          status: "sending",
+          status: "pending",
           worker_id: workerId,
           claimed_at: now.toISOString(),
-          started_at: now.toISOString(),
           metadata: { request_id: requestId },
         })
         .select("id")
@@ -167,17 +250,60 @@ export async function executarAgendamentosDeGrupo(
 
     resultado.claimed += 1;
 
-    const falhar = async (codigo: string, erro: string, status: "failed" | "skipped" = "failed") => {
-      await admin
+    // A linha pending nasce antes de qualquer chamada externa. Se o processo
+    // cair daqui para a frente, a tela ainda registra que o horário chegou.
+    await admin
+      .from("scheduled_group_messages")
+      .update({ last_run_at: now.toISOString(), updated_at: now.toISOString() })
+      .eq("id", agendamento.id)
+      .eq("organization_id", agendamento.organization_id)
+      .eq("status", "scheduled")
+      .eq("next_run_at", scheduledFor);
+
+    const { error: sendingError } = await admin
+      .from("scheduled_group_message_runs")
+      .update({ status: "sending", started_at: now.toISOString(), updated_at: now.toISOString() })
+      .eq("id", runId)
+      .eq("organization_id", agendamento.organization_id)
+      .eq("status", "pending");
+
+    if (sendingError) {
+      logger.error("[scheduled-group-messages] transição para envio falhou", {
+        error: sendingError.message,
+        run_id: runId,
+        requestId,
+      });
+      continue;
+    }
+
+    const sentCountBefore = await contarEnviosConcluidos(admin, agendamento);
+
+    const falhar = async (
+      codigo: string,
+      erro: string,
+      status: "failed" | "skipped" = "failed",
+    ) => {
+      const finishedAt = new Date().toISOString();
+      const { error: runError } = await admin
         .from("scheduled_group_message_runs")
         .update({
           status,
           error_code: codigo,
           error_message: erro.slice(0, 500),
-          updated_at: new Date().toISOString(),
+          updated_at: finishedAt,
         })
         .eq("id", runId)
         .eq("organization_id", agendamento.organization_id);
+      if (runError) throw new Error(`scheduled_group_run_finalize_failed: ${runError.message}`);
+
+      await avancarAgendamentoDepoisDaTentativa(
+        admin,
+        agendamento,
+        scheduledFor,
+        finishedAt,
+        sentCountBefore,
+        requestId,
+      );
       if (status === "skipped") resultado.skipped += 1;
       else resultado.failed += 1;
     };
@@ -200,41 +326,48 @@ export async function executarAgendamentosDeGrupo(
         continue;
       }
 
+      const media = midiaAgendadaDoMetadata(agendamento.metadata);
+      let mediaAssinada:
+        | { url: string; mime: string; filename?: string | null; caption?: string | null }
+        | undefined;
+      if (media) {
+        const { data: signed, error: signError } = await admin.storage
+          .from("whatsapp-media")
+          .createSignedUrl(media.storage_path, 600);
+        if (signError || !signed?.signedUrl) {
+          await falhar("storage_sign_failed", "Não foi possível preparar a mídia para envio.");
+          continue;
+        }
+        mediaAssinada = {
+          url: signed.signedUrl,
+          mime: media.mime,
+          filename: media.filename,
+          caption: agendamento.body,
+        };
+      }
+
       externalId = (
         await adapter.send({
           organizationId: agendamento.organization_id,
           sessionRef: resolveSessionRef(agendamento.channel_sessions),
           to: agendamento.scheduled_whatsapp_groups.external_group_id,
-          kind: "text",
+          kind: media?.kind ?? "text",
           body: agendamento.body,
+          media: mediaAssinada,
         })
       ).externalId;
 
       if (!externalId) {
-        await falhar(adapter.codes.sendFailed, "Transporte aceitou a chamada sem devolver id externo.");
+        await falhar(
+          adapter.codes.sendFailed,
+          "Transporte aceitou a chamada sem devolver id externo.",
+        );
         continue;
       }
     } catch (err) {
       await falhar("send_failed", mensagemDeErro(err));
       continue;
     }
-
-    const { count } = await admin
-      .from("scheduled_group_message_runs")
-      .select("id", { count: "exact", head: true })
-      .eq("organization_id", agendamento.organization_id)
-      .eq("scheduled_message_id", agendamento.id)
-      .eq("status", "sent");
-
-    const runsCount = (count ?? 0) + 1;
-    const nextRun = proximaExecucaoRecorrente({
-      recurrence_kind: agendamento.recurrence_kind,
-      recurrence_config: jsonObject(agendamento.recurrence_config),
-      scheduled_for: scheduledFor,
-      repeat_until: agendamento.repeat_until,
-      runs_count: runsCount,
-      max_runs: agendamento.max_runs,
-    });
 
     const sentAt = new Date().toISOString();
     const { error: finalizeError } = await admin
@@ -254,27 +387,20 @@ export async function executarAgendamentosDeGrupo(
         run_id: runId,
         requestId,
       });
+      // O efeito externo aconteceu, mas sem o recibo persistido não é seguro
+      // declarar sucesso nem liberar outro slot. A recuperação de execução
+      // presa fechará como falha/resultado incerto sem reenviar esta ocorrência.
+      continue;
     }
 
-    const { error: scheduleError } = await admin
-      .from("scheduled_group_messages")
-      .update({
-        status: nextRun ? "scheduled" : "completed",
-        next_run_at: nextRun,
-        last_run_at: sentAt,
-        updated_at: sentAt,
-      })
-      .eq("id", agendamento.id)
-      .eq("organization_id", agendamento.organization_id)
-      .eq("next_run_at", scheduledFor);
-
-    if (scheduleError) {
-      logger.error("[scheduled-group-messages] atualizar agendamento falhou", {
-        error: scheduleError.message,
-        scheduled_message_id: agendamento.id,
-        requestId,
-      });
-    }
+    await avancarAgendamentoDepoisDaTentativa(
+      admin,
+      agendamento,
+      scheduledFor,
+      sentAt,
+      sentCountBefore + 1,
+      requestId,
+    );
 
     resultado.sent += 1;
   }

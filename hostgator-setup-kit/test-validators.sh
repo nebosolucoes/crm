@@ -2649,6 +2649,101 @@ NEXT_PUBLIC_APP_URL='https://crm.exemplo.com.br'")"
 ) || fail=1
 rm -rf "$TMP_DDL_C"
 
+echo "install.sh re-executado: deadlock no baseline faz o arquivo ser aplicado de novo"
+# Sobre um banco que JÁ tem o schema, o install.sh segue o contrato do update.sh
+# (sem ON_ERROR_STOP) e tinha o mesmo buraco: um `deadlock detected` com o app no
+# ar deixava um `drop policy` sem o `create` seguinte — medido numa VPS real na
+# v1.27.3, pelo update.sh. A função é uma só (`reaplicar_baseline`, _common.sh),
+# com suíte própria em tests/shell/baseline-reaplica-apos-disputa.test.sh; este
+# caso prova que o install.sh passa por ela.
+TMP_REAPLICA="$(mktemp -d)"
+(
+  montar_vps "$TMP_REAPLICA" "crmreaplica" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$DOCKER_LOG"
+case "$1" in
+  compose) case "$*" in *" exec "*) printf 'healthy\n{"data":{"status":"healthy"}}\n' ;; esac; exit 0 ;;
+esac
+case "$*" in
+  # A sonda "o schema já existe?" responde que sim: é o ramo sob prova.
+  *"table_name='organizations'"*) printf '1\n' ;;
+  # A 1ª aplicação do baseline perde uma disputa; as seguintes saem limpas.
+  *" -f /b.sql")
+    marca="$(dirname "$DOCKER_LOG")/baseline-passadas"
+    printf x >> "$marca"
+    [ "$(wc -c < "$marca" | tr -d ' ')" = 1 ] && printf 'psql:/b.sql:16766: ERROR:  deadlock detected\n' ;;
+esac
+exit 0
+STUB
+  mkdir -p "$VPS_PROJ/supabase"; : > "$VPS_PROJ/supabase/baseline.sql"
+  export BASELINE_ESPERA_S=0
+  saida="$(rodar install.sh --yes)"
+
+  # Vacuidade: sem o ramo de schema existente, não há re-aplicação para medir.
+  if ! printf '%s' "$saida" | grep -q "schema já existe"; then
+    printf '  ✗ o install.sh não entrou no ramo de schema existente — teste inconclusivo, não verde\n'; exit 1
+  fi
+  n="$(grep -c -- '-f /b.sql' "$VPS_LOG")"
+  if [ "$n" != 2 ]; then
+    printf '  ✗ esperava o baseline aplicado 2 vezes (deadlock, depois limpo); foram %s\n' "$n"; exit 1
+  fi
+  printf '  ✓ o deadlock da 1ª passada fez o install.sh aplicar o baseline de novo\n'
+  if ! printf '%s' "$saida" | grep -q "✓ schema re-aplicado"; then
+    printf '  ✗ a 2ª passada saiu limpa e a tela não disse ✓ schema re-aplicado:\n'
+    printf '%s\n' "$saida" | grep -iE "schema|banco|deadlock" | sed 's/^/       /'; exit 1
+  fi
+  if printf '%s' "$saida" | grep -q "NÃO são os esperados"; then
+    printf '  ✗ o deadlock da 1ª passada virou aviso, embora a 2ª tenha curado\n'; exit 1
+  fi
+  printf '  ✓ e o veredito é o da última passada: ✓ schema re-aplicado, sem aviso\n'
+) || fail=1
+rm -rf "$TMP_REAPLICA"
+
+echo "install.sh re-executado: aviso de banco com lista grande não derruba o instalador"
+# O ramo de aviso ("⚠ Erros no banco que NÃO são os esperados") imprimia com
+# `| head -20`: sob pipefail, numa lista maior que o buffer do pipe (milhares de
+# "must be owner" de uma role sem dono) o head fecha cedo, o printf leva SIGPIPE e
+# o set -e mata o instalador ali. Nenhum caso chegava a este ramo.
+TMP_AVISO_GRANDE="$(mktemp -d)"
+(
+  montar_vps "$TMP_AVISO_GRANDE" "crmavisogrande" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$DOCKER_LOG"
+case "$1" in
+  compose) case "$*" in *" exec "*) printf 'healthy\n{"data":{"status":"healthy"}}\n' ;; esac; exit 0 ;;
+esac
+case "$*" in
+  *"table_name='organizations'"*) printf '1\n' ;;
+  *" -f /b.sql")
+    printf 'psql:/b.sql:16766: ERROR:  deadlock detected\n'
+    for i in $(seq 1 4000); do printf 'psql:/b.sql:%s: ERROR:  must be owner of table tabela_%s\n' "$i" "$i"; done ;;
+esac
+exit 0
+STUB
+  mkdir -p "$VPS_PROJ/supabase"; : > "$VPS_PROJ/supabase/baseline.sql"
+  export BASELINE_ESPERA_S=0
+  saida="$(rodar install.sh --yes)"
+
+  if ! printf '%s' "$saida" | grep -q "schema já existe"; then
+    printf '  ✗ o install.sh não entrou no ramo de schema existente — teste inconclusivo, não verde\n'; exit 1
+  fi
+  if ! printf '%s' "$saida" | grep -q "Erros no banco que NÃO são os esperados"; then
+    printf '  ✗ a lista grande não chegou ao aviso de banco\n'; exit 1
+  fi
+  # A linha seguinte ao bloco do schema: se ela saiu, o instalador sobreviveu ao aviso.
+  if ! printf '%s' "$saida" | grep -q "verificação:"; then
+    printf '  ✗ o instalador morreu no aviso de banco (a verificação de tabelas, logo depois, não saiu)\n'
+    printf '%s\n' "$saida" | grep -iE "schema|banco|erro" | tail -5 | sed 's/^/       /'; exit 1
+  fi
+  printf '  ✓ o instalador passa do aviso de banco com uma lista maior que o buffer do pipe\n'
+  n="$(grep -c -- '-f /b.sql' "$VPS_LOG")"
+  if [ "$n" != 3 ]; then
+    printf '  ✗ a disputa no topo da lista grande não foi reconhecida: %s passada(s), esperava 3\n' "$n"; exit 1
+  fi
+  printf '  ✓ e a disputa no topo foi reconhecida (3 passadas)\n'
+) || fail=1
+rm -rf "$TMP_AVISO_GRANDE"
+
 echo "e-mails de acesso: quem JÁ instalou também é avisado — uma vez só"
 # A população realmente quebrada hoje é quem instalou ANTES de a entrevista pedir
 # o token: o Site URL do projeto dela está em `localhost:3000` e nada a alcança.

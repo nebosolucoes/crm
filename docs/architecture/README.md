@@ -17,6 +17,7 @@ ser fonte sem ninguém decidir isso.
 | arquivo | escopo |
 |---|---|
 | `pre-go-live-whatsapp.architecture.json` | modo de teste por canal (issue #573): configuração administrativa, gate compartilhado, releitura no envio e validação pelo Inbox |
+| `disparo-programado.architecture.json` | disparo em grupo do horário ao desfecho visível — claim pendente antes do efeito, mídia privada e avanço do relógio também na falha |
 | `app-da-meta-da-instalacao.architecture.json` | App da Meta da instalação (issue #850, migration 0257) — 10 peças, 12 arestas; a tela `/admin/meta` que grava a chave e mostra o token uma vez, o resolvedor que serve o par inteiro de UMA fonte (banco, com o `.env` de reserva) e por que Conexões só mostra o token quando ele veio do `.env` |
 | `agenda-google-sync.architecture.json` | fontes/destino por dono, tupla estável, três vias, claim/CAS e cobertura de calendário; presença e LGPD integradas |
 | `encerramento-atendimento.architecture.json` | conversa/demanda independentes, mutex no inbound, origem imutável dos jobs, memória vigente e guardas antes dos efeitos |

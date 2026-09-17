@@ -13,5 +13,10 @@ describe("Disparo usa portas reais de navegação", () => {
     expect(fonte).toContain("Editar");
     expect(fonte).toContain("Salvar alterações");
     expect(fonte).toContain("apiClient.patch(`/api/v1/agendamentos/${editandoId}`");
+    expect(fonte).toContain("Adicionar foto ou vídeo");
+    expect(fonte).toContain("/api/v1/agendamentos/media");
+    expect(fonte).toContain("Última execução:");
+    expect(fonte).toContain("flex h-full min-h-0 w-full");
+    expect(fonte).not.toContain("max-w-6xl");
   });
 });

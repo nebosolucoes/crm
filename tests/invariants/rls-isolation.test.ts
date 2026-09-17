@@ -101,10 +101,47 @@ beforeAll(() => {
       v_stage uuid;
       v_agent uuid;
       v_version uuid;
+      v_group uuid;
+      v_scheduled_message uuid;
       v_boundary jsonb;
     begin
       foreach v_org in array array['${ORG_A}'::uuid, '${ORG_B}'::uuid] loop
         select id into v_sess from public.channel_sessions where organization_id = v_org limit 1;
+
+        -- 0263: o destino, a intenção agendada e a execução carregam dados
+        -- operacionais privados. As três linhas existem nos dois tenants para
+        -- que os casos abaixo provem a cerca pelo caminho real de JWT/RLS.
+        select id into v_group from public.scheduled_whatsapp_groups
+          where organization_id = v_org and external_group_id = '120363000000000000@g.us';
+        if v_group is null then
+          insert into public.scheduled_whatsapp_groups
+            (organization_id, channel_session_id, external_group_id, name)
+            values (v_org, v_sess, '120363000000000000@g.us', 'RLS Invariant Group')
+            returning id into v_group;
+        end if;
+
+        select id into v_scheduled_message from public.scheduled_group_messages
+          where organization_id = v_org and group_id = v_group and title = 'RLS Invariant Schedule';
+        if v_scheduled_message is null then
+          insert into public.scheduled_group_messages
+            (organization_id, channel_session_id, group_id, title, body, status,
+             starts_at, next_run_at)
+            values (v_org, v_sess, v_group, 'RLS Invariant Schedule',
+                    'RLS invariant private scheduled body', 'scheduled',
+                    now() + interval '1 hour', now() + interval '1 hour')
+            returning id into v_scheduled_message;
+        end if;
+
+        if not exists (
+          select 1 from public.scheduled_group_message_runs
+          where organization_id = v_org and scheduled_message_id = v_scheduled_message
+        ) then
+          insert into public.scheduled_group_message_runs
+            (organization_id, scheduled_message_id, channel_session_id, group_id,
+             scheduled_for, status)
+            values (v_org, v_scheduled_message, v_sess, v_group,
+                    now() + interval '1 hour', 'pending');
+        end if;
 
         select id into v_contact from public.contacts
           where organization_id = v_org and display_name = 'RLS Invariant Contact';
@@ -327,6 +364,12 @@ export const TABLES = [
   // aceitou o risco do segundo aparelho vinculado: vazar entre organizacoes
   // diria a uma empresa quem, na outra, ligou a feature e quando.
   "org_voice_calls",
+  // migration 0263 — grupos autorizados, conteúdo programado e histórico de
+  // execução. O usuário `agent` tem leitura para acompanhar o que ocorreu; a
+  // escrita exige manager e é guardada separadamente pelas policies de write.
+  "scheduled_whatsapp_groups",
+  "scheduled_group_messages",
+  "scheduled_group_message_runs",
   // ⚠️ `webhook_lead_captures` (migration 0174) NÃO entra nesta lista, e a
   // ausência é deliberada: a policy dela exige `manager`, e o usuário semeado
   // aqui é `agent` — o controle positivo falharia por ACERTO, e a "correção"

@@ -17,6 +17,11 @@ export function isMediaPathOwnedBy(path: string, orgId: string, conversationId: 
   return path.startsWith(`${orgId}/${conversationId}/`);
 }
 
+/** Posse da mídia de disparo, separada das pastas de conversas do Inbox. */
+export function isScheduledMediaPathOwnedBy(path: string, orgId: string): boolean {
+  return path.startsWith(`${orgId}/scheduled-groups/`);
+}
+
 const DOCUMENT_MIMES = new Set([
   "application/pdf",
   "application/msword",
@@ -31,7 +36,11 @@ const DOCUMENT_MIMES = new Set([
 ]);
 
 type Ok = { ok: true; kind: MessageKind };
-type Fail = { ok: false; code: "unsupported_media_type" | "payload_too_large" | "validation_failed"; message: string };
+type Fail = {
+  ok: false;
+  code: "unsupported_media_type" | "payload_too_large" | "validation_failed";
+  message: string;
+};
 
 export function validateOutboundMedia(mime: string, sizeBytes: number): Ok | Fail {
   if (!sizeBytes || sizeBytes <= 0) {

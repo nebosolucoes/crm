@@ -151,8 +151,42 @@ vi.mock("@/lib/messaging/media/transcription", () => ({
   apiTranscriptionProvider: (cfg: unknown) => provedorDeTranscricaoMock(cfg),
 }));
 
+// O worker lê o trio da transcrição pelo `env` — a régua do app (`lib/env.ts`)
+// —, e não pelo `process.env` cru: `vi.stubEnv` já não alcança esse caminho. O
+// módulo real continua inteiro; só as três chaves da transcrição passam a vir
+// de um objeto que cada caso controla.
+const transcricaoDoEnv = vi.hoisted(() => ({ apiKey: "", baseUrl: "", model: "" }));
+vi.mock("@/lib/env", async (importOriginal) => {
+  const real = await importOriginal<{ env: Env }>();
+  return {
+    env: {
+      ...real.env,
+      get TRANSCRIPTION_API_KEY() {
+        return transcricaoDoEnv.apiKey;
+      },
+      get TRANSCRIPTION_BASE_URL() {
+        return transcricaoDoEnv.baseUrl;
+      },
+      get TRANSCRIPTION_MODEL() {
+        return transcricaoDoEnv.model;
+      },
+    },
+  };
+});
+
+/**
+ * O trio da transcrição, do jeito que o `env` o entrega.
+ *
+ * Sem argumento, é o default do schema (vazio) — o caso "não configurei
+ * serviço nenhum", que segue transcrevendo pela chave da OpenAI.
+ */
+function comTranscricaoNoEnv(t: Partial<typeof transcricaoDoEnv> = {}): void {
+  Object.assign(transcricaoDoEnv, { apiKey: "", baseUrl: "", model: "" }, t);
+}
+
 import { deriveMessageMedia } from "@/workers/media-derive-worker";
 import { deriveMediaText, type DeriveDeps } from "@/lib/messaging/media/derive";
+import type { Env } from "@/lib/env";
 
 function eventRow(attempts = 0) {
   return {
@@ -180,6 +214,7 @@ function depsDaChamada(): DeriveDeps {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.unstubAllEnvs();
+  comTranscricaoNoEnv();
   dns.erro = null;
   dns.resposta = [{ address: "93.184.216.34", family: 4 }];
   bindingDaVez = BINDING_COM_ENDPOINT;
@@ -228,9 +263,11 @@ describe("worker de mídia: base_url do binding de visão (#855)", () => {
   });
 
   it("usa o serviço de transcrição do .env, quando ele está configurado", async () => {
-    vi.stubEnv("TRANSCRIPTION_API_KEY", "chave-do-servico");
-    vi.stubEnv("TRANSCRIPTION_BASE_URL", "https://api.groq.com/openai/v1");
-    vi.stubEnv("TRANSCRIPTION_MODEL", "whisper-large-v3");
+    comTranscricaoNoEnv({
+      apiKey: "chave-do-servico",
+      baseUrl: "https://api.groq.com/openai/v1",
+      model: "whisper-large-v3",
+    });
     linhaDaMensagem = {
       ...linhaDaMensagem,
       type: "audio",
@@ -320,8 +357,10 @@ describe("worker de mídia: base_url do binding de visão (#855)", () => {
   });
 
   it("não manda a chave do serviço de transcrição para endereço interno", async () => {
-    vi.stubEnv("TRANSCRIPTION_API_KEY", "chave-do-servico");
-    vi.stubEnv("TRANSCRIPTION_BASE_URL", "http://169.254.169.254/v1");
+    comTranscricaoNoEnv({
+      apiKey: "chave-do-servico",
+      baseUrl: "http://169.254.169.254/v1",
+    });
 
     await deriveMessageMedia(eventRow());
     const texto = await depsDaChamada().transcriber.transcribe(Buffer.from("ogg"), "audio/ogg");
@@ -335,13 +374,41 @@ describe("worker de mídia: base_url do binding de visão (#855)", () => {
   });
 
   it("segue transcrevendo no serviço quando o endereço é aceito", async () => {
-    vi.stubEnv("TRANSCRIPTION_API_KEY", "chave-do-servico");
-    vi.stubEnv("TRANSCRIPTION_BASE_URL", "https://api.groq.com/openai/v1");
+    comTranscricaoNoEnv({
+      apiKey: "chave-do-servico",
+      baseUrl: "https://api.groq.com/openai/v1",
+    });
 
     await deriveMessageMedia(eventRow());
     const texto = await depsDaChamada().transcriber.transcribe(Buffer.from("ogg"), "audio/ogg");
 
     expect(transcribeDoSvcMock).toHaveBeenCalledTimes(1);
     expect(texto).toBe("transcrição de mentira");
+  });
+
+  it("a chave só no ambiente não liga mais o serviço: a régua é o `env` (#964)", async () => {
+    // Sabotagem: o `process.env` tem o trio inteiro, e é ele que a leitura ANTES
+    // desta correção consultava — o serviço seria chamado com a chave e o
+    // endereço crus. Agora quem responde é o `env` (o schema do app), e o
+    // default dele é vazio: a transcrição segue pelo caminho de sempre.
+    vi.stubEnv("TRANSCRIPTION_API_KEY", "chave-só-no-ambiente");
+    vi.stubEnv("TRANSCRIPTION_BASE_URL", "https://api.groq.com/openai/v1");
+    vi.stubEnv("TRANSCRIPTION_MODEL", "whisper-large-v3");
+    comTranscricaoNoEnv();
+    linhaDaMensagem = {
+      ...linhaDaMensagem,
+      type: "audio",
+      media_mime: "audio/ogg",
+      media_storage_path: "org1/conv1/msg1.ogg",
+    };
+
+    await deriveMessageMedia(eventRow());
+
+    expect(provedorDeTranscricaoMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ apiKey: "chave-só-no-ambiente" }),
+    );
+    expect(provedorDeTranscricaoMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ baseUrl: "https://api.groq.com/openai/v1" }),
+    );
   });
 });
