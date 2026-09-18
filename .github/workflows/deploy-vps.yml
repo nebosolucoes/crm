@@ -1,0 +1,78 @@
+name: Deploy na VPS (fork)
+
+# O botão de deploy do FORK. Não dispara sozinho: só por "Run workflow" na aba
+# Actions. Entra na VPS por SSH e roda `scripts/deploy-nebo.sh`, que puxa as
+# imagens já publicadas pelo "Publicar imagem Docker (GHCR)" (o outro botão),
+# reaplica o baseline.sql e sobe os contêineres.
+#
+# Ordem dos cliques: 1) Publicar imagem Docker (GHCR) → 2) este. O script recusa
+# subir se a imagem no GHCR não for do commit que está na branch (a menos que
+# `force` esteja marcado).
+#
+# Secrets do repositório (Settings › Secrets and variables › Actions):
+#   VPS_HOST      IP ou host da VPS
+#   VPS_USER      usuário do SSH (o mesmo que instalou o CRM)
+#   VPS_SSH_KEY   chave PRIVADA (ed25519) cuja pública está no authorized_keys da VPS
+#   VPS_PORT      (opcional) porta do SSH, default 22
+
+on:
+  workflow_dispatch:
+    inputs:
+      pasta:
+        description: "Pasta do projeto na VPS (relativa ao home do usuário, ou absoluta)"
+        default: "deskcommcrm"
+        required: true
+      skip_backup:
+        description: "Pular o backup do banco antes do deploy"
+        type: boolean
+        default: false
+      force:
+        description: "Subir mesmo que a imagem no GHCR não seja deste commit"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Preparar a chave SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          set -euo pipefail
+          [ -n "$VPS_SSH_KEY" ] || { echo "::error::secret VPS_SSH_KEY vazio"; exit 1; }
+          [ -n "$VPS_HOST" ]    || { echo "::error::secret VPS_HOST vazio"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps && chmod 600 ~/.ssh/vps
+          ssh-keyscan -p "${VPS_PORT:-22}" -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Rodar o deploy na VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          PASTA: ${{ inputs.pasta }}
+          SKIP_BACKUP: ${{ inputs.skip_backup }}
+          FORCE: ${{ inputs.force }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          flags=""
+          [ "$SKIP_BACKUP" = "true" ] && flags="$flags --skip-backup"
+          [ "$FORCE" = "true" ]       && flags="$flags --force"
+          # A pasta e a branch vão como argumentos citados; o resto é fixo.
+          ssh -i ~/.ssh/vps -p "${VPS_PORT:-22}" -o BatchMode=yes -o ConnectTimeout=15 \
+            "${VPS_USER}@${VPS_HOST}" \
+            "cd $(printf '%q' "$PASTA") && DEPLOY_BRANCH=$(printf '%q' "$BRANCH") bash scripts/deploy-nebo.sh $flags"

@@ -1,0 +1,6 @@
+---
+impacto: capacidade_nova
+secao: adicionado
+titulo: Planos comerciais por organização — o que cada cliente pode usar
+---
+Quem administra a instalação passa a ter um catálogo de planos (Admin › Planos) e a decidir, por organização (Admin › Tenants › aba Plano), quais módulos ela pode usar — Atendimento, Disparo, CRM, Agentes de IA e Análises. Canais fica sempre disponível, em qualquer plano, e nenhuma configuração consegue desligá-lo. Toda organização existente cai automaticamente no plano "Legado", com todos os recursos: nada muda para quem já usa até que alguém atribua outro plano. Um recurso também pode ser liberado ou bloqueado para uma organização específica, com data de término — quando o prazo passa, o plano volta a valer sozinho. O que não está no plano some do menu, a API recusa, e o que já estava agendado (disparos, respostas da IA, follow-ups, ações de automação) é pulado com o motivo visível no histórico e um aviso na Central. Cada plano pode ter limites: canais conectados, usuários (convites pendentes contam) e agentes de IA são barrados na criação quando o teto é atingido; disparos por mês e contatos aparecem como informativos por enquanto. O cliente vê o próprio plano, os limites e o uso em Configurações › Billing. Toda mudança de plano ou liberação fica no audit log.
