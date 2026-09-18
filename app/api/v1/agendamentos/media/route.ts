@@ -13,7 +13,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 /**
- * Upload storage-first para foto/vídeo de disparo programado.
+ * Upload storage-first de um arquivo de disparo programado — foto, vídeo,
+ * áudio ou documento (a allowlist é a de `validateOutboundMedia`, a mesma do
+ * Inbox). Um arquivo por chamada; a tela chama uma vez por anexo.
  *
  * O arquivo fica no bucket privado. O worker cria uma URL assinada curta só
  * quando o horário chega; nenhum link temporário é persistido no agendamento.
@@ -55,12 +57,6 @@ export async function POST(req: NextRequest): Promise<Response> {
           : 422;
     return fail(verdict.code, t(verdict.message), status, { requestId });
   }
-  if (verdict.kind !== "image" && verdict.kind !== "video") {
-    return fail("unsupported_media_type", t("Escolha uma foto ou um vídeo."), 415, {
-      requestId,
-    });
-  }
-
   const bytes = Buffer.from(await file.arrayBuffer());
   const storagePath = `${authz.org.orgId}/scheduled-groups/out-${randomUUID()}.${extFromMime(mime)}`;
   const admin = createAdminClient();

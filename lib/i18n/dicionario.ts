@@ -9369,6 +9369,41 @@ export const DICIONARIO: Traducoes = {
   "Envio agendado": { es: "Envío programado" },
   "· Programado para": { es: "· Programado para" },
   "Sem data": { es: "Sin fecha" },
+  // Disparo para VÁRIOS grupos e com VÁRIOS arquivos, mais a prévia do celular
+  // (components/disparo/): seletor com caixas de marcar, lista de anexos e o
+  // WhatsApp desenhado na tela.
+  "Grupos de destino": { es: "Grupos de destino" },
+  "Um agendamento tem um grupo só. Para vários grupos, crie um disparo novo.": { es: "Una programación tiene un solo grupo. Para varios grupos, crea un envío nuevo." },
+  "Arquivos": { es: "Archivos" },
+  "já enviado": { es: "ya subido" },
+  "Mover para cima": { es: "Mover hacia arriba" },
+  "Mover para baixo": { es: "Mover hacia abajo" },
+  "Adicionar arquivos": { es: "Agregar archivos" },
+  "Adicionar mais arquivos": { es: "Agregar más archivos" },
+  "Fotos, vídeos, áudios e documentos · até 50 MB cada": { es: "Fotos, videos, audios y documentos · hasta 50 MB cada uno" },
+  "Cada arquivo sai como uma mensagem, nesta ordem. O texto vai junto do último.": { es: "Cada archivo sale como un mensaje, en este orden. El texto va junto con el último." },
+  "Marque ao menos um grupo de destino.": { es: "Marca al menos un grupo de destino." },
+  "Disparo para": { es: "Envío a" },
+  "grupos": { es: "grupos" },
+  "Como vai chegar no WhatsApp": { es: "Cómo llegará en WhatsApp" },
+  "Use *negrito*, _itálico_ e ~riscado~ como no WhatsApp.": { es: "Usa *negrita*, _cursiva_ y ~tachado~ como en WhatsApp." },
+  "arquivo(s)": { es: "archivo(s)" },
+  "Lote": { es: "Lote" },
+  "Grupo do WhatsApp": { es: "Grupo de WhatsApp" },
+  "e mais {n} grupo(s)": { es: "y {n} grupo(s) más" },
+  "toque para dados do grupo": { es: "toca para ver los datos del grupo" },
+  "Prévia da mensagem como aparece no WhatsApp": { es: "Vista previa del mensaje tal como aparece en WhatsApp" },
+  "Escreva a mensagem ou anexe um arquivo para ver como vai chegar.": { es: "Escribe el mensaje o adjunta un archivo para ver cómo llegará." },
+  "Nenhum grupo salvo ainda. Salve os grupos na aba Grupos para escolher o destino.": { es: "Aún no hay grupos guardados. Guarda los grupos en la pestaña Grupos para elegir el destino." },
+  "Buscar grupo…": { es: "Buscar grupo…" },
+  "Buscar grupo": { es: "Buscar grupo" },
+  "Desmarcar todos": { es: "Desmarcar todos" },
+  "Marcar todos": { es: "Marcar todos" },
+  "grupo(s) selecionado(s)": { es: "grupo(s) seleccionado(s)" },
+  // Respostas das rotas de disparo (app/api/v1/agendamentos/**), que chegam à tela em toast.
+  "Selecione pelo menos um grupo.": { es: "Selecciona al menos un grupo." },
+  "Erro ao conferir os grupos.": { es: "Error al verificar los grupos." },
+  "Arquivo não encontrado.": { es: "Archivo no encontrado." },
   // Do PR #773 (@xxjjjj): o aria-label do alternador de tema e as frases da
   // agenda que passaram a sair por t(). As três de "este horário…" são as
   // razões dinâmicas de `razaoDoBloco` — o gate de espanhol não as enxerga.

@@ -16,7 +16,12 @@
  * runtime em vez de lida do bundle.
  */
 
-export const DEFAULT_APP_NAME = "DeskcommCRM";
+/**
+ * O padrão do PRODUTO deste fork. A instalação continua mandando (banco acima
+ * do `.env` acima daqui); este é só o que aparece quando ninguém configurou
+ * nada — e é a condição que libera a marca em `components/branding/MarcaDoProduto.tsx`.
+ */
+export const DEFAULT_APP_NAME = "Nebo CRM";
 
 export type Branding = {
   /** Nome exibido na interface e nos títulos de página. */
@@ -84,7 +89,8 @@ export function resolveBranding(
  */
 /**
  * A marca em vigor é a do PRODUTO — e é só então que o símbolo e o logotipo
- * de `lib/branding/desenho.ts` podem aparecer.
+ * de `components/branding/MarcaDoProduto.tsx` (os PNGs de `public/assets/`)
+ * podem aparecer.
  *
  * Duas condições, e as duas são necessárias: sem logo configurado E com o nome
  * padrão. Quem só trocou o nome (para "Acme CRM") não pode receber um logotipo
@@ -94,6 +100,21 @@ export function resolveBranding(
  */
 export function marcaEhADoProduto(marca: Pick<Branding, "name" | "logoUrl">): boolean {
   return marca.logoUrl === null && marca.name === DEFAULT_APP_NAME;
+}
+
+/**
+ * O ÍCONE DA ABA é o do produto — regra mais frouxa que a de cima, de propósito.
+ *
+ * `app/icon.tsx` não pode usar o `logo_url` (é texto livre digitado pelo
+ * operador; buscá-lo no `<head>` de toda página seria SSRF por page load), então
+ * o ícone só tem duas saídas: o arquivo do produto ou cor + inicial do nome.
+ * Quem subiu um logo mas manteve o NOME do produto está mostrando "Nebo CRM" na
+ * tela — e para esse nome o ícone da Nebo é mais fiel que um "N" num ladrilho.
+ * Quem trocou o nome segue com a inicial: o ícone da Nebo na aba de quem se
+ * chama "Acme" seria a nossa marca vazando.
+ */
+export function iconeEhODoProduto(marca: Pick<Branding, "name">): boolean {
+  return marca.name === DEFAULT_APP_NAME;
 }
 
 export function branding(): Branding {

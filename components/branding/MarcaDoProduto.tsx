@@ -1,23 +1,31 @@
-import { LOGOTIPO, SIMBOLO } from "@/lib/branding/desenho";
 import { cn } from "@/lib/utils";
 
 /**
- * A marca do PRODUTO desenhada em SVG inline — o que a tela mostra quando
- * ninguém configurou marca própria (`marcaEhADoProduto`, em `lib/branding.ts`).
+ * A marca do PRODUTO — o que a tela mostra quando ninguém configurou marca
+ * própria (`marcaEhADoProduto`, em `lib/branding.ts`).
  *
- * Inline, e não `<img src="/algo.svg">`, por três motivos:
- *  - as cores seguem o TEMA: sálvia mais clara e nome em creme no escuro, como
- *    a régua do produto já define — um arquivo estático teria uma cor só;
- *  - nada em `public/`: um `.svg` fixo ali seria servido na instalação de um
- *    revendedor que configurou a marca dele (ver `lib/branding/desenho.ts`);
- *  - a barra lateral já usa `<img>` para o logo CONFIGURADO, e o e2e
- *    `marca-logo.spec.ts` mede "barra sem `<img>`" como "sem logo do
- *    revendedor". Um `<img>` do produto ali faria a spec medir a coisa errada.
+ * Neste fork a marca do produto é a Nebo, e ela vive como ARQUIVO em
+ * `public/assets/`: `Icone.png` (o símbolo, quadrado) e `Logo_menu.png` (o
+ * logotipo horizontal, fundo transparente). O favicon (`app/icon.tsx`) serve
+ * `favicon.png` da mesma pasta. O desenho em SVG do produto original
+ * (`lib/branding/desenho.ts`) foi removido junto — sem importador, seria
+ * código morto contando outra marca.
+ *
+ * O `<img>` leva `data-marca-do-produto` DE PROPÓSITO: o e2e `marca-logo.spec.ts`
+ * mede "barra sem `<img>` de revendedor" e precisa distinguir o logo do
+ * produto do logo subido por quem hospeda — o seletor dele exclui este atributo.
  *
  * O texto alternativo é o `nome` que a tela já resolveu — nunca uma string
  * fixa, para que a catraca de marca (`tests/unit/branding.test.ts`) continue
  * contando ZERO ocorrências fora de `lib/branding.ts`.
  */
+
+/** Os arquivos da marca do produto, servidos de `public/`. */
+export const ARQUIVOS_DA_MARCA_DO_PRODUTO = {
+  simbolo: "/assets/Icone.png",
+  logotipo: "/assets/Logo_menu.png",
+  favicon: "/assets/favicon.png",
+} as const;
 
 type Props = {
   readonly nome: string;
@@ -26,64 +34,32 @@ type Props = {
   readonly decorativo?: boolean;
 };
 
-const SIMBOLO_CLARO_ESCURO = "fill-[#506d48] dark:fill-[#82a077]";
-const NOME_CLARO_ESCURO = "fill-[#1c1a16] dark:fill-[#f5f4ef]";
-const SUFIXO_CLARO_ESCURO = "fill-[#5d594f] dark:fill-[#8e8b7f]";
-
-// As classes acima repetem os hexes de `CORES_DA_MARCA` porque o Tailwind só
-// gera utilitário para valor LITERAL no fonte. Quem impede os dois de divergirem
-// é `tests/unit/marca-do-produto.test.tsx`, que compara as classes à paleta —
-// e não uma asserção em runtime: um throw aqui derrubaria a casca inteira.
-export const CLASSES_DE_COR = {
-  simbolo: SIMBOLO_CLARO_ESCURO,
-  nome: NOME_CLARO_ESCURO,
-  sufixo: SUFIXO_CLARO_ESCURO,
-} as const;
-
 function acessibilidade(nome: string, decorativo: boolean) {
-  return decorativo
-    ? ({ "aria-hidden": true } as const)
-    : ({ role: "img", "aria-label": nome } as const);
+  return decorativo ? ({ alt: "", "aria-hidden": true } as const) : ({ alt: nome } as const);
 }
 
 /** O símbolo sozinho — para a barra recolhida, avatar e cantos apertados. */
 export function SimboloDoProduto({ nome, className, decorativo = false }: Props) {
   return (
-    <svg
-      viewBox={SIMBOLO.viewBox}
-      className={cn("shrink-0", className)}
+    // eslint-disable-next-line @next/next/no-img-element -- arquivo estático do produto; next/image exige allowlist/dimensões que não valem para o logo de revendedor ao lado
+    <img
+      src={ARQUIVOS_DA_MARCA_DO_PRODUTO.simbolo}
+      data-marca-do-produto=""
+      className={cn("shrink-0 rounded-md object-contain", className)}
       {...acessibilidade(nome, decorativo)}
-    >
-      <g className={SIMBOLO_CLARO_ESCURO} transform={SIMBOLO.transform}>
-        <path d={SIMBOLO.d} />
-        <rect {...SIMBOLO.modulo} />
-      </g>
-    </svg>
+    />
   );
 }
 
 /** Símbolo + nome — para a barra aberta e a fachada de entrada. */
 export function LogotipoDoProduto({ nome, className, decorativo = false }: Props) {
   return (
-    <svg
-      viewBox={LOGOTIPO.viewBox}
-      className={cn("shrink-0", className)}
+    // eslint-disable-next-line @next/next/no-img-element -- idem: arquivo estático do produto
+    <img
+      src={ARQUIVOS_DA_MARCA_DO_PRODUTO.logotipo}
+      data-marca-do-produto=""
+      className={cn("shrink-0 object-contain", className)}
       {...acessibilidade(nome, decorativo)}
-    >
-      <g className={SIMBOLO_CLARO_ESCURO} transform={LOGOTIPO.simbolo.transform}>
-        <path d={LOGOTIPO.simbolo.d} />
-        <rect {...LOGOTIPO.simbolo.modulo} />
-      </g>
-      <g className={NOME_CLARO_ESCURO}>
-        {LOGOTIPO.nome.map((g) => (
-          <path key={g.transform} transform={g.transform} d={g.d} />
-        ))}
-      </g>
-      <g className={SUFIXO_CLARO_ESCURO}>
-        {LOGOTIPO.sufixo.map((g) => (
-          <path key={g.transform} transform={g.transform} d={g.d} />
-        ))}
-      </g>
-    </svg>
+    />
   );
 }

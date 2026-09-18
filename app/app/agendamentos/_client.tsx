@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PreviaDoCelular, type AnexoDaPrevia } from "@/components/disparo/PreviaDoCelular";
+import { SeletorDeGrupos } from "@/components/disparo/SeletorDeGrupos";
+import { formatBytes } from "@/components/inbox/media/media-utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useActiveOrg } from "@/hooks/auth/AuthProvider";
@@ -21,19 +24,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { MAXIMO_DE_ARQUIVOS_POR_DISPARO } from "@/lib/agendamentos-grupos/schema";
 import { apiClient } from "@/lib/api/client";
+import { randomId } from "@/lib/random-id";
 import { capabilitiesOf } from "@/lib/channels/capabilities";
 import type { ChannelProvider } from "@/lib/channels/types";
 import {
   ArrowsClockwise,
   CalendarDots,
+  CaretDown,
+  CaretUp,
   CheckCircle,
+  FileText,
   ImageSquare,
+  MusicNote,
+  Paperclip,
   Pause,
   PencilSimple,
   Play,
   Plus,
   Trash,
+  VideoCamera,
   Warning,
   X,
 } from "@/lib/ui/icons";
@@ -43,12 +54,37 @@ type StatusAgendamento = "draft" | "scheduled" | "paused" | "cancelled" | "compl
 type Recorrencia = "none" | "daily" | "weekly" | "monthly" | "custom";
 type StatusExecucao = "pending" | "sending" | "sent" | "failed" | "skipped" | "cancelled";
 
+type TipoDeAnexo = "image" | "video" | "audio" | "document";
+
 interface MidiaAgendada {
-  kind: "image" | "video";
+  kind: TipoDeAnexo;
   storage_path: string;
   mime: string;
   size_bytes: number;
   filename?: string | null;
+}
+
+/**
+ * Um anexo na tela: ou um arquivo recém-escolhido (`file`, ainda não enviado)
+ * ou um já gravado no agendamento (`salvo`). A `url` é o que a prévia do
+ * celular mostra — object URL local para o primeiro caso, URL assinada curta
+ * (rota `/media/url`) para o segundo; `null` enquanto não há o que mostrar.
+ */
+interface AnexoLocal {
+  id: string;
+  kind: TipoDeAnexo;
+  nome: string;
+  mime: string;
+  sizeBytes: number;
+  file: File | null;
+  salvo: MidiaAgendada | null;
+  url: string | null;
+}
+
+interface LoteDeDisparo {
+  id: string;
+  size: number;
+  index: number;
 }
 
 interface UltimaExecucao {
@@ -94,6 +130,8 @@ interface Agendamento {
   next_run_at: string | null;
   last_run_at: string | null;
   media: MidiaAgendada | null;
+  media_items?: MidiaAgendada[];
+  batch?: LoteDeDisparo | null;
   latest_execution: UltimaExecucao | null;
   scheduled_whatsapp_groups?: { name: string | null; external_group_id: string | null } | null;
 }
@@ -180,6 +218,38 @@ function conexaoTemGrupos(c: ChannelSession): boolean {
   return capabilitiesOf(c.provider as ChannelProvider).groups !== "none";
 }
 
+/** O tipo que a tela dá a um arquivo escolhido — a mesma régua da API (`validateOutboundMedia`). */
+function tipoDoArquivo(mime: string): TipoDeAnexo {
+  const base = mime.split(";")[0]!.trim().toLowerCase();
+  if (base.startsWith("image/")) return "image";
+  if (base.startsWith("video/")) return "video";
+  if (base.startsWith("audio/")) return "audio";
+  return "document";
+}
+
+function horaDoInput(value: string): string {
+  const data = new Date(value);
+  if (Number.isNaN(data.getTime())) return "--:--";
+  const dois = (numero: number) => String(numero).padStart(2, "0");
+  return `${dois(data.getHours())}:${dois(data.getMinutes())}`;
+}
+
+function legendaDaData(value: string, tagDoIdioma: string, hoje: string): string {
+  const data = new Date(value);
+  if (Number.isNaN(data.getTime())) return hoje;
+  const agora = new Date();
+  const mesmoDia =
+    data.getFullYear() === agora.getFullYear() &&
+    data.getMonth() === agora.getMonth() &&
+    data.getDate() === agora.getDate();
+  if (mesmoDia) return hoje;
+  return new Intl.DateTimeFormat(tagDoIdioma, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(data);
+}
+
 function badgeStatus(status: StatusAgendamento) {
   if (status === "scheduled") return "default";
   if (status === "paused" || status === "draft") return "secondary";
@@ -217,7 +287,7 @@ export function AgendamentosClient({
 
   const [grupoConexaoId, setGrupoConexaoId] = useState("");
 
-  const [grupoId, setGrupoId] = useState("");
+  const [gruposSelecionados, setGruposSelecionados] = useState<string[]>([]);
   const [titulo, setTitulo] = useState("");
   const [mensagem, setMensagem] = useState("");
   const [quando, setQuando] = useState(agoraLocal);
@@ -226,22 +296,25 @@ export function AgendamentosClient({
   const [intervaloCustom, setIntervaloCustom] = useState("60");
   const [maxRuns, setMaxRuns] = useState("");
   const [repeatUntil, setRepeatUntil] = useState("");
-  const [arquivoMidia, setArquivoMidia] = useState<File | null>(null);
-  const [midiaAtual, setMidiaAtual] = useState<MidiaAgendada | null>(null);
-  const [previewMidia, setPreviewMidia] = useState<string | null>(null);
+  const [anexos, setAnexos] = useState<AnexoLocal[]>([]);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const inputMidiaRef = useRef<HTMLInputElement>(null);
-  const previewMidiaRef = useRef<string | null>(null);
+  /** Object URLs vivas, para revogar ao remover o anexo e ao desmontar. */
+  const urlsLocaisRef = useRef<Map<string, string>>(new Map());
   const router = useRouter();
   const searchParams = useSearchParams();
   const editandoIdNaUrl = searchParams.get("editar");
 
   const conexoesComGrupos = useMemo(() => conexoes.filter(conexaoTemGrupos), [conexoes]);
 
-  const grupoSelecionado = useMemo(
-    () => grupos.find((g) => g.id === grupoId) ?? null,
-    [grupoId, grupos],
+  const gruposEscolhidos = useMemo(
+    () =>
+      gruposSelecionados
+        .map((id) => grupos.find((g) => g.id === id))
+        .filter((g): g is GrupoSalvo => !!g),
+    [gruposSelecionados, grupos],
   );
+  const grupoSelecionado = gruposEscolhidos[0] ?? null;
 
   const gruposEncontradosVisiveis = useMemo(() => {
     const filtro = filtroGrupos.trim().toLocaleLowerCase();
@@ -254,9 +327,21 @@ export function AgendamentosClient({
     [conexoes, grupoSelecionado],
   );
 
+  const revogarUrlLocal = useCallback((id: string) => {
+    const url = urlsLocaisRef.current.get(id);
+    if (url) URL.revokeObjectURL(url);
+    urlsLocaisRef.current.delete(id);
+  }, []);
+
+  function limparAnexos() {
+    for (const id of [...urlsLocaisRef.current.keys()]) revogarUrlLocal(id);
+    setAnexos([]);
+    if (inputMidiaRef.current) inputMidiaRef.current.value = "";
+  }
+
   function preencherFormulario(agendamento: Agendamento) {
     setEditandoId(agendamento.id);
-    setGrupoId(agendamento.group_id);
+    setGruposSelecionados([agendamento.group_id]);
     setTitulo(agendamento.title ?? "");
     setMensagem(agendamento.body);
     setQuando(inputDeIso(agendamento.starts_at));
@@ -265,44 +350,88 @@ export function AgendamentosClient({
     setIntervaloCustom(String(agendamento.recurrence_config.interval_minutes ?? 60));
     setMaxRuns(agendamento.max_runs === null ? "" : String(agendamento.max_runs));
     setRepeatUntil(agendamento.repeat_until ? inputDeIso(agendamento.repeat_until) : "");
-    setArquivoMidia(null);
-    setMidiaAtual(agendamento.media);
-    limparPreviewMidia();
+    limparAnexos();
+    const salvos = agendamento.media_items ?? (agendamento.media ? [agendamento.media] : []);
+    setAnexos(
+      salvos.map((m) => ({
+        id: `salvo-${m.storage_path}`,
+        kind: m.kind,
+        nome: m.filename ?? m.storage_path.split("/").pop() ?? m.kind,
+        mime: m.mime,
+        sizeBytes: m.size_bytes,
+        file: null,
+        salvo: m,
+        url: null,
+      })),
+    );
   }
 
-  function limparPreviewMidia() {
-    if (previewMidiaRef.current) URL.revokeObjectURL(previewMidiaRef.current);
-    previewMidiaRef.current = null;
-    setPreviewMidia(null);
-  }
-
-  function removerMidia() {
-    limparPreviewMidia();
-    setArquivoMidia(null);
-    setMidiaAtual(null);
+  function removerAnexo(id: string) {
+    revogarUrlLocal(id);
+    setAnexos((atuais) => atuais.filter((a) => a.id !== id));
     if (inputMidiaRef.current) inputMidiaRef.current.value = "";
   }
 
-  function selecionarMidia(file: File | null) {
-    if (!file) return;
-    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
-      toast.error("Escolha uma foto ou um vídeo.");
+  function moverAnexo(id: string, direcao: -1 | 1) {
+    setAnexos((atuais) => {
+      const i = atuais.findIndex((a) => a.id === id);
+      const j = i + direcao;
+      if (i < 0 || j < 0 || j >= atuais.length) return atuais;
+      const proximo = [...atuais];
+      [proximo[i], proximo[j]] = [proximo[j]!, proximo[i]!];
+      return proximo;
+    });
+  }
+
+  function adicionarArquivos(lista: FileList | File[] | null) {
+    if (!lista) return;
+    const arquivos = [...lista];
+    if (arquivos.length === 0) return;
+    const vagas = MAXIMO_DE_ARQUIVOS_POR_DISPARO - anexos.length;
+    if (vagas <= 0) {
+      toast.error(`Um disparo leva no máximo ${MAXIMO_DE_ARQUIVOS_POR_DISPARO} arquivos.`);
       return;
     }
-    if (file.size > 50 * 1024 * 1024) {
-      toast.error("O arquivo deve ter no máximo 50 MB.");
-      return;
+    const aceitos: AnexoLocal[] = [];
+    for (const file of arquivos.slice(0, vagas)) {
+      if (file.size > 50 * 1024 * 1024) {
+        toast.error(`${file.name}: o arquivo deve ter no máximo 50 MB.`);
+        continue;
+      }
+      if (file.size === 0) {
+        toast.error(`${file.name}: arquivo vazio.`);
+        continue;
+      }
+      const kind = tipoDoArquivo(file.type || "application/octet-stream");
+      const id = `novo-${randomId()}`;
+      let url: string | null = null;
+      if (kind === "image" || kind === "video") {
+        url = URL.createObjectURL(file);
+        urlsLocaisRef.current.set(id, url);
+      }
+      aceitos.push({
+        id,
+        kind,
+        nome: file.name,
+        mime: file.type || "application/octet-stream",
+        sizeBytes: file.size,
+        file,
+        salvo: null,
+        url,
+      });
     }
-    limparPreviewMidia();
-    const url = URL.createObjectURL(file);
-    previewMidiaRef.current = url;
-    setPreviewMidia(url);
-    setArquivoMidia(file);
-    setMidiaAtual(null);
+    if (arquivos.length > vagas) {
+      toast.error(
+        `Só ${vagas} arquivo(s) cabem: o máximo por disparo é ${MAXIMO_DE_ARQUIVOS_POR_DISPARO}.`,
+      );
+    }
+    if (aceitos.length > 0) setAnexos((atuais) => [...atuais, ...aceitos]);
+    if (inputMidiaRef.current) inputMidiaRef.current.value = "";
   }
 
   function limparFormulario() {
     setEditandoId(null);
+    setGruposSelecionados([]);
     setTitulo("");
     setMensagem("");
     setQuando(agoraLocal());
@@ -311,15 +440,50 @@ export function AgendamentosClient({
     setIntervaloCustom("60");
     setMaxRuns("");
     setRepeatUntil("");
-    removerMidia();
+    limparAnexos();
   }
 
   useEffect(
     () => () => {
-      if (previewMidiaRef.current) URL.revokeObjectURL(previewMidiaRef.current);
+      for (const url of urlsLocaisRef.current.values()) URL.revokeObjectURL(url);
+      urlsLocaisRef.current.clear();
     },
     [],
   );
+
+  // Anexo já gravado é só um caminho no bucket privado: a prévia pede uma URL
+  // assinada curta para foto e vídeo. Documento e áudio se mostram sem ela.
+  useEffect(() => {
+    const pendentes = anexos.filter(
+      (a) => a.salvo && a.url === null && (a.kind === "image" || a.kind === "video"),
+    );
+    if (pendentes.length === 0) return;
+    let cancelado = false;
+    void Promise.all(
+      pendentes.map(async (a) => {
+        try {
+          const r = await apiClient.get<{ data: { url: string } }>(
+            `/api/v1/agendamentos/media/url?storage_path=${encodeURIComponent(a.salvo!.storage_path)}`,
+          );
+          return [a.id, r.data.url] as const;
+        } catch {
+          return [a.id, null] as const;
+        }
+      }),
+    ).then((resultados) => {
+      if (cancelado) return;
+      const urlPorId = new Map(
+        resultados.filter((r): r is readonly [string, string] => r[1] !== null),
+      );
+      if (urlPorId.size === 0) return;
+      setAnexos((atuais) =>
+        atuais.map((a) => (urlPorId.has(a.id) ? { ...a, url: urlPorId.get(a.id)! } : a)),
+      );
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [anexos]);
 
   /**
    * `silencioso` é a recarga que o banco pede (evento de realtime ou o refetch
@@ -343,12 +507,9 @@ export function AgendamentosClient({
       setGrupos(groups.data.groups);
       setAgendamentos(schedules.data.schedules);
       setExecucoes(runs.data.runs);
-      // Só preenche o grupo se AINDA estiver vazio no momento de aplicar. A
-      // forma anterior lia `grupoId` do fechamento de quando a carga começou:
-      // quem escolhia um grupo enquanto a lista ainda carregava tinha a escolha
-      // sobrescrita pelo primeiro da lista — e o disparo saía para o grupo errado.
-      const primeiro = groups.data.groups[0];
-      if (primeiro) setGrupoId((atual) => atual || primeiro.id);
+      // Nenhum grupo vem marcado de fábrica: o destino de um disparo é escolha
+      // explícita — a versão anterior pré-marcava o primeiro da lista, e um
+      // clique apressado em "Criar" mandava para o grupo errado.
     } catch {
       setErro("Não foi possível carregar os agendamentos.");
     } finally {
@@ -490,8 +651,8 @@ export function AgendamentosClient({
   }
 
   async function criarAgendamento() {
-    if (!grupoSelecionado) {
-      toast.error("Selecione um grupo.");
+    if (gruposEscolhidos.length === 0) {
+      toast.error("Selecione pelo menos um grupo.");
       return;
     }
     if (!mensagem.trim()) {
@@ -500,10 +661,17 @@ export function AgendamentosClient({
     }
     setSalvando(true);
     try {
-      let media = midiaAtual;
-      if (arquivoMidia) {
+      // Sobe os arquivos novos um a um, na ordem da lista; os já gravados
+      // seguem como estão. A ordem final é a ordem da tela — e da prévia.
+      const media_items: MidiaAgendada[] = [];
+      for (const anexo of anexos) {
+        if (anexo.salvo) {
+          media_items.push(anexo.salvo);
+          continue;
+        }
+        if (!anexo.file) continue;
         const form = new FormData();
-        form.append("file", arquivoMidia);
+        form.append("file", anexo.file);
         const response = await fetch("/api/v1/agendamentos/media", {
           method: "POST",
           body: form,
@@ -514,17 +682,17 @@ export function AgendamentosClient({
           error?: { message?: string };
         };
         if (!response.ok || !json.data?.media) {
-          throw new Error(json.error?.message || "Não foi possível enviar a mídia.");
+          throw new Error(
+            `${anexo.nome}: ${json.error?.message || "não foi possível enviar o arquivo."}`,
+          );
         }
-        media = json.data.media;
+        media_items.push(json.data.media);
       }
       const recurrence_config =
         recorrencia === "custom"
           ? { interval_minutes: Math.max(1, Number(intervaloCustom) || 60) }
           : {};
-      const payload = {
-        channel_session_id: grupoSelecionado.channel_session_id,
-        group_id: grupoSelecionado.id,
+      const base = {
         title: titulo.trim() || null,
         body: mensagem.trim(),
         status,
@@ -534,14 +702,26 @@ export function AgendamentosClient({
         recurrence_config,
         repeat_until: repeatUntil ? isoDeInput(repeatUntil) : null,
         max_runs: maxRuns ? Math.max(1, Number(maxRuns)) : null,
-        media,
+        media_items,
       };
       if (editandoId) {
-        await apiClient.patch(`/api/v1/agendamentos/${editandoId}`, payload);
+        await apiClient.patch(`/api/v1/agendamentos/${editandoId}`, {
+          ...base,
+          group_id: gruposEscolhidos[0]!.id,
+        });
         toast.success("Agendamento atualizado.");
       } else {
-        await apiClient.post("/api/v1/agendamentos", payload);
-        toast.success(status === "draft" ? "Rascunho salvo." : "Agendamento criado.");
+        await apiClient.post("/api/v1/agendamentos", {
+          ...base,
+          group_ids: gruposEscolhidos.map((g) => g.id),
+        });
+        toast.success(
+          status === "draft"
+            ? "Rascunho salvo."
+            : gruposEscolhidos.length > 1
+              ? `Disparo agendado para ${gruposEscolhidos.length} grupos.`
+              : "Agendamento criado.",
+        );
       }
       limparFormulario();
       await carregar();
@@ -586,6 +766,26 @@ export function AgendamentosClient({
       setSalvando(false);
     }
   }
+
+  const anexosDaPrevia = useMemo<AnexoDaPrevia[]>(
+    () =>
+      anexos.map((a) => ({
+        id: a.id,
+        kind: a.kind,
+        url: a.url,
+        nome: a.nome,
+        mime: a.mime,
+        sizeBytes: a.sizeBytes,
+      })),
+    [anexos],
+  );
+  const nomeDaConexaoPorId = useCallback(
+    (id: string) => {
+      const c = conexoes.find((x) => x.id === id);
+      return c ? nomeDaConexao(c) : `Conexão ${id.slice(0, 8)}`;
+    },
+    [conexoes],
+  );
 
   const agendados = agendamentos.filter((a) => a.status === "scheduled").length;
   const entregues = execucoes.filter((e) => e.status === "sent").length;
@@ -652,25 +852,33 @@ export function AgendamentosClient({
                 )}
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-6 pt-6 xl:grid-cols-2">
+            <CardContent className="grid gap-6 pt-6 lg:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_320px]">
               <div className="space-y-5">
-                <Campo label={t("Grupo")}>
-                  <Select
-                    value={grupoId}
-                    onValueChange={setGrupoId}
-                    disabled={!podeEditar || grupos.length === 0}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("Selecione um grupo salvo")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {grupos.map((g) => (
-                        <SelectItem key={g.id} value={g.id}>
-                          {g.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <Campo label={editandoId ? t("Grupo") : t("Grupos de destino")}>
+                  <SeletorDeGrupos
+                    grupos={grupos.map((g) => ({
+                      id: g.id,
+                      name: g.name,
+                      channel_session_id: g.channel_session_id,
+                      is_active: g.is_active,
+                      participantes:
+                        typeof g.metadata?.participant_count === "number"
+                          ? (g.metadata.participant_count as number)
+                          : null,
+                    }))}
+                    nomeDaConexao={nomeDaConexaoPorId}
+                    selecionados={gruposSelecionados}
+                    onChange={setGruposSelecionados}
+                    disabled={!podeEditar || salvando}
+                    unico={!!editandoId}
+                  />
+                  {editandoId ? (
+                    <p className="text-xs text-muted-foreground">
+                      {t(
+                        "Um agendamento tem um grupo só. Para vários grupos, crie um disparo novo.",
+                      )}
+                    </p>
+                  ) : null}
                 </Campo>
                 <Campo label={t("Título interno")}>
                   <Input
@@ -689,74 +897,122 @@ export function AgendamentosClient({
                     disabled={!podeEditar}
                   />
                 </Campo>
-                <Campo label={t("Foto ou vídeo")}>
+                <Campo label={t("Arquivos")}>
                   <input
                     ref={inputMidiaRef}
                     type="file"
-                    accept="image/*,video/*"
+                    multiple
+                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
                     className="sr-only"
-                    onChange={(event) => selecionarMidia(event.target.files?.[0] ?? null)}
+                    onChange={(event) => adicionarArquivos(event.target.files)}
                     disabled={!podeEditar || salvando}
                   />
-                  {arquivoMidia || midiaAtual ? (
-                    <div className="overflow-hidden rounded-lg border bg-muted/30">
-                      {arquivoMidia && previewMidia ? (
-                        arquivoMidia.type.startsWith("image/") ? (
-                          // eslint-disable-next-line @next/next/no-img-element -- preview local de arquivo ainda não enviado
-                          <img
-                            src={previewMidia}
-                            alt={t("Prévia da foto selecionada")}
-                            className="max-h-72 w-full object-contain"
-                          />
-                        ) : (
-                          <video
-                            src={previewMidia}
-                            controls
-                            className="max-h-72 w-full bg-black object-contain"
-                          />
-                        )
-                      ) : null}
-                      <div className="flex items-center justify-between gap-3 p-3">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <ImageSquare size={18} className="shrink-0 text-primary" aria-hidden />
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">
-                              {arquivoMidia?.name || midiaAtual?.filename || t("Mídia anexada")}
-                            </p>
+                  {anexos.length > 0 ? (
+                    <ul
+                      className="divide-y overflow-hidden rounded-lg border bg-muted/30"
+                      data-lista-de-anexos
+                    >
+                      {anexos.map((anexo, i) => (
+                        <li key={anexo.id} className="flex items-center gap-3 p-2.5">
+                          <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-surface text-primary">
+                            {anexo.kind === "image" && anexo.url ? (
+                              // eslint-disable-next-line @next/next/no-img-element -- prévia local/assinada
+                              <img src={anexo.url} alt="" className="h-full w-full object-cover" />
+                            ) : anexo.kind === "image" ? (
+                              <ImageSquare size={22} aria-hidden />
+                            ) : anexo.kind === "video" ? (
+                              <VideoCamera size={22} aria-hidden />
+                            ) : anexo.kind === "audio" ? (
+                              <MusicNote size={22} aria-hidden />
+                            ) : (
+                              <FileText size={22} aria-hidden />
+                            )}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">{anexo.nome}</p>
                             <p className="text-xs text-muted-foreground">
-                              {(arquivoMidia?.type || midiaAtual?.mime)?.startsWith("video/")
-                                ? t("Vídeo")
-                                : t("Foto")}
+                              {anexo.kind === "image"
+                                ? t("Foto")
+                                : anexo.kind === "video"
+                                  ? t("Vídeo")
+                                  : anexo.kind === "audio"
+                                    ? t("Áudio")
+                                    : t("Documento")}
+                              {" · "}
+                              {formatBytes(anexo.sizeBytes)}
+                              {anexo.salvo ? ` · ${t("já enviado")}` : ""}
                             </p>
                           </div>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="gap-1.5 text-destructive"
-                          onClick={removerMidia}
-                          disabled={!podeEditar || salvando}
-                        >
-                          <Trash size={15} aria-hidden /> {t("Remover")}
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-24 w-full flex-col gap-2 border-dashed"
-                      onClick={() => inputMidiaRef.current?.click()}
-                      disabled={!podeEditar || salvando}
-                    >
-                      <ImageSquare size={22} className="text-primary" aria-hidden />
-                      {t("Adicionar foto ou vídeo")}
-                      <span className="text-xs font-normal text-muted-foreground">
-                        {t("Até 50 MB")}
-                      </span>
-                    </Button>
-                  )}
+                          <div className="flex shrink-0 items-center">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              aria-label={t("Mover para cima")}
+                              onClick={() => moverAnexo(anexo.id, -1)}
+                              disabled={!podeEditar || salvando || i === 0}
+                            >
+                              <CaretUp size={14} aria-hidden />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              aria-label={t("Mover para baixo")}
+                              onClick={() => moverAnexo(anexo.id, 1)}
+                              disabled={!podeEditar || salvando || i === anexos.length - 1}
+                            >
+                              <CaretDown size={14} aria-hidden />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive"
+                              aria-label={t("Remover")}
+                              onClick={() => removerAnexo(anexo.id)}
+                              disabled={!podeEditar || salvando}
+                            >
+                              <Trash size={15} aria-hidden />
+                            </Button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={cn(
+                      "w-full gap-2 border-dashed",
+                      anexos.length === 0 ? "h-24 flex-col" : "h-10",
+                    )}
+                    onClick={() => inputMidiaRef.current?.click()}
+                    disabled={
+                      !podeEditar || salvando || anexos.length >= MAXIMO_DE_ARQUIVOS_POR_DISPARO
+                    }
+                  >
+                    <Paperclip
+                      size={anexos.length === 0 ? 22 : 16}
+                      className="text-primary"
+                      aria-hidden
+                    />
+                    {anexos.length === 0 ? t("Adicionar arquivos") : t("Adicionar mais arquivos")}
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {anexos.length === 0
+                        ? t("Fotos, vídeos, áudios e documentos · até 50 MB cada")
+                        : `${anexos.length}/${MAXIMO_DE_ARQUIVOS_POR_DISPARO}`}
+                    </span>
+                  </Button>
+                  {anexos.length > 1 ? (
+                    <p className="text-xs text-muted-foreground">
+                      {t(
+                        "Cada arquivo sai como uma mensagem, nesta ordem. O texto vai junto do último.",
+                      )}
+                    </p>
+                  ) : null}
                 </Campo>
               </div>
 
@@ -835,14 +1091,24 @@ export function AgendamentosClient({
                   </Campo>
                 </div>
                 <div className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
-                  {grupoSelecionado ? (
+                  {gruposEscolhidos.length === 0 ? (
+                    grupos.length === 0 ? (
+                      t("Salve um grupo antes de criar o primeiro agendamento.")
+                    ) : (
+                      t("Marque ao menos um grupo de destino.")
+                    )
+                  ) : gruposEscolhidos.length === 1 && grupoSelecionado ? (
                     <span>
                       {t("Grupo")}:{" "}
                       <strong className="text-foreground">{grupoSelecionado.name}</strong>
                       {conexaoDoGrupo ? ` · ${nomeDaConexao(conexaoDoGrupo)}` : ""}
                     </span>
                   ) : (
-                    t("Salve um grupo antes de criar o primeiro agendamento.")
+                    <span>
+                      {t("Disparo para")}{" "}
+                      <strong className="text-foreground">{gruposEscolhidos.length}</strong>{" "}
+                      {t("grupos")}: {gruposEscolhidos.map((g) => g.name).join(", ")}
+                    </span>
                   )}
                 </div>
                 <div className="flex gap-2">
@@ -865,6 +1131,24 @@ export function AgendamentosClient({
                     <Plus size={16} aria-hidden />
                     {editandoId ? t("Salvar alterações") : t("Criar agendamento")}
                   </Button>
+                </div>
+              </div>
+
+              <div className="lg:col-span-2 xl:col-span-1">
+                <div className="xl:sticky xl:top-4">
+                  <p className="mb-3 text-center text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                    {t("Como vai chegar no WhatsApp")}
+                  </p>
+                  <PreviaDoCelular
+                    grupos={gruposEscolhidos.map((g) => g.name)}
+                    mensagem={mensagem}
+                    anexos={anexosDaPrevia}
+                    horario={horaDoInput(quando)}
+                    dataLegenda={legendaDaData(quando, tagDoIdioma, t("Hoje"))}
+                  />
+                  <p className="mt-3 text-center text-[11px] text-muted-foreground">
+                    {t("Use *negrito*, _itálico_ e ~riscado~ como no WhatsApp.")}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -899,7 +1183,16 @@ export function AgendamentosClient({
                         {a.recurrence_kind !== "none" ? (
                           <Badge variant="outline">{t("Recorrente")}</Badge>
                         ) : null}
-                        {a.media ? <Badge variant="outline">{t("Com mídia")}</Badge> : null}
+                        {(a.media_items?.length ?? (a.media ? 1 : 0)) > 0 ? (
+                          <Badge variant="outline">
+                            {a.media_items?.length ?? 1} {t("arquivo(s)")}
+                          </Badge>
+                        ) : null}
+                        {a.batch ? (
+                          <Badge variant="outline">
+                            {t("Lote")} {a.batch.index + 1}/{a.batch.size}
+                          </Badge>
+                        ) : null}
                       </div>
                       <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{a.body}</p>
                       <p className="mt-2 text-xs text-muted-foreground">

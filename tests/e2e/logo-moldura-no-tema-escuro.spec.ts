@@ -503,10 +503,13 @@ test.describe("a moldura do logo no tema escuro", () => {
     ).toBe(true);
   });
 
-  test("(5) A FRONTEIRA: no escuro, a marca do PRODUTO não recebe moldura", async ({ page }) => {
+  test("(5) A MARCA DO PRODUTO: no escuro, o logotipo da Nebo recebe a mesma moldura clara", async ({ page }) => {
     await loginComTotp(page, creds.users.dono!.email, secret());
     // Tira o logo enviado: sem ele, e com o nome padrão, a barra cai no ramo
-    // `marcaDoProduto` — o `<svg>` inline desenhado para os dois temas.
+    // `marcaDoProduto` — que neste fork é o PNG `public/assets/Logo_menu.png`
+    // (`components/branding/MarcaDoProduto.tsx`), com fundo transparente e
+    // tinta colorida. Ele tem a MESMA doença que um logo de revendedor num
+    // fundo escuro, então recebe o mesmo remédio: o chip claro.
     await removerLogoSeHouver(page, "/admin/marca", "instalacao");
 
     await page.goto("/app/inbox");
@@ -515,43 +518,27 @@ test.describe("a moldura do logo no tema escuro", () => {
 
     const barra = page.locator("aside").first();
     await expect(
-      barra.locator("img"),
-      "ainda há um <img> na barra — o logo enviado não foi removido, e o caso mediria outra coisa",
+      barra.locator("img:not([data-marca-do-produto])"),
+      "ainda há um <img> de revendedor na barra — o logo enviado não foi removido, e o caso mediria outra coisa",
     ).toHaveCount(0, { timeout: 15_000 });
 
-    const marca = barra.getByRole("img", { name: "DeskcommCRM" });
+    const marca = barra.locator("img[data-marca-do-produto]").first();
     await expect(
       marca,
-      "a barra não caiu no ramo `marcaDoProduto` — sem ele não há fronteira para medir",
+      "a barra não caiu no ramo `marcaDoProduto` — sem ele não há o que medir",
     ).toBeVisible({ timeout: 15_000 });
+    await expect(marca).toHaveAttribute("src", /\/assets\/Logo_menu\.png$/);
 
-    // A negação é sobre TODA a cadeia entre a marca e o `<aside>`, e não só sobre
-    // o pai: uma moldura acrescentada em qualquer avô pintaria igual na tela, e
-    // uma asserção sobre um nível só passaria verde ao lado do defeito.
-    const cadeia = await marca.evaluate((el) => {
-      const saida: { tag: string; classe: string; fundo: string; padding: string }[] = [];
-      let no = el as HTMLElement | null;
-      while (no && no.tagName.toLowerCase() !== "aside") {
-        const cs = getComputedStyle(no);
-        saida.push({
-          tag: no.tagName.toLowerCase(),
-          classe: typeof no.className === "string" ? no.className : "",
-          fundo: cs.backgroundColor,
-          padding: `${cs.paddingTop} ${cs.paddingRight} ${cs.paddingBottom} ${cs.paddingLeft}`,
-        });
-        no = no.parentElement;
-      }
-      return saida;
-    });
-    anotar("5-marca-do-produto-escuro.json", cadeia);
+    const m = await medirMoldura(marca);
+    anotar("5-marca-do-produto-escuro.json", m);
     await page.screenshot({ path: evidencia("5-marca-do-produto-escuro.png") });
 
-    const comMoldura = cadeia.filter((n) => fundoEClaro(n.fundo));
     expect(
-      comMoldura,
-      `a marca do PRODUTO ganhou moldura clara no tema escuro — é o remédio dado a quem ` +
-        `não tem a doença, e quebra o visual que já existia: ${JSON.stringify(comMoldura)}`,
-    ).toEqual([]);
+      fundoEClaro(m.fundo),
+      `a marca do PRODUTO ficou sem moldura clara no tema escuro (fundo=${m.fundo}) — ` +
+        `o logotipo tem fundo transparente e some contra a superfície escura`,
+    ).toBe(true);
+    expect(m.padding.every((v) => v > 0), "a moldura precisa de respiro em volta do logo").toBe(true);
   });
 
   test("(6) A CONDIÇÃO DO DONO: sem logo enviado, o cabeçalho não muda de retângulo", async ({

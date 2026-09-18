@@ -12,12 +12,26 @@ import { isScheduledMediaPathOwnedBy } from "@/lib/messaging/media/upload-valida
 import { logger } from "@/lib/logger";
 import type { createAdminClient } from "@/lib/supabase/admin";
 
-import { midiaAgendadaDoMetadata, proximaExecucaoRecorrente } from "./schema";
-import type { RECORRENCIAS_DE_GRUPO } from "./schema";
+import { midiasAgendadasDoMetadata, proximaExecucaoRecorrente } from "./schema";
+import type { MidiaAgendada, RECORRENCIAS_DE_GRUPO } from "./schema";
 
 const LIMITE_PADRAO = 50;
 const TENTATIVAS_DE_CLAIM = 5;
 const LIMITE_SENDING_PRESO_MS = 5 * 60_000;
+
+/**
+ * Pausa entre dois arquivos do MESMO disparo. Um disparo com vários anexos
+ * vira várias mensagens seguidas no mesmo grupo, e rajada é o padrão que o
+ * WhatsApp lê como spam — a régua anti-banimento do produto é 1 msg/1,2 s
+ * com jitter (CLAUDE.md, seção WAHA). Só vale a partir do segundo arquivo.
+ */
+const PAUSA_ENTRE_ARQUIVOS_MS = 1_200;
+const JITTER_ENTRE_ARQUIVOS_MS = 800;
+
+/** Sobrescrevível pelo teste para não esperar de verdade. */
+export const relogioDoWorker = {
+  esperar: (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+};
 
 type Recorrencia = (typeof RECORRENCIAS_DE_GRUPO)[number];
 
@@ -345,9 +359,21 @@ export async function executarAgendamentosDeGrupo(
     // O plano ANTES do grupo e da conexão: é a condição mais barata e a que a
     // organização inteira compartilha. `skipped`, não `failed` — nada quebrou;
     // e o relógio avança, senão a mesma ocorrência voltaria a cada minuto.
-    if ((await organizacaoTemDisparo(admin, planoPorOrg, agendamento.organization_id, requestId)) === false) {
-      await falhar("feature_not_entitled", "Disparo não está incluído no plano da organização.", "skipped");
-      void avisarBloqueioPorRecurso(admin, agendamento.organization_id, "broadcast", "Um disparo programado");
+    if (
+      (await organizacaoTemDisparo(admin, planoPorOrg, agendamento.organization_id, requestId)) ===
+      false
+    ) {
+      await falhar(
+        "feature_not_entitled",
+        "Disparo não está incluído no plano da organização.",
+        "skipped",
+      );
+      void avisarBloqueioPorRecurso(
+        admin,
+        agendamento.organization_id,
+        "broadcast",
+        "Um disparo programado",
+      );
       continue;
     }
 
@@ -362,6 +388,7 @@ export async function executarAgendamentosDeGrupo(
     }
 
     let externalId: string | null = null;
+    let externalIds: string[] = [];
     try {
       const adapter = getAdapter(agendamento.channel_sessions.provider as ChannelProvider);
       if (!adapter.isConfigured()) {
@@ -369,44 +396,101 @@ export async function executarAgendamentosDeGrupo(
         continue;
       }
 
-      const media = midiaAgendadaDoMetadata(agendamento.metadata);
-      let mediaAssinada:
-        | { url: string; mime: string; filename?: string | null; caption?: string | null }
-        | undefined;
-      if (media) {
-        // A API já recusa caminho fora de `${org}/scheduled-groups/` ao gravar,
-        // mas a linha também é gravável por PostgREST (manager+ pela RLS). O
-        // worker assina com service role, então confere o prefixo DE NOVO antes
-        // de assinar: uma chave de outra organização nunca vira URL enviável.
-        if (!isScheduledMediaPathOwnedBy(media.storage_path, agendamento.organization_id)) {
-          await falhar("media_path_invalid", "A mídia agendada não pertence a esta organização.");
-          continue;
-        }
+      const medias = midiasAgendadasDoMetadata(agendamento.metadata);
+
+      // A API já recusa caminho fora de `${org}/scheduled-groups/` ao gravar,
+      // mas a linha também é gravável por PostgREST (manager+ pela RLS). O
+      // worker assina com service role, então confere o prefixo DE NOVO antes
+      // de assinar: uma chave de outra organização nunca vira URL enviável.
+      // TODOS os caminhos são conferidos ANTES do primeiro envio — descobrir o
+      // terceiro arquivo inválido depois de dois já terem saído seria um
+      // disparo pela metade por um erro que dava para ver antes.
+      if (
+        medias.some(
+          (m) => !isScheduledMediaPathOwnedBy(m.storage_path, agendamento.organization_id),
+        )
+      ) {
+        await falhar("media_path_invalid", "A mídia agendada não pertence a esta organização.");
+        continue;
+      }
+
+      const assinadas: Array<{ media: MidiaAgendada; url: string }> = [];
+      let assinaturaFalhou = false;
+      for (const media of medias) {
         const { data: signed, error: signError } = await admin.storage
           .from("whatsapp-media")
           .createSignedUrl(media.storage_path, 600);
         if (signError || !signed?.signedUrl) {
-          await falhar("storage_sign_failed", "Não foi possível preparar a mídia para envio.");
-          continue;
+          assinaturaFalhou = true;
+          break;
         }
-        mediaAssinada = {
-          url: signed.signedUrl,
-          mime: media.mime,
-          filename: media.filename,
-          caption: agendamento.body,
-        };
+        assinadas.push({ media, url: signed.signedUrl });
+      }
+      if (assinaturaFalhou) {
+        await falhar("storage_sign_failed", "Não foi possível preparar a mídia para envio.");
+        continue;
       }
 
-      externalId = (
-        await adapter.send({
-          organizationId: agendamento.organization_id,
-          sessionRef: resolveSessionRef(agendamento.channel_sessions),
-          to: agendamento.scheduled_whatsapp_groups.external_group_id,
-          kind: media?.kind ?? "text",
-          body: agendamento.body,
-          media: mediaAssinada,
-        })
-      ).externalId;
+      const sessionRef = resolveSessionRef(agendamento.channel_sessions);
+      const to = agendamento.scheduled_whatsapp_groups.external_group_id;
+
+      if (assinadas.length === 0) {
+        externalId = (
+          await adapter.send({
+            organizationId: agendamento.organization_id,
+            sessionRef,
+            to,
+            kind: "text",
+            body: agendamento.body,
+          })
+        ).externalId;
+        if (externalId) externalIds = [externalId];
+      } else {
+        // Um arquivo = uma mensagem, na ordem em que a pessoa anexou. O texto
+        // vai como legenda do ÚLTIMO — é o que a prévia do celular na tela
+        // mostra, e é como o WhatsApp mostra um álbum seguido de mensagem.
+        for (let i = 0; i < assinadas.length; i += 1) {
+          const { media, url } = assinadas[i]!;
+          const ultimo = i === assinadas.length - 1;
+          if (i > 0) {
+            await relogioDoWorker.esperar(
+              PAUSA_ENTRE_ARQUIVOS_MS + Math.floor(Math.random() * JITTER_ENTRE_ARQUIVOS_MS),
+            );
+          }
+          let idDesteArquivo: string | null = null;
+          try {
+            idDesteArquivo = (
+              await adapter.send({
+                organizationId: agendamento.organization_id,
+                sessionRef,
+                to,
+                kind: media.kind,
+                body: ultimo ? agendamento.body : "",
+                media: {
+                  url,
+                  mime: media.mime,
+                  filename: media.filename,
+                  caption: ultimo ? agendamento.body : null,
+                },
+              })
+            ).externalId;
+          } catch (err) {
+            // Envio pela metade: os anteriores JÁ saíram e não podem sair de
+            // novo. A execução fecha como falha nomeando o arquivo, e o
+            // relógio avança — reenviar o lote inteiro duplicaria o que chegou.
+            throw new Error(
+              `Arquivo ${i + 1} de ${assinadas.length} (${media.filename ?? media.kind}) falhou depois de ${i} enviado(s): ${mensagemDeErro(err)}`,
+            );
+          }
+          if (!idDesteArquivo) {
+            throw new Error(
+              `Arquivo ${i + 1} de ${assinadas.length} (${media.filename ?? media.kind}): transporte aceitou a chamada sem devolver id externo, ${i} enviado(s) antes.`,
+            );
+          }
+          externalIds.push(idDesteArquivo);
+        }
+        externalId = externalIds[0] ?? null;
+      }
 
       if (!externalId) {
         await falhar(
@@ -416,7 +500,7 @@ export async function executarAgendamentosDeGrupo(
         continue;
       }
     } catch (err) {
-      await falhar("send_failed", mensagemDeErro(err));
+      await falhar(externalIds.length > 0 ? "partial_send" : "send_failed", mensagemDeErro(err));
       continue;
     }
 
@@ -427,6 +511,9 @@ export async function executarAgendamentosDeGrupo(
         status: "sent",
         sent_at: sentAt,
         external_message_id: externalId,
+        // Um disparo com N arquivos são N mensagens: o primeiro id vai na
+        // coluna (contrato antigo) e a lista inteira fica aqui, no recibo.
+        metadata: { request_id: requestId, external_message_ids: externalIds },
         updated_at: sentAt,
       })
       .eq("id", runId)

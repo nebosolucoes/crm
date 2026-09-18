@@ -40,21 +40,21 @@
       "lane": "operacao",
       "col": 0,
       "type": "ui",
-      "label": "Disparo — criar, anexar mídia e ver última execução"
+      "label": "Disparo — escolher vários grupos, anexar vários arquivos, ver a prévia e a última execução"
     },
     {
       "id": "api-agendamentos",
       "lane": "api",
       "col": 1,
       "type": "service",
-      "label": "REST /api/v1/agendamentos — escopo da organização"
+      "label": "REST /api/v1/agendamentos — escopo da organização; group_ids vira uma linha por grupo"
     },
     {
       "id": "upload",
       "lane": "api",
       "col": 2,
       "type": "service",
-      "label": "Upload de foto/vídeo — valida tipo, tamanho e posse"
+      "label": "Upload de arquivo — foto, vídeo, áudio ou documento; um por chamada; valida tipo, tamanho e posse"
     },
     {
       "id": "agendamento",
@@ -96,7 +96,7 @@
       "lane": "canal",
       "col": 5,
       "type": "external",
-      "label": "Adapter de canal — texto, foto ou vídeo"
+      "label": "Adapter de canal — texto, ou uma mensagem por arquivo com pausa entre elas"
     },
     {
       "id": "realtime",
@@ -104,6 +104,20 @@
       "col": 4,
       "type": "database",
       "label": "Publicação supabase_realtime — as duas tabelas que mudam de estado"
+    },
+    {
+      "id": "previa",
+      "lane": "operacao",
+      "col": 1,
+      "type": "ui",
+      "label": "Prévia do celular — o disparo como chega no WhatsApp (balão por arquivo, legenda no último, formato interpretado)"
+    },
+    {
+      "id": "midia-url",
+      "lane": "api",
+      "col": 3,
+      "type": "service",
+      "label": "GET /media/url — URL assinada de dez minutos para a prévia de anexo já gravado"
     }
   ],
   "edges": [
@@ -117,7 +131,7 @@
       "id": "tela-upload",
       "from": "tela",
       "to": "upload",
-      "label": "multipart da foto ou vídeo"
+      "label": "multipart, um arquivo por chamada, na ordem da lista"
     },
     {
       "id": "upload-midia",
@@ -129,7 +143,7 @@
       "id": "api-grava",
       "from": "api-agendamentos",
       "to": "agendamento",
-      "label": "organization_id confiável e próxima execução"
+      "label": "organization_id confiável; com group_ids, um INSERT com uma linha por grupo, conexão lida do próprio grupo, lote em metadata.batch"
     },
     {
       "id": "scheduler-chama",
@@ -159,7 +173,7 @@
       "id": "worker-envia",
       "from": "worker",
       "to": "adapter",
-      "label": "efeito externo depois do rastro"
+      "label": "efeito externo depois do rastro; vários arquivos = vários envios, 1,2–2 s entre eles, texto como legenda do último; falha no meio = partial_send sem reenvio"
     },
     {
       "id": "worker-fecha",
@@ -187,6 +201,30 @@
       "from": "realtime",
       "to": "tela",
       "label": "postgres_changes filtrado por organization_id; RLS filtra do outro lado"
+    },
+    {
+      "id": "tela-previa",
+      "from": "tela",
+      "to": "previa",
+      "label": "grupos marcados, mensagem e anexos, a cada tecla"
+    },
+    {
+      "id": "tela-midia-url",
+      "from": "tela",
+      "to": "midia-url",
+      "label": "storage_path de anexo salvo (edição)"
+    },
+    {
+      "id": "midia-url-midia",
+      "from": "midia-url",
+      "to": "midia",
+      "label": "confere o prefixo da organização e assina"
+    },
+    {
+      "id": "midia-url-previa",
+      "from": "midia-url",
+      "to": "previa",
+      "label": "URL curta para a foto/vídeo já gravado"
     }
   ]
 }

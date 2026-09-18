@@ -53,6 +53,25 @@ describe("worker de disparos em grupo", () => {
   it("assina a mídia privada somente no momento do disparo", () => {
     expect(FONTE).toContain('from("whatsapp-media")');
     expect(FONTE).toContain("createSignedUrl(media.storage_path, 600)");
-    expect(FONTE).toContain('kind: media?.kind ?? "text"');
+    // Sem arquivo é texto; com arquivos, cada um sai com o próprio tipo.
+    expect(FONTE).toContain('kind: "text"');
+    expect(FONTE).toContain("kind: media.kind");
+  });
+
+  it("vários arquivos: confere TODOS os caminhos antes do primeiro envio, espaça e não reenvia lote pela metade", () => {
+    // A cerca de posse é avaliada sobre a lista inteira ANTES de assinar.
+    const cerca = FONTE.search(/medias\.some\(\s*\(m\) => !isScheduledMediaPathOwnedBy\(/);
+    const assina = FONTE.indexOf("createSignedUrl(media.storage_path, 600)");
+    const envia = FONTE.indexOf("await adapter.send");
+    expect(cerca).toBeGreaterThan(-1);
+    expect(assina).toBeGreaterThan(cerca);
+    expect(envia).toBeGreaterThan(assina);
+    // Pausa anti-rajada a partir do segundo arquivo, e a legenda no último.
+    expect(FONTE).toContain("PAUSA_ENTRE_ARQUIVOS_MS");
+    expect(FONTE).toContain("caption: ultimo ? agendamento.body : null");
+    // Falha depois de algum arquivo já ter saído fecha como `partial_send` —
+    // um código próprio, para o Histórico dizer que algo CHEGOU.
+    expect(FONTE).toContain('"partial_send"');
+    expect(FONTE).toContain("external_message_ids: externalIds");
   });
 });

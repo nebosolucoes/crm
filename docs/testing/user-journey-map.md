@@ -2556,10 +2556,14 @@ casos dela (L12.G2.1, G2.2 e G2.3) estão provados nas linhas acima.
 | J28.2 | Transporte aceita o envio | a última execução muda para **Enviado**, guarda o id externo e o agendamento sem recorrência fica concluído |
 | J28.3 | Grupo inativo, conexão indisponível ou erro de transporte | a ocorrência fica **Ignorada** ou **Falhou**, com motivo visível; nunca permanece apenas como "Agendado" depois do horário |
 | J28.4 | Falha num disparo recorrente | o desfecho fica no histórico e o próximo horário avança; o mesmo slot não é reenviado a cada tick |
-| J28.5 | Anexar foto ou vídeo | a tela mostra prévia/remoção, guarda o arquivo no bucket privado e o worker cria URL assinada somente ao enviar |
-| J28.6 | Abrir em desktop e largura estreita | conteúdo usa a área disponível sem `max-width` próprio, sem dupla margem e sem elemento vazando horizontalmente |
+| J28.5 | Anexar VÁRIOS arquivos (foto, vídeo, áudio, documento) | a lista mostra cada um com tipo, tamanho, reordenação e remoção; cada arquivo vai ao bucket privado e sai como UMA mensagem, na ordem, com o texto como legenda do último; o worker assina as URLs só ao enviar, confere a posse de TODOS os caminhos antes do primeiro envio, espaça 1,2–2 s entre arquivos e fecha falha no meio como `partial_send` sem reenviar — **PASS 2026-09-18** (`lib/agendamentos-grupos/worker.arquivos.test.ts`, `disparo-programado-visual.spec.ts`) |
+| J28.6 | Abrir em desktop e largura estreita | conteúdo usa a área disponível sem `max-width` próprio, sem dupla margem e sem elemento vazando horizontalmente — **PASS 2026-09-18** em 1440 e 390 px (overflow horizontal = 0) |
+| J28.7 | Escolher VÁRIOS grupos de destino | lista com caixa de marcar agrupada por conexão, busca e "Marcar todos"; o POST manda `group_ids` e o servidor cria uma linha por grupo, com a conexão lida do PRÓPRIO grupo (nunca do corpo) e o lote carimbado em `metadata.batch` — "Lote i/N" na lista; editar continua sendo de um grupo só — **PASS 2026-09-18** (`disparo-programado-visual.spec.ts`, evidência em `.superpowers/evidence/disparo-multi-e-marca-nebo/`) |
+| J28.8 | Prévia do celular | um aparelho com o WhatsApp aberto no grupo mostra o disparo como vai chegar: balão por arquivo, legenda no último, `*negrito*`/`_itálico_`/`~riscado~` interpretados (sem os marcadores à vista), hora agendada no carimbo, "e mais N grupo(s)" no cabeçalho, conversa rolada para o fim — **PASS 2026-09-18** (mesma spec; `lib/disparo/formato-do-whatsapp.test.ts` para o formato) |
 
 Cobertura automática desta entrega: `tests/unit/scheduled-group-worker-query.test.ts`,
-`tests/unit/disparo-midia.test.ts`, `tests/unit/disparo-navegacao.test.ts` e os gates
-de cron/scheduler já existentes. A entrega visual ainda exige a prova por navegador
-em ambiente com sessão e grupo reais; teste unitário não é apresentado como prova de UX.
+`lib/agendamentos-grupos/worker.arquivos.test.ts`, `tests/unit/disparo-midia.test.ts`,
+`tests/unit/disparo-navegacao.test.ts`, `tests/e2e/disparo-programado-visual.spec.ts` e os
+gates de cron/scheduler já existentes. A spec e2e mocka as rotas de escrita (o que se prova é
+a cadeia da tela e o contrato que ela manda); o envio real por WAHA com vários arquivos ainda
+não foi provado com número pareado.

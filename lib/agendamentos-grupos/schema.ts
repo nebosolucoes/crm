@@ -19,7 +19,18 @@ export const STATUS_DA_EXECUCAO_DE_GRUPO = [
 
 export const RECORRENCIAS_DE_GRUPO = ["none", "daily", "weekly", "monthly", "custom"] as const;
 
-export const TIPOS_DE_MIDIA_AGENDADA = ["image", "video"] as const;
+export const TIPOS_DE_MIDIA_AGENDADA = ["image", "video", "audio", "document"] as const;
+
+/**
+ * Teto de arquivos por disparo. Cada arquivo vira UMA mensagem no grupo, e o
+ * worker espaça os envios — trinta é folga para catálogo e material de
+ * campanha sem virar rajada que o WhatsApp lê como spam. É constante, não
+ * regra: quem precisar de mais muda aqui e no texto da tela.
+ */
+export const MAXIMO_DE_ARQUIVOS_POR_DISPARO = 30;
+
+/** Teto de grupos num único disparo — cada grupo vira um agendamento próprio. */
+export const MAXIMO_DE_GRUPOS_POR_DISPARO = 100;
 
 export const midiaAgendadaSchema = z.object({
   kind: z.enum(TIPOS_DE_MIDIA_AGENDADA),
@@ -31,7 +42,21 @@ export const midiaAgendadaSchema = z.object({
 
 export type MidiaAgendada = z.infer<typeof midiaAgendadaSchema>;
 
+/**
+ * Duas chaves no jsonb, e as duas são escritas de propósito:
+ *
+ *  - `scheduled_media_items` é a lista — a fonte de verdade desde que um
+ *    disparo aceita vários arquivos;
+ *  - `scheduled_media` é o formato anterior (UM arquivo, só foto ou vídeo). Ele
+ *    continua sendo gravado com o primeiro item compatível porque o `agent.sh`
+ *    reverte a IMAGEM, nunca o banco: um código antigo lendo uma linha nova
+ *    ainda encontra a mídia em vez de mandar só o texto.
+ *
+ * Na leitura a lista vence; sem lista, o formato antigo vira lista de um.
+ */
 const CHAVE_DA_MIDIA_AGENDADA = "scheduled_media";
+const CHAVE_DAS_MIDIAS_AGENDADAS = "scheduled_media_items";
+const CHAVE_DO_LOTE = "batch";
 
 function objetoJson(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -44,18 +69,70 @@ function objetoJson(value: unknown): Record<string, unknown> {
  * interna. Isso evita transformar `metadata.scheduled_media` num contrato
  * espalhado — o anti-pattern de jsonb lock-in da doutrina do repositório.
  */
+export function midiasAgendadasDoMetadata(metadata: unknown): MidiaAgendada[] {
+  const objeto = objetoJson(metadata);
+  const lista = z.array(midiaAgendadaSchema).safeParse(objeto[CHAVE_DAS_MIDIAS_AGENDADAS]);
+  if (lista.success) return lista.data;
+  const unica = midiaAgendadaSchema.safeParse(objeto[CHAVE_DA_MIDIA_AGENDADA]);
+  return unica.success ? [unica.data] : [];
+}
+
+/** O primeiro arquivo, ou nada — o contrato de UM arquivo que a tela antiga lia. */
 export function midiaAgendadaDoMetadata(metadata: unknown): MidiaAgendada | null {
-  const parsed = midiaAgendadaSchema.safeParse(objetoJson(metadata)[CHAVE_DA_MIDIA_AGENDADA]);
-  return parsed.success ? parsed.data : null;
+  return midiasAgendadasDoMetadata(metadata)[0] ?? null;
+}
+
+export function metadataComMidiasAgendadas(
+  metadata: unknown,
+  medias: readonly MidiaAgendada[],
+): Record<string, unknown> {
+  const proximo = objetoJson(metadata);
+  if (medias.length === 0) {
+    delete proximo[CHAVE_DAS_MIDIAS_AGENDADAS];
+    delete proximo[CHAVE_DA_MIDIA_AGENDADA];
+    return proximo;
+  }
+  proximo[CHAVE_DAS_MIDIAS_AGENDADAS] = [...medias];
+  // O formato antigo só conhecia foto e vídeo; um PDF ali seria recusado pelo
+  // Zod de quem lê, e o disparo inteiro sairia sem anexo.
+  const compativel = medias.find((m) => m.kind === "image" || m.kind === "video");
+  if (compativel) proximo[CHAVE_DA_MIDIA_AGENDADA] = compativel;
+  else delete proximo[CHAVE_DA_MIDIA_AGENDADA];
+  return proximo;
 }
 
 export function metadataComMidiaAgendada(
   metadata: unknown,
   media: MidiaAgendada | null,
 ): Record<string, unknown> {
+  return metadataComMidiasAgendadas(metadata, media ? [media] : []);
+}
+
+/**
+ * O LOTE: um disparo criado para vários grupos vira N agendamentos, um por
+ * grupo, e o que os liga é este carimbo. A tela usa para mostrar "1 de 5" e o
+ * histórico para agrupar; o worker não o lê — cada linha é independente.
+ */
+export const loteDeDisparoSchema = z.object({
+  id: z.string().uuid(),
+  size: z.number().int().positive(),
+  index: z.number().int().nonnegative(),
+});
+
+export type LoteDeDisparo = z.infer<typeof loteDeDisparoSchema>;
+
+export function loteDoMetadata(metadata: unknown): LoteDeDisparo | null {
+  const parsed = loteDeDisparoSchema.safeParse(objetoJson(metadata)[CHAVE_DO_LOTE]);
+  return parsed.success ? parsed.data : null;
+}
+
+export function metadataComLote(
+  metadata: unknown,
+  lote: LoteDeDisparo | null,
+): Record<string, unknown> {
   const proximo = objetoJson(metadata);
-  if (media) proximo[CHAVE_DA_MIDIA_AGENDADA] = media;
-  else delete proximo[CHAVE_DA_MIDIA_AGENDADA];
+  if (lote) proximo[CHAVE_DO_LOTE] = lote;
+  else delete proximo[CHAVE_DO_LOTE];
   return proximo;
 }
 
@@ -81,9 +158,16 @@ export const alterarGrupoDoWhatsappSchema = z
     message: "Informe pelo menos um campo para alterar.",
   });
 
+/**
+ * O destino é UM grupo (`group_id`, o contrato original) OU vários
+ * (`group_ids`). Com vários, a conexão de cada agendamento é a do PRÓPRIO
+ * grupo — a tela pode misturar grupos de contas diferentes, e o
+ * `channel_session_id` do corpo deixa de ser fonte.
+ */
 export const criarAgendamentoDeGrupoSchema = z.object({
-  channel_session_id: z.string().uuid(),
-  group_id: z.string().uuid(),
+  channel_session_id: z.string().uuid().optional(),
+  group_id: z.string().uuid().optional(),
+  group_ids: z.array(z.string().uuid()).min(1).max(MAXIMO_DE_GRUPOS_POR_DISPARO).optional(),
   title: z.string().trim().min(1).max(160).nullable().optional(),
   body: z.string().trim().min(1).max(4000),
   status: z.enum(STATUS_DO_AGENDAMENTO_DE_GRUPO).default("draft"),
@@ -94,10 +178,31 @@ export const criarAgendamentoDeGrupoSchema = z.object({
   repeat_until: z.string().datetime({ offset: true }).nullable().optional(),
   max_runs: z.number().int().positive().nullable().optional(),
   media: midiaAgendadaSchema.nullable().optional(),
+  media_items: z.array(midiaAgendadaSchema).max(MAXIMO_DE_ARQUIVOS_POR_DISPARO).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
+export type CriarAgendamentoDeGrupo = z.infer<typeof criarAgendamentoDeGrupoSchema>;
+
+/** Os grupos do pedido, na ordem, sem repetição — `group_ids` vence `group_id`. */
+export function gruposDoPedido(
+  input: Pick<CriarAgendamentoDeGrupo, "group_id" | "group_ids">,
+): string[] {
+  const lista = input.group_ids?.length ? input.group_ids : input.group_id ? [input.group_id] : [];
+  return [...new Set(lista)];
+}
+
+/** Os arquivos do pedido — `media_items` vence `media`; `media: null` limpa. */
+export function midiasDoPedido(
+  input: Pick<CriarAgendamentoDeGrupo, "media" | "media_items">,
+): MidiaAgendada[] | undefined {
+  if (input.media_items !== undefined) return input.media_items;
+  if (input.media === undefined) return undefined;
+  return input.media ? [input.media] : [];
+}
+
 export const alterarAgendamentoDeGrupoSchema = criarAgendamentoDeGrupoSchema
+  .omit({ group_ids: true })
   .partial()
   .extend({
     status: z.enum(STATUS_DO_AGENDAMENTO_DE_GRUPO).optional(),

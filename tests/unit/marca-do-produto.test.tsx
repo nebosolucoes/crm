@@ -4,19 +4,23 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
 import { Sidebar } from "@/components/shell/Sidebar";
-import { CLASSES_DE_COR, LogotipoDoProduto, SimboloDoProduto } from "@/components/branding/MarcaDoProduto";
+import {
+  ARQUIVOS_DA_MARCA_DO_PRODUTO,
+  LogotipoDoProduto,
+  SimboloDoProduto,
+} from "@/components/branding/MarcaDoProduto";
 import type { ActiveOrg, AuthUser } from "@/lib/auth/types";
-import { DEFAULT_APP_NAME, marcaEhADoProduto, type Branding } from "@/lib/branding";
+import { DEFAULT_APP_NAME, iconeEhODoProduto, marcaEhADoProduto, type Branding } from "@/lib/branding";
 import { MarcaDaInstalacaoProvider } from "@/lib/branding/contexto";
-import { CORES_DA_MARCA } from "@/lib/branding/desenho";
 
 /**
  * A marca do PRODUTO aparece — e SÓ aparece — quando ninguém pôs a sua.
  *
- * O desenho vive em `lib/branding/desenho.ts` e a decisão em `marcaEhADoProduto`.
- * Este arquivo mede as duas metades: a regra pura, e a regra ALCANÇANDO a
- * barra lateral (conferir que a Sidebar importa o componente não bastaria — é
- * evidência de símbolo, não de comportamento).
+ * Neste fork a marca é a Nebo: os PNGs de `public/assets/` referenciados por
+ * `components/branding/MarcaDoProduto.tsx`; a decisão continua em
+ * `marcaEhADoProduto`. Este arquivo mede as duas metades: a regra pura, e a
+ * regra ALCANÇANDO a barra lateral (conferir que a Sidebar importa o
+ * componente não bastaria — é evidência de símbolo, não de comportamento).
  */
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/app/inbox" }));
@@ -41,7 +45,7 @@ const org = {
 let contexto: { user: AuthUser; activeOrg: ActiveOrg | null } = { user: usuario, activeOrg: org };
 vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: () => contexto }));
 
-const PADRAO: Branding = { name: DEFAULT_APP_NAME, logoUrl: null, initial: "D" };
+const PADRAO: Branding = { name: DEFAULT_APP_NAME, logoUrl: null, initial: "N" };
 
 function renderSidebar(marca: Branding, collapsed: boolean) {
   return render(
@@ -72,63 +76,56 @@ describe("marcaEhADoProduto", () => {
   });
 });
 
-describe("o desenho na barra lateral", () => {
-  it("aberta e sem marca própria, mostra o logotipo do produto (SVG, não <img>)", () => {
+describe("os arquivos da marca existem em public/", () => {
+  it.each(Object.entries(ARQUIVOS_DA_MARCA_DO_PRODUTO))("%s → %s", (_papel, caminho) => {
+    // A referência é um caminho servido de `public/`; sem o arquivo no disco
+    // a tela mostraria um <img> quebrado e a aba ficaria em 404.
+    expect(caminho.startsWith("/assets/")).toBe(true);
+    expect(fs.existsSync(path.join(process.cwd(), "public", caminho))).toBe(true);
+  });
+});
+
+describe("a marca do produto na barra lateral", () => {
+  it("aberta e sem marca própria, mostra o logotipo do produto (<img> marcado como do produto)", () => {
     renderSidebar(PADRAO, false);
     const logotipo = screen.getByRole("img", { name: DEFAULT_APP_NAME });
-    expect(logotipo.tagName.toLowerCase()).toBe("svg");
-    // O e2e `marca-logo.spec.ts` lê "barra sem <img>" como "sem logo do
-    // revendedor"; um <img> do produto aqui faria a spec medir a coisa errada.
-    expect(document.querySelector("img")).toBeNull();
+    expect(logotipo.tagName.toLowerCase()).toBe("img");
+    expect(logotipo.getAttribute("src")).toBe(ARQUIVOS_DA_MARCA_DO_PRODUTO.logotipo);
+    // O e2e `marca-logo.spec.ts` lê "barra sem <img> de revendedor" como "sem
+    // logo do revendedor"; o atributo é o que separa os dois <img>.
+    expect(logotipo.hasAttribute("data-marca-do-produto")).toBe(true);
+    expect(document.querySelector("img:not([data-marca-do-produto])")).toBeNull();
     // Nem o nome em texto: o logotipo já o escreve.
     expect(screen.queryByText(DEFAULT_APP_NAME)).toBeNull();
   });
 
   it("recolhida, mostra só o símbolo — e não a inicial em texto", () => {
     renderSidebar(PADRAO, true);
-    expect(screen.getByRole("img", { name: DEFAULT_APP_NAME }).tagName.toLowerCase()).toBe("svg");
-    expect(screen.queryByText("D")).toBeNull();
+    const simbolo = screen.getByRole("img", { name: DEFAULT_APP_NAME });
+    expect(simbolo.getAttribute("src")).toBe(ARQUIVOS_DA_MARCA_DO_PRODUTO.simbolo);
+    expect(screen.queryByText("N")).toBeNull();
   });
 
-  it("com nome da instalação, segue em texto — o desenho do produto não vaza", () => {
+  it("com nome da instalação, segue em texto — a marca do produto não vaza", () => {
     renderSidebar({ name: "Sistema do Revendedor", logoUrl: null, initial: "S" }, false);
     expect(screen.getByText("Sistema do Revendedor")).toBeTruthy();
-    expect(document.querySelector("svg[role=img]")).toBeNull();
+    expect(document.querySelector("img[data-marca-do-produto]")).toBeNull();
   });
 
-  it("com nome da ORGANIZAÇÃO sobre a instalação padrão, o nome dela vence o desenho", () => {
-    contexto = { user: usuario, activeOrg: { ...org, marca: { nome: "Loja da Ana" } } };
-    renderSidebar(PADRAO, false);
-    expect(screen.getByText("Loja da Ana")).toBeTruthy();
-    expect(document.querySelector("svg[role=img]")).toBeNull();
-  });
-
-  it("com logo da instalação, a imagem vence o desenho", () => {
+  it("com logo da instalação, a imagem do revendedor vence a do produto", () => {
     renderSidebar({ ...PADRAO, logoUrl: "https://cdn.exemplo.test/logo.png" }, false);
-    expect(screen.getByRole("img").tagName.toLowerCase()).toBe("img");
+    const img = screen.getByRole("img");
+    expect(img.getAttribute("src")).toBe("https://cdn.exemplo.test/logo.png");
+    expect(img.hasAttribute("data-marca-do-produto")).toBe(false);
   });
 });
 
-describe("as cores do desenho", () => {
-  it("as classes do componente cobrem exatamente a paleta declarada, nos dois temas", () => {
-    // O Tailwind só gera utilitário para hex LITERAL no fonte, então o
-    // componente repete os valores. Isto é o que impede os dois de divergirem.
-    const nasClasses = Object.values(CLASSES_DE_COR).join(" ").match(/#[0-9a-f]{6}/g) ?? [];
-    const naPaleta = [...Object.values(CORES_DA_MARCA.claro), ...Object.values(CORES_DA_MARCA.escuro)];
-    expect([...nasClasses].sort()).toEqual([...naPaleta].sort());
-  });
-
-  it("cada tema tem a sua classe: `dark:` no escuro, nada no claro", () => {
-    for (const [papel, classes] of Object.entries(CLASSES_DE_COR)) {
-      const chave = papel as keyof typeof CORES_DA_MARCA.claro;
-      expect(classes).toContain(`fill-[${CORES_DA_MARCA.claro[chave]}]`);
-      expect(classes).toContain(`dark:fill-[${CORES_DA_MARCA.escuro[chave]}]`);
-    }
-  });
-
+describe("acessibilidade da marca", () => {
   it("decorativo esconde do leitor de tela; sem isso, nomeia a marca", () => {
     render(<SimboloDoProduto nome="Marca X" decorativo />);
-    expect(document.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+    const decorativo = document.querySelector("img")!;
+    expect(decorativo.getAttribute("aria-hidden")).toBe("true");
+    expect(decorativo.getAttribute("alt")).toBe("");
     cleanup();
     render(<LogotipoDoProduto nome="Marca X" />);
     expect(screen.getByRole("img", { name: "Marca X" })).toBeTruthy();
@@ -138,9 +135,16 @@ describe("as cores do desenho", () => {
 describe("o favicon segue a mesma regra", () => {
   const icone = fs.readFileSync(path.join(process.cwd(), "app/icon.tsx"), "utf8");
 
-  it("desenha o símbolo quando a marca é a do produto, e a inicial quando não é", () => {
-    expect(icone).toMatch(/marcaEhADoProduto\(\{ name: marca\.nome, logoUrl: marca\.logoUrl \}\)/);
-    expect(icone).toMatch(/<path d=\{SIMBOLO\.d\}/);
+  it("serve o favicon do produto quando o NOME é o do produto, e a inicial quando não é", () => {
+    expect(icone).toMatch(/iconeEhODoProduto\(\{ name: marca\.nome \}\)/);
+    expect(icone).toMatch(/ARQUIVOS_DA_MARCA_DO_PRODUTO\.favicon/);
     expect(icone).toMatch(/letraDoIcone\(marca\.nome\)/);
+  });
+
+  it("o logo subido não tira o ícone do produto; o nome trocado tira", () => {
+    // O ícone não pode buscar o `logo_url` (SSRF por page load), então quem
+    // manteve o nome do produto fica com o ícone dele, e não com um "N".
+    expect(iconeEhODoProduto({ name: DEFAULT_APP_NAME })).toBe(true);
+    expect(iconeEhODoProduto({ name: "Acme CRM" })).toBe(false);
   });
 });

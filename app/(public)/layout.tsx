@@ -88,7 +88,9 @@ export default async function PublicLayout({ children }: { children: React.React
             </div>
           ) : marcaEhADoProduto({ name: marca.nome, logoUrl: null }) ? (
             <div className="flex justify-center">
-              <LogotipoDoProduto nome={marca.nome} className="h-12 w-auto" />
+              <div className="rounded-md dark:bg-white dark:px-3 dark:py-2 dark:shadow-sm">
+                <LogotipoDoProduto nome={marca.nome} className="h-14 w-auto" />
+              </div>
             </div>
           ) : null}
           {children}

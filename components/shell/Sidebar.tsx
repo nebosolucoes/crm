@@ -129,12 +129,16 @@ export function SidebarContent({
             <img src={logo} alt={nome} className="h-7 w-auto max-w-[10rem] object-contain" />
           </div>
         ) : marcaDoProduto ? (
-          // O desenho do produto, inline (ver `components/branding/MarcaDoProduto.tsx`):
-          // logotipo com a barra aberta, só o símbolo com ela recolhida.
+          // A marca do produto (ver `components/branding/MarcaDoProduto.tsx`):
+          // logotipo com a barra aberta, só o símbolo com ela recolhida. O
+          // logotipo tem fundo transparente e tinta colorida, então ganha o
+          // mesmo chip claro no tema escuro que o logo de revendedor acima.
           collapsed ? (
             <SimboloDoProduto nome={nome} className="h-8 w-8" />
           ) : (
-            <LogotipoDoProduto nome={nome} className="h-8 w-auto" />
+            <div className="rounded-md dark:bg-white dark:px-2 dark:py-1 dark:shadow-sm">
+              <LogotipoDoProduto nome={nome} className="h-8 w-auto" />
+            </div>
           )
         ) : (
           <span className={cn("font-semibold tracking-tight", collapsed && "sr-only")}>{nome}</span>

@@ -4,8 +4,11 @@ import { type NextRequest } from "next/server";
 
 import {
   alterarAgendamentoDeGrupoSchema,
-  metadataComMidiaAgendada,
+  loteDoMetadata,
+  metadataComMidiasAgendadas,
   midiaAgendadaDoMetadata,
+  midiasAgendadasDoMetadata,
+  midiasDoPedido,
   proximaExecucaoInicial,
 } from "@/lib/agendamentos-grupos/schema";
 import { fail, ok } from "@/lib/api/wrappers";
@@ -21,7 +24,12 @@ const COLUNAS =
   "id, organization_id, channel_session_id, group_id, title, body, status, starts_at, timezone, recurrence_kind, recurrence_config, repeat_until, max_runs, next_run_at, last_run_at, created_at, updated_at, created_by, updated_by, cancelled_at, cancelled_by, cancel_reason, metadata, scheduled_whatsapp_groups!scheduled_group_messages_group_id_fkey(name, external_group_id)";
 
 function apresentarAgendamento(row: Record<string, unknown>) {
-  return { ...row, media: midiaAgendadaDoMetadata(row.metadata) };
+  return {
+    ...row,
+    media: midiaAgendadaDoMetadata(row.metadata),
+    media_items: midiasAgendadasDoMetadata(row.metadata),
+    batch: loteDoMetadata(row.metadata),
+  };
 }
 
 interface Contexto {
@@ -34,7 +42,11 @@ export async function PATCH(req: NextRequest, ctx: Contexto): Promise<Response> 
 
   const requestId = randomUUID();
   const { id } = await ctx.params;
-  const authz = await requireRole("manager", { feature: "broadcast", requestId, resource: "scheduled_group_messages" });
+  const authz = await requireRole("manager", {
+    feature: "broadcast",
+    requestId,
+    resource: "scheduled_group_messages",
+  });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 
@@ -45,10 +57,8 @@ export async function PATCH(req: NextRequest, ctx: Contexto): Promise<Response> 
       details: parsed.error.flatten().fieldErrors as Record<string, unknown>,
     });
   }
-  if (
-    parsed.data.media &&
-    !isScheduledMediaPathOwnedBy(parsed.data.media.storage_path, authz.org.orgId)
-  ) {
+  const mediasPedidas = midiasDoPedido(parsed.data);
+  if (mediasPedidas?.some((m) => !isScheduledMediaPathOwnedBy(m.storage_path, authz.org.orgId))) {
     return fail("validation_failed", t("A mídia não pertence a esta organização."), 422, {
       requestId,
     });
@@ -68,18 +78,50 @@ export async function PATCH(req: NextRequest, ctx: Contexto): Promise<Response> 
     return fail("internal_error", t("Erro ao carregar o agendamento."), 500, { requestId });
   }
 
-  const { media, metadata, ...alteracoes } = parsed.data;
-  const mediaAtual = midiaAgendadaDoMetadata(atual.metadata);
-  const mediaResolvida = media === undefined ? mediaAtual : media;
+  // `media`/`media_items` já foram lidos por `midiasDoPedido`; a conexão do
+  // corpo é ignorada — quem a define é o grupo (abaixo).
+  const {
+    media: _media,
+    media_items: _mediaItems,
+    channel_session_id: _conexaoDoCorpo,
+    metadata,
+    group_id,
+    ...alteracoes
+  } = parsed.data;
+  const mediasAtuais = midiasAgendadasDoMetadata(atual.metadata);
+  const mediasResolvidas = mediasPedidas === undefined ? mediasAtuais : mediasPedidas;
   const metadataMesclado = {
     ...((atual.metadata as Record<string, unknown> | null) ?? {}),
     ...(metadata ?? {}),
   };
+
+  // Trocar o grupo exige trocar a conexão junto: a FK composta
+  // (organization_id, channel_session_id, group_id) recusa o par errado. A
+  // conexão vem do grupo, lida do banco e filtrada pela organização.
+  let destino: { group_id: string; channel_session_id: string } | null = null;
+  if (group_id !== undefined) {
+    const { data: grupo, error: erroGrupo } = await admin
+      .from("scheduled_whatsapp_groups")
+      .select("id, channel_session_id")
+      .eq("organization_id", authz.org.orgId)
+      .eq("id", group_id)
+      .maybeSingle();
+    if (erroGrupo)
+      return fail("internal_error", t("Erro ao conferir os grupos."), 500, { requestId });
+    if (!grupo)
+      return fail("validation_failed", t("Grupo ou conexão não encontrados."), 422, { requestId });
+    destino = {
+      group_id: grupo.id as string,
+      channel_session_id: grupo.channel_session_id as string,
+    };
+  }
+
   const patch = {
     ...alteracoes,
+    ...(destino ?? {}),
     updated_by: authz.user.id,
-    ...(media !== undefined || metadata !== undefined
-      ? { metadata: metadataComMidiaAgendada(metadataMesclado, mediaResolvida) }
+    ...(mediasPedidas !== undefined || metadata !== undefined
+      ? { metadata: metadataComMidiasAgendadas(metadataMesclado, mediasResolvidas) }
       : {}),
   };
   if (parsed.data.status || parsed.data.starts_at) {
@@ -117,7 +159,11 @@ export async function PATCH(req: NextRequest, ctx: Contexto): Promise<Response> 
     resourceType: "scheduled_group_messages",
     resourceId: id,
     requestId,
-    metadata: { campos: Object.keys(parsed.data), has_media: Boolean(mediaResolvida) },
+    metadata: {
+      campos: Object.keys(parsed.data),
+      has_media: mediasResolvidas.length > 0,
+      media_count: mediasResolvidas.length,
+    },
   });
 
   return ok(
@@ -129,7 +175,11 @@ export async function PATCH(req: NextRequest, ctx: Contexto): Promise<Response> 
 export async function GET(_req: NextRequest, ctx: Contexto): Promise<Response> {
   const requestId = randomUUID();
   const { id } = await ctx.params;
-  const authz = await requireRole("viewer", { feature: "broadcast", requestId, resource: "scheduled_group_messages" });
+  const authz = await requireRole("viewer", {
+    feature: "broadcast",
+    requestId,
+    resource: "scheduled_group_messages",
+  });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 

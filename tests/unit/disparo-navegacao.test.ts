@@ -13,8 +13,13 @@ describe("Disparo usa portas reais de navegação", () => {
     expect(fonte).toContain("Editar");
     expect(fonte).toContain("Salvar alterações");
     expect(fonte).toContain("apiClient.patch(`/api/v1/agendamentos/${editandoId}`");
-    expect(fonte).toContain("Adicionar foto ou vídeo");
+    // Vários arquivos por disparo, e a prévia do celular ao lado do formulário.
+    expect(fonte).toContain("Adicionar arquivos");
+    expect(fonte).toContain("multiple");
     expect(fonte).toContain("/api/v1/agendamentos/media");
+    expect(fonte).toContain("<PreviaDoCelular");
+    expect(fonte).toContain("<SeletorDeGrupos");
+    expect(fonte).toContain("group_ids: gruposEscolhidos.map((g) => g.id)");
     expect(fonte).toContain("Última execução:");
     expect(fonte).toContain("flex h-full min-h-0 w-full");
     expect(fonte).not.toContain("max-w-6xl");

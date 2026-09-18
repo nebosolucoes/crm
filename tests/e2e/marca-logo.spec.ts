@@ -377,7 +377,11 @@ async function logoDaBarra(page: Page): Promise<LogoNaTela | null> {
     `a casca do app não montou em /app — ${page.url()}. Sem <aside> não há o que medir.`,
   ).toBeAttached({ timeout: 15_000 });
 
-  const img = casca.locator("img").first();
+  // `:not([data-marca-do-produto])`: a marca do PRODUTO também é um `<img>`
+  // (`components/branding/MarcaDoProduto.tsx`), e ela é exatamente o que a
+  // barra mostra quando NÃO há logo de revendedor — contá-la aqui faria
+  // "sem logo" nunca acontecer.
+  const img = casca.locator("img:not([data-marca-do-produto])").first();
   // `count()` é a ÚNICA leitura sem auto-espera do helper, e por isso era ela
   // que media durante a troca de documento: `goto("/app")` cai num
   // `redirect("/app/inbox")` (app/app/page.tsx tem 3 linhas), o Next serve /app
@@ -540,7 +544,7 @@ async function barraMostraLogoDe(
   onde: string,
 ): Promise<LogoNaTela> {
   await expect(
-    page.locator("aside").first().locator("img").first(),
+    page.locator("aside").first().locator("img:not([data-marca-do-produto])").first(),
     `${onde}: a barra lateral não passou a mostrar o logo da camada — esperava um src ` +
       `com "brand-logos/${caminhoNoBucket}" e há outro (ou nenhum)`,
   ).toHaveAttribute("src", new RegExp(`brand-logos/${caminhoNoBucket}`), { timeout: 15_000 });

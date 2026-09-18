@@ -142,4 +142,14 @@ export {
   GoogleLogo,
   MapPin,
   ArrowsOutSimple,
+  // disparo: seletor de vários grupos, anexos de qualquer tipo e a prévia do
+  // celular com o WhatsApp aberto (components/disparo/)
+  Square,
+  CheckSquare,
+  VideoCamera,
+  File as FileIcon,
+  Camera,
+  ArrowLeft,
+  DotsThreeVertical,
+  Broadcast,
 } from "@phosphor-icons/react/dist/ssr";
