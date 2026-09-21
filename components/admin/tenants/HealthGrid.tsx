@@ -11,7 +11,7 @@ import {
 } from "@/lib/ui/icons";
 import type { TenantHealthResponse } from "@/app/api/v1/admin/tenants/[id]/health/route";
 import { useT } from "@/hooks/i18n/useT";
-import { formatCentsUSD } from "@/lib/money";
+import { useFormatadorDeCusto } from "@/lib/ai/custo/ExibicaoDoCustoProvider";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -57,6 +57,7 @@ interface HealthGridProps {
 export function HealthGrid({ health }: HealthGridProps) {
   const tagDoIdioma = useTagDeIdioma();
   const t = useT();
+  const custo = useFormatadorDeCusto();
   const { waha, nuvemshop, ai, audit } = health;
 
   // WAHA card
@@ -91,10 +92,10 @@ export function HealthGrid({ health }: HealthGridProps) {
   const aiPrimary =
     ai.percent_used !== null ? `${ai.percent_used}% ${t("usado")}` : t("Sem orçamento");
   const aiDetails = [
-    { label: t("Consumido"), value: formatCentsUSD(ai.consumed_cents) },
+    { label: t("Consumido"), value: custo.formatarComReal(ai.consumed_cents) },
     {
       label: t("Orçamento"),
-      value: ai.budget_cents ? formatCentsUSD(ai.budget_cents) : t("Ilimitado"),
+      value: ai.budget_cents ? custo.formatarComReal(ai.budget_cents) : t("Ilimitado"),
     },
     { label: t("Limite"), value: t(MODO_LABEL[ai.enforcement_mode]) },
   ];

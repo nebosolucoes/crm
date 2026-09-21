@@ -22,6 +22,7 @@ import { EvolutionTimeline } from "@/components/ai/EvolutionTimeline";
 import { useEvolution } from "@/hooks/ai/useEvolution";
 import type { EvolutionPayload } from "@/lib/ai/evolution/aggregate";
 import { useT } from "@/hooks/i18n/useT";
+import { useFormatadorDeCusto } from "@/lib/ai/custo/ExibicaoDoCustoProvider";
 
 /**
  * O painel responde UMA pergunta do dono do negócio: "o que meu agente aprendeu
@@ -34,8 +35,8 @@ import { useT } from "@/hooks/i18n/useT";
  * "casos que precisaram de uma pessoa". A tela é escrita para o segundo.
  */
 
-// DÓLAR: `outcome.cost_cents` vem de `llm_calls`, que `pricing.ts` grava em centavo de USD.
-const usd = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "USD" });
+// `outcome.cost_cents` vem de `llm_calls`, centavo de DÓLAR; a moeda mostrada é
+// decisão da instalação (`useFormatadorDeCusto`: US$, ou R$ por cotação fixa).
 
 /**
  * O bloco se chama "o que MUDOU", mas o payload traz um período só — não há
@@ -403,6 +404,7 @@ export function EvolutionClient({ defaultRange }: { defaultRange: { from: string
 
 function Conteudo({ payload }: { payload: NonNullable<ReturnType<typeof useEvolution>["data"]> }) {
   const t = useT();
+  const custo = useFormatadorDeCusto();
   const { learned, activity, outcome, gaps } = payload;
 
   const soma = (s: Array<{ value: number }>) => s.reduce((a, p) => a + p.value, 0);
@@ -583,8 +585,8 @@ function Conteudo({ payload }: { payload: NonNullable<ReturnType<typeof useEvolu
           />
           <StatCard
             rotulo={t("Custo da IA no período")}
-            valor={usd.format(outcome.cost_cents / 100)}
-            significa={t("O que você pagou aos provedores de IA para tudo isto acontecer.")}
+            valor={custo.formatarComReal(outcome.cost_cents)}
+            significa={t("O custo da IA para tudo isto acontecer.")}
           />
         </div>
       </Bloco>

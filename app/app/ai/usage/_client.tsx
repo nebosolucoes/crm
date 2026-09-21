@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAiUsage, type AiUsageFilters } from "@/hooks/ai/useAiUsage";
 import { UsageFilters, type UsageFiltersAgent } from "@/components/ai/UsageFilters";
 import { UsageChart } from "@/components/ai/UsageChart";
-import { formatCentsUSD } from "@/lib/money";
+import { useFormatadorDeCusto } from "@/lib/ai/custo/ExibicaoDoCustoProvider";
 import { useT } from "@/hooks/i18n/useT";
 
 interface Props {
@@ -64,6 +64,7 @@ function ChartSkeletons() {
 
 export function UsageDashboardClient({ agents, initial }: Props) {
   const t = useT();
+  const custo = useFormatadorDeCusto();
   const searchParams = useSearchParams();
 
   const filters: AiUsageFilters = {
@@ -89,9 +90,10 @@ export function UsageDashboardClient({ agents, initial }: Props) {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               label={t("Custo no período")}
-              // DÓLAR: esta tela mostrava o MESMO número em duas moedas — o card de
-              // orçamento logo acima em US$ e este StatCard em R$, dois centímetros abaixo.
-              value={formatCentsUSD(q.data.totals.cost_cents)}
+              // MESMA moeda do card de orçamento logo acima: esta tela já mostrou
+              // o mesmo número em duas moedas, dois centímetros uma da outra. As duas
+              // saem do formatador da instalação.
+              value={custo.formatarComReal(q.data.totals.cost_cents)}
             />
             <StatCard
               label={t("Atendimentos com IA")}

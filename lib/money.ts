@@ -72,9 +72,14 @@ export function formatCentsBRL(cents: number): string {
  * (exigiria fonte de câmbio, dependência externa nova num produto self-host):
  * o que muda é o rótulo dizer a unidade real.
  *
- * Vírgula decimal porque a frase é pt-BR; "US$" porque a moeda é dólar. É a
- * mesma escolha de `emDolares` em `lib/agent-engine/edge/llm/orcamento.ts` —
- * mas ali ela não pode importar daqui (o módulo é do engine e roda no worker).
+ * Vírgula decimal porque a frase é pt-BR; "US$" porque a moeda é dólar.
+ *
+ * ⚠️ DESDE A 0277, TELA NENHUMA CHAMA ISTO. A instalação pode escolher mostrar
+ * o custo em R$ (cotação fixa + margem), e quem sabe disso é o formatador de
+ * `lib/ai/custo/` — `useFormatadorDeCusto()` no cliente, `formatarCusto()` no
+ * servidor e no worker. Esta função fica como o "custo real" (sempre USD, sem
+ * margem), que é o que o admin da instalação vê entre parênteses. Vigiado por
+ * `tests/unit/moeda-de-exibicao-do-custo.test.ts` (caso 6).
  */
 export function formatCentsUSD(cents: number): string {
   return ((cents ?? 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "USD" });

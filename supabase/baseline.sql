@@ -27921,6 +27921,89 @@ create trigger trg_platform_meta_app_updated_at
   before update on public.platform_meta_app
   for each row execute function public.fn_set_updated_at();
 
+-- ---- custo das chamadas de IA recalculado pelo catálogo (migration 0276) ----
+--
+-- Backfill do HISTÓRICO: `llm_calls.cost_cents` nulo (todo modelo via OpenRouter
+-- até aqui) recalculado dos tokens gravados × preço de `ai_models`, com a
+-- fórmula do código (`lib/agent-engine/edge/llm/pricing.ts`). Só `status='ok'`,
+-- só linha nula, só modelo com os dois preços. Idempotente. Prosa: migration 0276.
+update public.llm_calls c
+   set cost_cents = (
+         greatest(0, c.input_tokens - c.cache_read_tokens - c.cache_write_tokens)
+           * m.input_price_per_million_cents
+         + c.cache_read_tokens  * m.input_price_per_million_cents * 0.1
+         + c.cache_write_tokens * m.input_price_per_million_cents * 2
+         + c.output_tokens      * m.output_price_per_million_cents
+       )::numeric / 1000000
+  from public.ai_models m
+ where c.cost_cents is null
+   and c.status = 'ok'
+   and m.provider = c.provider
+   and m.model_id = c.model
+   and m.input_price_per_million_cents  is not null
+   and m.output_price_per_million_cents is not null;
+
+-- ---- moeda de exibição do custo de IA: cotação fixa e margem (migration 0277) ----
+--
+-- Três colunas na linha única de `platform_settings`. O banco segue em USD;
+-- a tela converte. Prosa e decisões: a própria migration 0277.
+alter table public.platform_settings
+  add column if not exists ai_cost_currency   text          not null default 'USD',
+  add column if not exists ai_cost_fx_rate    numeric(12,4),
+  add column if not exists ai_cost_markup_pct numeric(6,2)  not null default 0;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.platform_settings'::regclass
+       and conname = 'platform_settings_ai_cost_currency'
+  ) then
+    alter table public.platform_settings
+      add constraint platform_settings_ai_cost_currency
+      check (ai_cost_currency in ('USD', 'BRL'));
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.platform_settings'::regclass
+       and conname = 'platform_settings_ai_cost_fx_rate'
+  ) then
+    alter table public.platform_settings
+      add constraint platform_settings_ai_cost_fx_rate
+      check (ai_cost_fx_rate is null or ai_cost_fx_rate > 0);
+  end if;
+
+  -- BRL sem cotação seria uma exibição que não sabe converter. O padrão USD
+  -- não exige nada.
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.platform_settings'::regclass
+       and conname = 'platform_settings_ai_cost_brl_exige_cotacao'
+  ) then
+    alter table public.platform_settings
+      add constraint platform_settings_ai_cost_brl_exige_cotacao
+      check (ai_cost_currency = 'USD' or ai_cost_fx_rate is not null);
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.platform_settings'::regclass
+       and conname = 'platform_settings_ai_cost_markup_pct'
+  ) then
+    alter table public.platform_settings
+      add constraint platform_settings_ai_cost_markup_pct
+      check (ai_cost_markup_pct >= 0 and ai_cost_markup_pct <= 1000);
+  end if;
+end $$;
+
+comment on column public.platform_settings.ai_cost_currency is
+  'Moeda em que o custo de IA é MOSTRADO (USD = como o provedor cobra; BRL = convertido pela cotação fixa). O banco guarda sempre centavos de USD. Ver lib/ai/custo/moeda.ts.';
+comment on column public.platform_settings.ai_cost_fx_rate is
+  'Reais por dólar, fixa, digitada pelo admin da instalação. Obrigatória quando ai_cost_currency = BRL.';
+comment on column public.platform_settings.ai_cost_markup_pct is
+  'Margem (%) aplicada sobre o custo de IA em toda tela de organização; o admin da instalação vê também o custo real. 0 = só converter.';
+
 -- ---- travas do modo somente leitura do suporte, depois de toda tabela (migration 0274) ----
 --
 -- ⚠️ ESTA CHAMADA É O ÚLTIMO BLOCO DO ARQUIVO. Tabela nova, coluna

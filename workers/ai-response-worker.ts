@@ -54,6 +54,7 @@ import type { EventRow } from "@/lib/event-log/dispatcher";
 import { resolverModeloDoPonto } from "@/lib/ai/gateway-binding";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { exibicaoDoCusto } from "@/lib/ai/custo/exibicao-da-instalacao";
 
 const RECENT_MESSAGES_LIMIT = 20;
 const RAG_TOP_K = 5;
@@ -477,7 +478,8 @@ async function vetoPorTetoDeGasto(alvo: {
     kind: "budget_exceeded",
     severity: "critical",
     title: BLOQUEIO_TITULO,
-    body: corpoDoBloqueio(status.current_month_consumed_cents, status.monthly_limit_cents),
+    // Na moeda que a instalação mostra (memo de 30 s; nunca lança).
+    body: corpoDoBloqueio(status.current_month_consumed_cents, status.monthly_limit_cents, await exibicaoDoCusto()),
   });
 
   // ── A CONVERSA VAI PARA A FILA HUMANA, IGUAL AO ENGINE ────────────────────

@@ -21,6 +21,7 @@ import { apiClient } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/types";
 import { agentRunsKey } from "@/hooks/ai/useAgentRuns";
 import { useT } from "@/hooks/i18n/useT";
+import { useFormatadorDeCusto } from "@/lib/ai/custo/ExibicaoDoCustoProvider";
 import type { AgentRow } from "@/hooks/ai/useAgent";
 import type { AgentVersionRow } from "@/hooks/ai/useAgentVersions";
 
@@ -133,6 +134,7 @@ function Verificacoes({ g }: { g: NonNullable<TestResponse["data"]["guardrails"]
 
 export function TestPanel({ agent, draft, published, readOnly }: Props) {
   const t = useT();
+  const custo = useFormatadorDeCusto();
   const target = draft ?? published;
   const qc = useQueryClient();
 
@@ -296,7 +298,7 @@ export function TestPanel({ agent, draft, published, readOnly }: Props) {
                 {result.tokens_in?.toLocaleString()??"—"} /{" "}
                 {result.tokens_out?.toLocaleString()??"—"}
               </Cell>
-              <Cell label={t("Custo (cents)")}>{result.cost_cents ?? "—"}</Cell>
+              <Cell label={t("Custo")}>{typeof result.cost_cents === "number" ? custo.formatarComReal(result.cost_cents, { casas: 4 }) : "—"}</Cell>
             </div>
 
             <RunTrace

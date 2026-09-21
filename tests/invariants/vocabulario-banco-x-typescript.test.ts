@@ -49,6 +49,12 @@ const PARES: Array<{
   simbolo: string;
 }> = [
   {
+    tabela: "platform_settings",
+    coluna: "ai_cost_currency",
+    arquivo: "lib/ai/custo/moeda.ts",
+    simbolo: "MOEDAS_DO_CUSTO",
+  },
+  {
     tabela: "extension_operations",
     coluna: "kind",
     // O recibo das extensões (0271). Quatro cópias no TypeScript viraram uma; um kind

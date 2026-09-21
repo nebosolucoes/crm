@@ -15,6 +15,8 @@ import {
 } from "@/components/app/ImpersonateBanner";
 import { ConexaoCaidaBanner } from "@/components/app/ConexaoCaidaBanner";
 import { IdiomaProvider } from "@/lib/i18n/IdiomaProvider";
+import { ExibicaoDoCustoProvider } from "@/lib/ai/custo/ExibicaoDoCustoProvider";
+import { exibicaoDoCusto } from "@/lib/ai/custo/exibicao-da-instalacao";
 import { listarConexoesCaidas, type ConexaoCaida } from "@/lib/channels/health";
 import { VoiceCallProvider } from "@/components/voice/VoiceCallContext";
 import { acessoFoiRevogado } from "@/lib/auth/vinculo-revogado";
@@ -136,6 +138,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     expiresAt: user.support.expires_at, accessMode: user.support.access_mode,
   } : null;
 
+  // Moeda em que o custo de IA é mostrado (Uso, Execuções, Evolução, teto).
+  // Configuração da INSTALAÇÃO, memoizada 30 s e que nunca lança — sem
+  // linha, sem coluna ou sem banco vale dólar, como sempre foi.
+  const exibicaoCusto = await exibicaoDoCusto();
+
   const shell = (
     <VoiceCallProvider>
       <AppShell sidebarCollapsed={collapsed}>{children}</AppShell>
@@ -147,6 +154,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     // pergunta quem está logado. Ver `lib/i18n/IdiomaProvider`: foi o
     // acoplamento com a autenticação que derrubou 32 casos.
     <IdiomaProvider locale={user.idioma}>
+    <ExibicaoDoCustoProvider cfg={exibicaoCusto}>
     <AuthProvider user={user} activeOrg={activeOrg}>
       <InterfaceRefresh userId={user.id} org={activeOrg} support={!!user.support} />
       <div className="contents">
@@ -162,6 +170,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         )}
       </div>
     </AuthProvider>
+    </ExibicaoDoCustoProvider>
     </IdiomaProvider>
   );
 }

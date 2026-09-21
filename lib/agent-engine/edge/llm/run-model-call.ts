@@ -30,13 +30,14 @@ import {
   AVISO_TITULO,
   BLOQUEIO_TITULO,
   corpoDoBloqueio,
+  exibicaoDaLinha,
   decidirOrcamento,
   normalizarModoDeOrcamento,
   LIMIAR_PADRAO_PCT,
   SQL_ORCAMENTO,
   type ChaveDeOrcamento,
 } from './orcamento';
-import { costCents } from './pricing';
+import { custoEmCents } from './pricing';
 import { createDefaultRegistry, type ProviderRegistry } from './providers';
 import { buildStablePrefix } from './stable-prefix';
 
@@ -160,6 +161,8 @@ interface LinhaDoOrcamento {
   /** `numeric` do Postgres chega como STRING no node-pg. Sempre coagir. */
   gasto: string | number | null;
   avisado_antes: boolean | null;
+  /** jsonb da linha de `platform_settings` (moeda de exibição), ou null. */
+  exibicao: unknown;
 }
 
 /**
@@ -279,7 +282,7 @@ async function aplicarOrcamento(d: {
        select 1 from agent_inbox_items
        where organization_id = $1 and kind = 'budget_exceeded' and status = 'open'
      )`,
-    [d.organizationId, BLOQUEIO_TITULO, corpoDoBloqueio(gastoCents, tetoCents)],
+    [d.organizationId, BLOQUEIO_TITULO, corpoDoBloqueio(gastoCents, tetoCents, exibicaoDaLinha(linha.exibicao))],
   );
   // A recusa vira LINHA em llm_calls. A tela /app/ai/runs nasceu porque
   // "llm_calls só registrava sucesso — a tabela ficava vazia exatamente no caso
@@ -473,7 +476,10 @@ export async function runModelCall(db: pg.Pool, cfg: LlmEdgeConfig, input: RunMo
     cacheReadTokens: result.usage.inputTokenDetails.cacheReadTokens ?? 0,
     cacheWriteTokens: result.usage.inputTokenDetails.cacheWriteTokens ?? 0,
   };
-  const cost = costCents(model, usage);
+  // Preço pelo catálogo `ai_models` (o que o sync do OpenRouter mantém), com a
+  // tabela fixa de fallback — ver o cabeçalho de pricing.ts para o NULL que
+  // toda chamada via OpenRouter gravava até aqui.
+  const cost = await custoEmCents(db, config.provider, model, usage);
 
   const { rows } = await db.query<{ id: string }>(
     `insert into llm_calls

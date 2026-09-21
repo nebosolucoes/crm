@@ -12,7 +12,7 @@ import {
   Legend,
 } from "recharts";
 import type { UsagePayload } from "@/lib/ai/usage/aggregate";
-import { formatCentsUSD } from "@/lib/money";
+import { useFormatadorDeCusto } from "@/lib/ai/custo/ExibicaoDoCustoProvider";
 import { useT } from "@/hooks/i18n/useT";
 
 interface Props {
@@ -66,6 +66,7 @@ const tooltipStyle = {
 export function UsageChart({ payload }: Props) {
   const tagDoIdioma = useTagDeIdioma();
   const t = useT();
+  const custo = useFormatadorDeCusto();
   const { series } = payload;
 
   // Pre-build merged latency dataset for the dual-line chart.
@@ -109,11 +110,11 @@ export function UsageChart({ payload }: Props) {
                 tick={{ fontSize: 11 }}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(v: number) => formatCentsUSD(v)}
+                tickFormatter={(v: number) => custo.formatar(v)}
                 width={70}
               />
               <Tooltip
-                formatter={(value) => [formatCentsUSD(Number(value)), t("Custo")]}
+                formatter={(value) => [custo.formatarComReal(Number(value)), t("Custo")]}
                 labelFormatter={(label) => formatDateTick(String(label), tagDoIdioma)}
                 contentStyle={tooltipStyle}
               />

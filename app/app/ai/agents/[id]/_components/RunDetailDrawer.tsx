@@ -18,6 +18,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useT } from "@/hooks/i18n/useT";
+import { useFormatadorDeCusto } from "@/lib/ai/custo/ExibicaoDoCustoProvider";
 
 import { RunTrace } from "./RunTrace";
 import type { AgentRunRow } from "@/hooks/ai/useAgentRuns";
@@ -28,10 +29,6 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
-function fmtCost(cents: number | null): string {
-  if (cents == null) return "—";
-  return `US$ ${(cents / 100).toFixed(4)}`;
-}
 
 function fmtLatency(ms: number | null): string {
   if (ms == null) return "—";
@@ -50,6 +47,7 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
 
 export function RunDetailDrawer({ run, open, onOpenChange }: Props) {
   const t = useT();
+  const custo = useFormatadorDeCusto();
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex w-full flex-col gap-4 overflow-y-auto sm:max-w-2xl">
@@ -82,7 +80,7 @@ export function RunDetailDrawer({ run, open, onOpenChange }: Props) {
               <Cell label={t("Tokens (in/out)")}>
                 {(run.tokens_in ?? 0).toLocaleString()} / {(run.tokens_out ?? 0).toLocaleString()}
               </Cell>
-              <Cell label={t("Custo")}>{fmtCost(run.cost_cents)}</Cell>
+              <Cell label={t("Custo")}>{run.cost_cents == null ? "—" : custo.formatarComReal(run.cost_cents, { casas: 4 })}</Cell>
               <Cell label={t("Latência")}>{fmtLatency(run.latency_ms)}</Cell>
               <Cell label={t("Steps")}>{run.steps_count ?? 0}</Cell>
             </dl>

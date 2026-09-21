@@ -342,6 +342,12 @@ export const AUDIT_ACTIONS = [
   // (nenhum handler o consumiria — ver register-handlers.ts) e a troca não
   // deixa rastro em nenhuma outra tabela.
   "platform.signup_mode_updated",
+  // A moeda de EXIBIÇÃO do custo de IA da INSTALAÇÃO (cotação fixa e margem,
+  // migration 0277) trocada em `platform_settings`. Auditável porque muda o
+  // número que TODO cliente daquela instalação lê como "quanto gastei" e o
+  // que o admin repassa — "por que o custo dobrou de ontem para hoje?" só tem
+  // resposta aqui, com o valor anterior e o novo.
+  "platform.ai_cost_display_updated",
   "platform_google_oauth.updated",
   // A credencial do APP da Meta da INSTALAÇÃO (migration 0257): o App Secret que
   // assina a entrega do webhook e o verify token que responde ao handshake.

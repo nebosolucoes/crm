@@ -11,7 +11,7 @@ import {
   Tooltip,
 } from "recharts";
 import type { UsageSeries } from "@/app/api/v1/admin/usage/route";
-import { formatCentsUSD } from "@/lib/money";
+import { useFormatadorDeCusto } from "@/lib/ai/custo/ExibicaoDoCustoProvider";
 import { useT } from "@/hooks/i18n/useT";
 
 interface UsageChartsProps {
@@ -23,8 +23,8 @@ function formatDateTick(date: string, idioma: string): string {
   return d.toLocaleDateString(idioma, { day: "2-digit", month: "2-digit" });
 }
 
-// DÓLAR: o número é `llm_calls.cost_cents`, e `pricing.ts` cota o provedor em USD.
-const formatCurrency = formatCentsUSD;
+// O custo sai pelo formatador da instalação (US$, ou R$ por cotação fixa +
+// margem); no admin ele mostra também o custo real entre parênteses.
 
 function formatNumber(n: number): string {
   return n.toLocaleString("pt-BR");
@@ -56,6 +56,7 @@ function ChartCard({ title, children }: ChartCardProps) {
 export function UsageCharts({ series }: UsageChartsProps) {
   const tagDoIdioma = useTagDeIdioma();
   const t = useT();
+  const custo = useFormatadorDeCusto();
   const hasMessages = series.messages.some((p) => p.count > 0);
   const hasCost = series.ai_cost.some((p) => p.cents > 0);
   const hasTokens = series.ai_tokens.some((p) => p.tokens > 0);
@@ -144,13 +145,11 @@ export function UsageCharts({ series }: UsageChartsProps) {
                 tick={{ fontSize: 11 }}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(v: number) =>
-                  formatCurrency(v)
-                }
+                tickFormatter={(v: number) => custo.formatar(v)}
                 width={70}
               />
               <Tooltip
-                formatter={(value) => [formatCurrency(Number(value)), t("Custo")]}
+                formatter={(value) => [custo.formatarComReal(Number(value)), t("Custo")]}
                 labelFormatter={(label) => formatDateTick(String(label), tagDoIdioma)}
                 contentStyle={{
                   borderRadius: "8px",

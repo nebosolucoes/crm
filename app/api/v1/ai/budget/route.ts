@@ -35,6 +35,8 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
 import { getBudgetStatus, type BudgetStatus } from "@/lib/ai/budget/check";
+import { exibicaoDoCusto } from "@/lib/ai/custo/exibicao-da-instalacao";
+import { formatarCusto } from "@/lib/ai/custo/moeda";
 import {
   PISO_DE_TETO_CENTS,
   normalizarModoDeOrcamento,
@@ -50,16 +52,16 @@ export const dynamic = "force-dynamic";
 const CARENCIA_HORAS = 72;
 
 /**
- * O piso escrito como o leitor brasileiro o lê. `toFixed(2)` devolveria
- * "US$ 1.00" — ponto decimal numa frase em português, na única linha que o
- * usuário recebe quando o salvamento é recusado. Mesmo idioma de `emDolares`
- * em `run-model-call.ts`: dólar porque `cost_cents` é USD, vírgula porque a
- * frase é pt-BR.
+ * O piso escrito como o leitor brasileiro o lê, NA MOEDA QUE A TELA MOSTRA:
+ * vírgula decimal porque a frase é pt-BR; "R$" ou "US$" conforme a instalação
+ * (`platform_settings`, migration 0277 — cotação fixa + margem, a mesma régua
+ * do campo que a pessoa acabou de preencher). É a única linha que o usuário
+ * recebe quando o salvamento é recusado; dizer "US$ 1,00" a quem digitou em
+ * real é pedir um número que ele não sabe converter.
  */
-const PISO_LEGIVEL = `US$ ${(PISO_DE_TETO_CENTS / 100).toLocaleString("pt-BR", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})}`;
+async function pisoLegivel(): Promise<string> {
+  return formatarCusto(PISO_DE_TETO_CENTS, await exibicaoDoCusto(), { casas: 2 });
+}
 
 /** A escada. Comparação por posição — nunca por igualdade de string espalhada. */
 const DEGRAU: Record<ModoDeOrcamento, number> = { off: 0, avisar: 1, bloquear: 2 };
@@ -181,7 +183,7 @@ export async function PATCH(req: NextRequest): Promise<Response> {
   if (modoDepois !== "off" && tetoDepois < PISO_DE_TETO_CENTS) {
     return fail(
       "unprocessable_entity",
-      `Para avisar ou parar no limite, o limite precisa ser de pelo menos ${PISO_LEGIVEL} por mês. ` +
+      `Para avisar ou parar no limite, o limite precisa ser de pelo menos ${await pisoLegivel()} por mês. ` +
         'Se você só quer acompanhar o gasto sem limite, escolha "Só acompanhar".',
       422,
       {

@@ -61,6 +61,9 @@ const NAV_ITEMS: NavItem[] = [
   // razão das duas de cima: é configuração da INSTALAÇÃO, e /admin tem
   // navegação própria (o registro de `lib/navigation/` cobre só `app/app/**`).
   { href: "/admin/cadastro", label: "Cadastro", icon: Key },
+  // A porta da tela que decide em que moeda (e com que margem) o custo de IA
+  // é mostrado a toda organização desta instalação — mesma razão das de cima.
+  { href: "/admin/custo-de-ia", label: "Custo de IA", icon: Receipt },
 ];
 
 interface AdminSidebarProps {

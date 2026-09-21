@@ -19,6 +19,7 @@ import {
 
 import { useAgentRuns, type AgentRunRow } from "@/hooks/ai/useAgentRuns";
 import { useT } from "@/hooks/i18n/useT";
+import { useFormatadorDeCusto } from "@/lib/ai/custo/ExibicaoDoCustoProvider";
 import { RunDetailDrawer } from "./RunDetailDrawer";
 
 interface Props {
@@ -41,13 +42,10 @@ function fmtLatency(ms: number | null): string {
   return `${(ms / 1000).toFixed(2)}s`;
 }
 
-function fmtCost(cents: number | null): string {
-  if (cents == null) return "—";
-  return `US$ ${(cents / 100).toFixed(4)}`;
-}
 
 export function RunsTable({ agentId, active }: Props) {
   const t = useT();
+  const custo = useFormatadorDeCusto();
   const { data, isLoading, error, refetch, isFetching } = useAgentRuns(agentId, {
     enabled: active,
     realtime: active,
@@ -132,7 +130,7 @@ export function RunsTable({ agentId, active }: Props) {
                   {(r.tokens_in ?? 0).toLocaleString()} /{" "}
                   {(r.tokens_out ?? 0).toLocaleString()}
                 </TableCell>
-                <TableCell className="font-mono text-xs">{fmtCost(r.cost_cents)}</TableCell>
+                <TableCell className="font-mono text-xs">{r.cost_cents == null ? "—" : custo.formatarComReal(r.cost_cents, { casas: 4 })}</TableCell>
                 <TableCell className="font-mono text-xs">{fmtLatency(r.latency_ms)}</TableCell>
                 <TableCell className="font-mono text-xs">{r.steps_count ?? 0}</TableCell>
                 <TableCell className="text-right">

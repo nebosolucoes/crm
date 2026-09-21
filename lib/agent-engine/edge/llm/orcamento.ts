@@ -28,6 +28,8 @@
  * recusas abaixo é essa assimetria escrita.
  */
 
+import { EXIBICAO_PADRAO, formatarCusto, normalizarExibicao, type ExibicaoDoCusto } from '@/lib/ai/custo/moeda';
+
 /**
  * Piso do teto: US$ 1,00/mês. Abaixo disto o número não é orçamento de um agente
  * de WhatsApp, é erro de unidade — e um erro de unidade não pode calar a IA.
@@ -86,9 +88,16 @@ export const BLOQUEIO_TITULO = 'O limite de gasto com IA foi atingido';
  */
 export const HANDOFF_REASON_ORCAMENTO = 'orcamento_de_ia';
 
-/** Escreve dólar, porque o número É dólar (`pricing.ts` calcula em USD). */
-function emDolares(cents: number): string {
-  return `US$ ${(cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/**
+ * O número É dólar (`pricing.ts` calcula em USD); a MOEDA ESCRITA é a que a
+ * instalação escolheu mostrar (`platform_settings`, migration 0277) — o aviso
+ * da Central precisa falar a mesma língua da tela de Uso, senão "chegou a
+ * US$ 20" aparece ao lado de um card que diz "R$ 108". Quem chama passa a
+ * configuração lida no MESMO statement (`SQL_ORCAMENTO`, CTE `exib`); sem
+ * ela, dólar, como sempre foi.
+ */
+function naMoedaDaInstalacao(cents: number, exib: ExibicaoDoCusto): string {
+  return formatarCusto(cents, exib, { casas: 2 });
 }
 
 /**
@@ -102,10 +111,14 @@ function emDolares(cents: number): string {
  * é `lib/escalacao/retomada.ts`, acionado por um botão POR CONVERSA. Subir o
  * teto evita paradas NOVAS; ele não devolve a IA a nenhuma conversa já parada.
  */
-export function corpoDoBloqueio(gastoCents: number, tetoCents: number): string {
+export function corpoDoBloqueio(
+  gastoCents: number,
+  tetoCents: number,
+  exib: ExibicaoDoCusto = EXIBICAO_PADRAO,
+): string {
   const pct = tetoCents > 0 ? Math.round((gastoCents / tetoCents) * 100) : 0;
   return (
-    `O gasto de IA deste mês chegou a ${emDolares(gastoCents)} de um limite de ${emDolares(tetoCents)} (${pct}%), ` +
+    `O gasto de IA deste mês chegou a ${naMoedaDaInstalacao(gastoCents, exib)} de um limite de ${naMoedaDaInstalacao(tetoCents, exib)} (${pct}%), ` +
     'e você escolheu que a IA parasse ao chegar nele. ' +
     'As conversas que estavam sendo atendidas foram para a FILA DE ATENDIMENTO HUMANO — ' +
     'ninguém ficou sem próximo passo, mas alguém precisa responder. ' +
@@ -336,6 +349,21 @@ export function normalizarModoDeOrcamento(v: string | null | undefined): ModoDeO
  * Sem linha em `ai_budgets` a CTE `orc` é vazia, `modo` volta `null`, e o
  * chamador resolve para `'off'`. Nulo é sempre a resposta mais frouxa.
  */
+/**
+ * A coluna `exibicao` de `SQL_ORCAMENTO` (jsonb da linha de `platform_settings`,
+ * ou null) → configuração válida. Nunca lança: chave ausente ou valor torto é
+ * dólar.
+ */
+export function exibicaoDaLinha(bruto: unknown): ExibicaoDoCusto {
+  if (bruto === null || typeof bruto !== 'object') return EXIBICAO_PADRAO;
+  const o = bruto as Record<string, unknown>;
+  return normalizarExibicao({
+    moeda: o['ai_cost_currency'],
+    cotacao: o['ai_cost_fx_rate'],
+    margemPct: o['ai_cost_markup_pct'],
+  });
+}
+
 export const SQL_ORCAMENTO = `
 with orc as (
   select b.monthly_limit_cents            as teto,
@@ -347,6 +375,13 @@ with orc as (
 ),
 gasto as (
   select public.fn_gasto_de_ia_do_mes($1) as spent
+),
+-- A moeda em que o aviso da Central é ESCRITO (migration 0277). \`to_jsonb\` da
+-- linha inteira, e não as três colunas: num banco anterior à 0277 a coluna não
+-- existe, e citá-la derrubaria o statement — e com ele o GATE de orçamento,
+-- que segue "sem teto" quando a consulta falha. Chave ausente no JSON = dólar.
+exib as (
+  select to_jsonb(ps) as cfg from platform_settings ps where ps.id = 1
 ),
 -- Lido ANTES dos inserts: todas as CTEs enxergam o MESMO snapshot, então
 -- \`avisado_antes\` reflete o estado anterior a qualquer insert deste statement.
@@ -407,5 +442,6 @@ select (select teto from orc)         as teto,
        (select efetivo_em from orc)   as efetivo_em,
        (select limiar_pct from orc)   as limiar_pct,
        (select spent from gasto)      as gasto,
-       (select ja from avisado_antes) as avisado_antes;
+       (select ja from avisado_antes) as avisado_antes,
+       (select cfg from exib)         as exibicao;
 `;

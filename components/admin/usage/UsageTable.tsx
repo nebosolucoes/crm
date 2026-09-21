@@ -12,15 +12,15 @@ import {
 import { ChartBar } from "@/lib/ui/icons";
 import type { UsageTenantRow } from "@/app/api/v1/admin/usage/route";
 import type { UsageRange } from "@/hooks/useAdminUsage";
-import { formatCentsUSD } from "@/lib/money";
+import { useFormatadorDeCusto } from "@/lib/ai/custo/ExibicaoDoCustoProvider";
 import { useT } from "@/hooks/i18n/useT";
 
 // ---------------------------------------------------------------------------
 // Formatters
 // ---------------------------------------------------------------------------
 
-// DÓLAR: o número é `llm_calls.cost_cents`, e `pricing.ts` cota o provedor em USD.
-const fmtUSD = formatCentsUSD;
+// O número é `llm_calls.cost_cents`, centavo de DÓLAR; o formatador da instalação
+// decide a moeda mostrada e, no admin, acrescenta o custo real entre parênteses.
 
 function fmtNum(n: number): string {
   return n.toLocaleString("pt-BR");
@@ -76,6 +76,7 @@ interface UsageTableProps {
 
 export function UsageTable({ tenants, range }: UsageTableProps) {
   const t = useT();
+  const custo = useFormatadorDeCusto();
   if (tenants.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 rounded-md border py-16 text-center text-muted-foreground">
@@ -144,7 +145,7 @@ export function UsageTable({ tenants, range }: UsageTableProps) {
                   {fmtNum(row.ai_tokens_total)}
                 </TableCell>
                 <TableCell className="text-right text-sm font-medium tabular-nums">
-                  {fmtUSD(row.ai_cost_cents)}
+                  {custo.formatarComReal(row.ai_cost_cents)}
                 </TableCell>
               </TableRow>
             ))}

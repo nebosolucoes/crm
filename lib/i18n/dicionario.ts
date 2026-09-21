@@ -37,6 +37,25 @@ import type { Idioma } from "./idiomas";
 type Traducoes = Record<string, Partial<Record<Exclude<Idioma, "pt-BR">, string>>>;
 
 export const DICIONARIO: Traducoes = {
+  // fachada de acesso (components/auth/fachada, app/(public)/login, app/(public)/signup)
+  "Entre com seu e-mail profissional para acessar o": {
+    es: "Entra con tu correo profesional para acceder a",
+  },
+  "voce@empresa.com": { es: "tu@empresa.com" },
+  "Digite sua senha": { es: "Escribe tu contraseña" },
+  "Repita sua senha": { es: "Repite tu contraseña" },
+  "Ocultar senha": { es: "Ocultar contraseña" },
+  "Mostrar senha": { es: "Mostrar contraseña" },
+  "Comece agora": { es: "Empieza ahora" },
+  "CRM com agentes de IA": { es: "CRM con agentes de IA" },
+  "Transforme conversas do WhatsApp em vendas.": {
+    es: "Convierte conversaciones de WhatsApp en ventas.",
+  },
+  "Atenda, qualifique e venda pelo WhatsApp em um só lugar.": {
+    es: "Atiende, califica y vende por WhatsApp en un solo lugar.",
+  },
+  "Ilustração: site em construção": { es: "Ilustración: sitio en construcción" },
+  "Ilustração: alvo sendo avaliado": { es: "Ilustración: objetivo en evaluación" },
   // vocabulario.ts (followups) — MatchReplyForm.tsx não traduzia, ClassifyForm.tsx sim.
   "Se a informação já existir": { es: "Si la información ya existe" },
   "Perguntar de novo e substituir": { es: "Preguntar de nuevo y reemplazar" },
@@ -9420,6 +9439,32 @@ export const DICIONARIO: Traducoes = {
   "o compromisso": { es: "la cita" },
   "Entendi": { es: "Entendido" },
   "e-mail do convidado inválido": { es: "correo del invitado no válido" },
+  // ─── Custo de IA em real: cotação fixa e margem (migration 0277) ───
+  "Custo de IA": { es: "Costo de IA" },
+  "Em que moeda, e com que margem, o gasto com IA aparece para as empresas desta instalação.": { es: "En qué moneda, y con qué margen, aparece el gasto en IA para las empresas de esta instalación." },
+  "Confira a cotação e a margem: a cotação precisa ser maior que zero para mostrar em real.": { es: "Revisa la cotización y el margen: la cotización debe ser mayor que cero para mostrar en reales." },
+  "Moeda do custo de IA": { es: "Moneda del costo de IA" },
+  "O provedor de IA cobra em dólar, e é em dólar que o sistema guarda cada gasto. Aqui você escolhe como esse gasto é MOSTRADO às empresas: em dólar, ou em real por uma cotação fixa que você define — com a margem que quiser embutir.": { es: "El proveedor de IA cobra en dólares, y en dólares guarda el sistema cada gasto. Aquí eliges cómo se MUESTRA ese gasto a las empresas: en dólares, o en reales por una cotización fija que tú defines — con el margen que quieras incluir." },
+  "Mostrar em real (R$)": { es: "Mostrar en reales (R$)" },
+  "Ligado: Uso, Execuções, Evolução, o limite de orçamento e os avisos falam em R$ pela cotação abaixo.": { es: "Activado: Uso, Ejecuciones, Evolución, el límite de presupuesto y los avisos hablan en R$ según la cotización de abajo." },
+  "Desligado: tudo em US$, como o provedor cobra.": { es: "Desactivado: todo en US$, como cobra el proveedor." },
+  "Cotação do dólar (R$ por US$ 1)": { es: "Cotización del dólar (R$ por US$ 1)" },
+  "Fixa: o sistema não busca câmbio. Atualize quando quiser; o histórico passa a ser lido pela cotação nova.": { es: "Fija: el sistema no consulta el tipo de cambio. Actualízala cuando quieras; el historial pasa a leerse con la cotización nueva." },
+  "Para mostrar em real, a cotação precisa ser maior que zero.": { es: "Para mostrar en reales, la cotización debe ser mayor que cero." },
+  "Margem sobre o custo (%)": { es: "Margen sobre el costo (%)" },
+  "0 = só converter. As empresas veem o valor COM margem; você, aqui no admin, vê também o custo real.": { es: "0 = solo convertir. Las empresas ven el valor CON margen; tú, aquí en el admin, ves también el costo real." },
+  "A margem vai de 0 a": { es: "El margen va de 0 a" },
+  "Salvo. As telas passam a usar a nova moeda no próximo carregamento.": { es: "Guardado. Las pantallas pasan a usar la nueva moneda en la próxima carga." },
+  "Como vai aparecer": { es: "Cómo se verá" },
+  "Dois exemplos reais, com o que você digitou acima.": { es: "Dos ejemplos reales, con lo que escribiste arriba." },
+  "Uma execução do agente": { es: "Una ejecución del agente" },
+  "Um mês de uma empresa pequena": { es: "Un mes de una empresa pequeña" },
+  "O que muda é a leitura: o sistema continua guardando cada gasto em dólar, e o limite de orçamento continua sendo comparado nessa mesma régua.": { es: "Lo que cambia es la lectura: el sistema sigue guardando cada gasto en dólares, y el límite de presupuesto sigue comparándose con esa misma regla." },
+  "custo real": { es: "costo real" },
+  "valores em real, pela cotação definida por quem administra a instalação": { es: "valores en reales, según la cotización definida por quien administra la instalación" },
+  "Limite mensal": { es: "Límite mensual" },
+  "O custo da IA para tudo isto acontecer.": { es: "El costo de la IA para que todo esto ocurra." },
+  "Escolha o que acontece quando o gasto do mês chega no limite. Os valores são em real, pela cotação definida por quem administra a instalação.": { es: "Elige qué pasa cuando el gasto del mes llega al límite. Los valores son en reales, según la cotización definida por quien administra la instalación." },
 };
 
 /**

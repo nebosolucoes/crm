@@ -9,21 +9,22 @@
  * D1 de marca (`tests/unit/branding.test.ts`): ele ainda escreve o nosso nome,
  * o que só passa a importar no dia em que ele voltar a ser enviado.
  */
+import { EXIBICAO_PADRAO, formatarCusto, type ExibicaoDoCusto } from "@/lib/ai/custo/moeda";
+
 export interface BudgetAlarmEmailOptions {
   pct: number;
   consumedCents: number;
   limitCents: number;
+  /** Moeda em que a instalação MOSTRA o custo (migration 0277). Sem ela, dólar. */
+  exibicao?: ExibicaoDoCusto;
   orgName?: string | null;
   dashboardUrl: string;
 }
 
-const brl = new Intl.NumberFormat("pt-BR", {
-  style: "currency",
-  currency: "USD",
-});
-
-function fmt(cents: number): string {
-  return brl.format(cents / 100);
+// Os centavos são de DÓLAR; a moeda escrita é a da instalação (cotação fixa
+// + margem), a mesma da tela de Uso que o e-mail manda abrir.
+function fmt(cents: number, exibicao: ExibicaoDoCusto): string {
+  return formatarCusto(cents, exibicao, { casas: 2 });
 }
 
 export function buildBudgetAlarmEmail(opts: BudgetAlarmEmailOptions): {
@@ -31,6 +32,7 @@ export function buildBudgetAlarmEmail(opts: BudgetAlarmEmailOptions): {
   html: string;
   text: string;
 } {
+  const exibicao = opts.exibicao ?? EXIBICAO_PADRAO;
   const pctStr = `${opts.pct.toFixed(2)}%`;
   const subject = `Alerta IA: orçamento atingiu ${pctStr} — DeskcommCRM`;
   const orgLine = opts.orgName
@@ -46,8 +48,8 @@ export function buildBudgetAlarmEmail(opts: BudgetAlarmEmailOptions): {
     </h1>
     ${orgLine}
     <p style="margin:0 0 12px;font-size:15px;line-height:1.5">
-      Consumo no mês: <strong>${escapeHtml(fmt(opts.consumedCents))}</strong>
-      de <strong>${escapeHtml(fmt(opts.limitCents))}</strong>.
+      Consumo no mês: <strong>${escapeHtml(fmt(opts.consumedCents, exibicao))}</strong>
+      de <strong>${escapeHtml(fmt(opts.limitCents, exibicao))}</strong>.
     </p>
     <p style="margin:0 0 16px;font-size:14px;color:#57534e">
       Ao atingir 100%, o bot de IA será automaticamente pausado ou desabilitado
@@ -69,7 +71,7 @@ export function buildBudgetAlarmEmail(opts: BudgetAlarmEmailOptions): {
   const text = [
     `Orçamento mensal de IA atingiu ${pctStr}.`,
     opts.orgName ? `Organização: ${opts.orgName}` : "",
-    `Consumo: ${fmt(opts.consumedCents)} de ${fmt(opts.limitCents)}.`,
+    `Consumo: ${fmt(opts.consumedCents, exibicao)} de ${fmt(opts.limitCents, exibicao)}.`,
     "",
     `Dashboard: ${opts.dashboardUrl}`,
   ]

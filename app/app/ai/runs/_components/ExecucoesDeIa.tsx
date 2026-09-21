@@ -21,19 +21,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useT } from "@/hooks/i18n/useT";
+import { useFormatadorDeCusto } from "@/lib/ai/custo/ExibicaoDoCustoProvider";
 
-/**
- * O MESMO formato da tela de Uso — as duas leem `llm_calls.cost_cents`, que é
- * centavo de DÓLAR (`pricing.ts` cota o provedor em USD).
- */
-const usd = new Intl.NumberFormat("pt-BR", {
-  style: "currency",
-  currency: "USD",
-  // 4 casas porque uma execução isolada custa fração de centavo, e arredondar
-  // para 2 mostraria "R$ 0,00" para todas elas — o zero que não é zero.
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 4,
-});
+// O custo sai pelo formatador da instalação (`useFormatadorDeCusto`): o MESMO
+// da tela de Uso — as duas leem `llm_calls.cost_cents`, centavo de DÓLAR, e a
+// instalação decide se mostra em US$ ou em R$ (cotação fixa + margem).
+// 4 casas porque uma execução isolada custa fração de centavo, e arredondar
+// para 2 mostraria "0,00" para todas elas — o zero que não é zero.
 
 interface Execucao {
   id: string;
@@ -64,6 +58,7 @@ interface Resumo {
 export function ExecucoesDeIa() {
   const tagDoIdioma = useTagDeIdioma();
   const t = useT();
+  const custo = useFormatadorDeCusto();
   const [execucoes, setExecucoes] = useState<Execucao[] | null>(null);
   const [resumo, setResumo] = useState<Resumo | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -231,7 +226,7 @@ export function ExecucoesDeIa() {
                       aparecia como "0.2500 centavos", 100× menor que o mesmo
                       evento na tela de Uso, sem nenhuma das duas dizer qual
                       estava certa. Aqui vale o mesmo formato de lá: reais. */}
-                  {e.cost_cents !== null ? ` · ${usd.format(e.cost_cents / 100)}` : ""}
+                  {e.cost_cents !== null ? ` · ${custo.formatarComReal(e.cost_cents, { casas: 4 })}` : ""}
                 </p>
               )}
 
