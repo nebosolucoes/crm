@@ -38,6 +38,15 @@ vi.mock("@/lib/supabase/server", () => ({
     auth: { getUser: vi.fn(async () => ({ data: { user: null } })) },
   })),
 }));
+// A casca de dois painéis (`components/auth/fachada/CascaDeAcesso.tsx`) é um
+// client component que lê rota e query (`usePathname`, `useSearchParams`) e
+// navega (`useRouter`) — nada disso existe fora do App Router. Fora dele, o
+// login é a rota e não há transição em curso.
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/login",
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+}));
 
 const MARCA: MarcaDeSaida = {
   nome: "Vendas Turbo",

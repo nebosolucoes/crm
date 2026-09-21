@@ -1,5 +1,4 @@
-import Link from "next/link";
-
+import { LinkDeTransicao } from "@/components/auth/fachada/LinkDeTransicao";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { branding } from "@/lib/branding";
 import { createClient } from "@/lib/supabase/server";
@@ -28,10 +27,14 @@ export default async function LoginPage({
   const t = (texto: string) => traduzir(texto, idioma);
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-1.5 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Entrar")}</h1>
-        <p className="text-sm text-muted-foreground">{branding().name}</p>
+    <div className="space-y-7">
+      <div className="space-y-3">
+        <h1 className="text-[34px] font-semibold leading-[42px] tracking-tight text-text">
+          {t("Entrar")}
+        </h1>
+        <p className="max-w-[390px] text-[15px] leading-[22px] text-text-muted">
+          {t("Entre com seu e-mail profissional para acessar o")} {branding().name}.
+        </p>
       </div>
       {reset === "success" && (
         <div
@@ -99,23 +102,12 @@ export default async function LoginPage({
         </div>
       )}
       <LoginForm next={next} />
-      <div className="space-y-2 text-center text-sm">
-        <p>
-          <Link
-            href="/login/forgot"
-            className="text-muted-foreground underline underline-offset-4 hover:text-foreground"
-          >
-            {t("Esqueci minha senha")}
-          </Link>
-        </p>
-        <p className="text-muted-foreground">
+      <div className="border-t border-border pt-6 text-center">
+        <p className="text-[15px] text-text-muted">
           {t("Não tem conta?")}{" "}
-          <Link
-            href="/signup"
-            className="font-medium text-foreground underline underline-offset-4"
-          >
+          <LinkDeTransicao href="/signup" className="font-semibold text-accent hover:underline">
             {t("Criar conta")}
-          </Link>
+          </LinkDeTransicao>
         </p>
       </div>
     </div>

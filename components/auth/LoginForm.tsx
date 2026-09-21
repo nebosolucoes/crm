@@ -3,13 +3,14 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTransition, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { useT } from "@/hooks/i18n/useT";
 import { loginSchema, type LoginInput } from "@/lib/auth/schemas";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { CampoDaFachada } from "@/components/auth/fachada/CampoDaFachada";
+import { CircleNotch, Envelope, Lock, SignIn } from "@/lib/ui/icons";
 import { signInWithPassword } from "@/app/actions/auth/signInWithPassword";
 
 export function LoginForm({ next }: { next?: string }) {
@@ -58,33 +59,37 @@ export function LoginForm({ next }: { next?: string }) {
   };
 
   return (
-    <form method="post" onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-      <div className="space-y-1.5">
-        <Label htmlFor="email">{t("Email")}</Label>
-        <Input
-          id="email"
-          type="email"
-          autoComplete="email"
-          autoFocus
-          aria-invalid={errors.email ? true : undefined}
-          {...register("email")}
-        />
-        {errors.email && (
-          <p className="text-xs text-destructive">{t(errors.email.message ?? "")}</p>
-        )}
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="password">{t("Senha")}</Label>
-        <Input
+    <form method="post" onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
+      <CampoDaFachada
+        id="email"
+        rotulo={t("Email")}
+        icone={<Envelope weight="regular" />}
+        type="email"
+        autoComplete="email"
+        autoFocus
+        placeholder={t("voce@empresa.com")}
+        erro={errors.email ? t(errors.email.message ?? "") : null}
+        {...register("email")}
+      />
+      <div className="space-y-3">
+        <CampoDaFachada
           id="password"
+          rotulo={t("Senha")}
+          icone={<Lock weight="regular" />}
           type="password"
           autoComplete="current-password"
-          aria-invalid={errors.password ? true : undefined}
+          placeholder="••••••••"
+          erro={errors.password ? t(errors.password.message ?? "") : null}
           {...register("password")}
         />
-        {errors.password && (
-          <p className="text-xs text-destructive">{t(errors.password.message ?? "")}</p>
-        )}
+        <div className="text-right">
+          <Link
+            href="/login/forgot"
+            className="text-[13px] font-medium text-accent transition-colors hover:text-accent-hover"
+          >
+            {t("Esqueci minha senha")}
+          </Link>
+        </div>
       </div>
       {serverError && (
         <div
@@ -94,7 +99,12 @@ export function LoginForm({ next }: { next?: string }) {
           {serverError}
         </div>
       )}
-      <Button type="submit" className="w-full" disabled={isPending}>
+      <Button
+        type="submit"
+        className="auth-sombra-botao h-14 w-full rounded-full text-[15px] font-semibold lg:h-14"
+        disabled={isPending}
+      >
+        {isPending ? <CircleNotch className="animate-spin" /> : <SignIn weight="bold" />}
         {isPending ? t("Entrando...") : t("Entrar")}
       </Button>
     </form>

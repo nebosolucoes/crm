@@ -119,6 +119,10 @@ export {
   CaretRight,
   ArrowRight,
   SignOut,
+  // fachada de acesso (login/cadastro): ícones dentro dos campos
+  Envelope,
+  EyeSlash,
+  SignIn,
   WebhooksLogo,
   PuzzlePiece,
   UploadSimple,

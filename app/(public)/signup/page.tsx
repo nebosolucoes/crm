@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { LinkDeTransicao } from "@/components/auth/fachada/LinkDeTransicao";
 import { SignupForm } from "@/components/auth/SignupForm";
 import { Button } from "@/components/ui/button";
 import { branding } from "@/lib/branding";
@@ -57,12 +58,12 @@ export default async function SignupPage({
 
   if (soPorConvite) {
     return (
-      <div className="space-y-6 text-center">
-        <div className="space-y-1.5">
-          <h1 className="text-2xl font-semibold tracking-tight">
+      <div className="space-y-6">
+        <div className="space-y-3">
+          <h1 className="text-[34px] font-semibold leading-[42px] tracking-tight text-text">
             {t("Cadastro apenas por convite")}
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-[15px] leading-[22px] text-text-muted">
             {conviteExpirado
               ? t(
                   "Esse convite expirou ou não é mais válido. Peça um novo a quem te convidou — esta instalação não aceita cadastro sem convite.",
@@ -72,7 +73,7 @@ export default async function SignupPage({
                 )}
           </p>
         </div>
-        <Button asChild className="w-full">
+        <Button asChild className="auth-sombra-botao h-14 w-full rounded-full text-[15px] font-semibold lg:h-14">
           <Link href="/login">{t("Entrar")}</Link>
         </Button>
       </div>
@@ -80,10 +81,12 @@ export default async function SignupPage({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-1.5 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Criar conta")}</h1>
-        <p className="text-sm text-muted-foreground">
+    <div className="space-y-7">
+      <div className="space-y-3">
+        <h1 className="text-[34px] font-semibold leading-[42px] tracking-tight text-text">
+          {convite ? t("Criar conta") : t("Comece agora")}
+        </h1>
+        <p className="max-w-[420px] text-[15px] leading-[22px] text-text-muted">
           {convite
             ? t("Crie sua senha para entrar na empresa que te convidou")
             : `${t("Comece a usar o")} ${branding().name} ${t("em minutos")}`}
@@ -103,11 +106,11 @@ export default async function SignupPage({
 
       <SignupForm convite={convite} />
 
-      <p className="text-center text-sm text-muted-foreground">
+      <p className="text-center text-[15px] text-text-muted">
         {t("Já tem conta?")}{" "}
-        <Link href="/login" className="font-medium text-foreground underline underline-offset-4">
+        <LinkDeTransicao href="/login" className="font-semibold text-accent hover:underline">
           {t("Entrar")}
-        </Link>
+        </LinkDeTransicao>
       </p>
     </div>
   );

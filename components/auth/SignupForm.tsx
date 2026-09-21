@@ -14,8 +14,17 @@ import {
   type SignupComConviteInput,
 } from "@/lib/auth/schemas";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { CampoDaFachada } from "@/components/auth/fachada/CampoDaFachada";
+import {
+  ArrowRight,
+  Buildings,
+  CircleNotch,
+  Envelope,
+  Eye,
+  EyeSlash,
+  Lock,
+  UserCircle,
+} from "@/lib/ui/icons";
 import { signUp } from "@/app/actions/auth/signUp";
 
 /**
@@ -36,6 +45,7 @@ export function SignupForm({ convite }: { convite?: ConviteDoSignup }) {
   const [serverError, setServerError] = useState<string | null>(null);
   const [contaExistente, setContaExistente] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
+  const [mostrarSenha, setMostrarSenha] = useState(false);
 
   const {
     register,
@@ -158,8 +168,15 @@ export function SignupForm({ convite }: { convite?: ConviteDoSignup }) {
     );
   }
 
+  const tipoDaSenha = mostrarSenha ? "text" : "password";
+
   return (
-    <form method="post" onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+    <form
+      method="post"
+      onSubmit={handleSubmit(onSubmit)}
+      className="grid gap-5 sm:grid-cols-2"
+      noValidate
+    >
       {/*
         Só no modo CONVITE. Quem abre a própria empresa dá o nome no onboarding;
         quem é convidado pula o onboarding e ficava sem nome para sempre —
@@ -167,90 +184,99 @@ export function SignupForm({ convite }: { convite?: ConviteDoSignup }) {
         nomeia (medido no diálogo de transferir conversa, em produção).
       */}
       {convite && (
-      <div className="space-y-1.5">
-        <Label htmlFor="full_name">{t("Seu nome")}</Label>
-        <Input
-          id="full_name"
-          type="text"
-          autoComplete="name"
-          autoFocus
-          aria-invalid={errors.full_name ? true : undefined}
-          {...register("full_name")}
-        />
-        {errors.full_name && (
-          <p className="text-xs text-destructive">{t(errors.full_name.message ?? "")}</p>
-        )}
-      </div>
+        <div className="sm:col-span-2">
+          <CampoDaFachada
+            id="full_name"
+            rotulo={t("Seu nome")}
+            icone={<UserCircle weight="regular" />}
+            type="text"
+            autoComplete="name"
+            autoFocus
+            placeholder={t("Seu nome")}
+            erro={errors.full_name ? t(errors.full_name.message ?? "") : null}
+            {...register("full_name")}
+          />
+        </div>
       )}
       {!convite && (
-      <div className="space-y-1.5">
-        <Label htmlFor="org_name">{t("Nome da empresa")}</Label>
-        <Input
-          id="org_name"
-          type="text"
-          autoComplete="organization"
-          autoFocus
-          aria-invalid={errors.org_name ? true : undefined}
-          {...register("org_name")}
-        />
-        {errors.org_name && (
-          <p className="text-xs text-destructive">{t(errors.org_name.message ?? "")}</p>
-        )}
-      </div>
+        <div className="sm:col-span-2">
+          <CampoDaFachada
+            id="org_name"
+            rotulo={t("Nome da empresa")}
+            icone={<Buildings weight="regular" />}
+            type="text"
+            autoComplete="organization"
+            autoFocus
+            placeholder={t("Nome da empresa")}
+            erro={errors.org_name ? t(errors.org_name.message ?? "") : null}
+            {...register("org_name")}
+          />
+        </div>
       )}
-      <div className="space-y-1.5">
-        <Label htmlFor="email">Email</Label>
-        <Input
+      <div className="sm:col-span-2">
+        <CampoDaFachada
           id="email"
+          rotulo="Email"
+          icone={<Envelope weight="regular" />}
           type="email"
           autoComplete="email"
+          placeholder={t("voce@empresa.com")}
           // O convite vale para UM endereço. Deixar editável convidaria a
           // trocar e receber "email_divergente" depois de preencher tudo.
           readOnly={Boolean(convite)}
-          aria-invalid={errors.email ? true : undefined}
+          erro={errors.email ? t(errors.email.message ?? "") : null}
           {...register("email")}
         />
-        {errors.email && (
-          <p className="text-xs text-destructive">{t(errors.email.message ?? "")}</p>
-        )}
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="password">{t("Senha")}</Label>
-        <Input
-          id="password"
-          type="password"
-          autoComplete="new-password"
-          aria-invalid={errors.password ? true : undefined}
-          {...register("password")}
-        />
-        {errors.password && (
-          <p className="text-xs text-destructive">{t(errors.password.message ?? "")}</p>
-        )}
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="password_confirm">{t("Confirmar senha")}</Label>
-        <Input
-          id="password_confirm"
-          type="password"
-          autoComplete="new-password"
-          aria-invalid={errors.password_confirm ? true : undefined}
-          {...register("password_confirm")}
-        />
-        {errors.password_confirm && (
-          <p className="text-xs text-destructive">{t(errors.password_confirm.message ?? "")}</p>
-        )}
-      </div>
+      <CampoDaFachada
+        id="password"
+        rotulo={t("Senha")}
+        icone={<Lock weight="regular" />}
+        type={tipoDaSenha}
+        autoComplete="new-password"
+        placeholder={t("Digite sua senha")}
+        erro={errors.password ? t(errors.password.message ?? "") : null}
+        acessorio={
+          <button
+            type="button"
+            className="text-text-muted transition-colors hover:text-text [&_svg]:size-5"
+            aria-label={mostrarSenha ? t("Ocultar senha") : t("Mostrar senha")}
+            aria-pressed={mostrarSenha}
+            onClick={() => setMostrarSenha((atual) => !atual)}
+          >
+            {mostrarSenha ? <EyeSlash weight="regular" /> : <Eye weight="regular" />}
+          </button>
+        }
+        {...register("password")}
+      />
+      <CampoDaFachada
+        id="password_confirm"
+        rotulo={t("Confirmar senha")}
+        icone={<Lock weight="regular" />}
+        type={tipoDaSenha}
+        autoComplete="new-password"
+        placeholder={t("Repita sua senha")}
+        erro={errors.password_confirm ? t(errors.password_confirm.message ?? "") : null}
+        {...register("password_confirm")}
+      />
       {serverError && (
         <div
-          className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive sm:col-span-2"
           role="alert"
         >
           {serverError}
         </div>
       )}
-      <Button type="submit" className="w-full" disabled={isPending}>
-        {isPending ? t("Criando conta...") : t("Criar conta")}
-      </Button>
+      <div className="sm:col-span-2">
+        <Button
+          type="submit"
+          className="auth-sombra-botao mt-1 h-14 w-full rounded-full text-[15px] font-semibold lg:h-14"
+          disabled={isPending}
+        >
+          {isPending ? <CircleNotch className="animate-spin" /> : <ArrowRight weight="bold" />}
+          {isPending ? t("Criando conta...") : t("Criar conta")}
+        </Button>
+      </div>
     </form>
   );
 }
