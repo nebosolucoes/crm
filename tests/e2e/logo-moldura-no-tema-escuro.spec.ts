@@ -76,6 +76,7 @@ import * as zlib from "node:zlib";
 
 import { test, expect, type Page, type Locator } from "@playwright/test";
 
+import { TEMA_ESCURO_HABILITADO } from "../../lib/tema-escuro";
 import { generateTotp, msUntilNextTotpWindow } from "./utils/totp";
 
 const CREDS_PATH = path.join(process.cwd(), ".e2e-creds.json");
@@ -364,6 +365,7 @@ async function medirCaixa(alvo: Locator): Promise<Caixa> {
 test.describe.configure({ mode: "serial" });
 
 test.describe("a moldura do logo no tema escuro", () => {
+  test.skip(!TEMA_ESCURO_HABILITADO, "tema escuro desligado no produto (lib/tema-escuro.ts) — este caso mede o escuro e volta quando a chave religar");
   // Cada caso faz o próprio login: `mode: "serial"` encadeia ORDEM e estado do
   // BANCO, não a sessão do navegador (as fixtures `page`/`context` são de escopo
   // de teste). Ver o comentário longo em `marca-logo.spec.ts`.

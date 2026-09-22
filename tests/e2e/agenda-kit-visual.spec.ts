@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { TEMA_ESCURO_HABILITADO } from "../../lib/tema-escuro";
 import { lerCreds, loginComoAdmin } from "./helpers/login-admin";
 
 /**
@@ -378,6 +379,7 @@ test.describe("kit visual da Agenda", () => {
   });
 
   test("as oito trilhas passam em contraste e são distinguíveis — nos DOIS temas", async () => {
+    test.skip(!TEMA_ESCURO_HABILITADO, "tema escuro desligado no produto (lib/tema-escuro.ts) — este caso mede o escuro e volta quando a chave religar");
     const relatorio: string[] = [];
 
     for (const tema of ["claro", "escuro"] as const) {

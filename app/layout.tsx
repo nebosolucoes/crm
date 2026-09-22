@@ -20,6 +20,7 @@ import {
 } from "@/lib/branding/resolve";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
+import { TEMA_ESCURO_HABILITADO } from "@/lib/tema-escuro";
 import { ThemeProvider } from "@/lib/theme";
 import { Providers } from "./providers";
 import { PublicEnvScript } from "./public-env-script";
@@ -114,12 +115,25 @@ export async function generateMetadata(): Promise<Metadata> {
  * banco — está no cabeçalho de `lib/branding/barra-do-navegador.ts`.
  */
 export const viewport: Viewport = {
-  themeColor: coresDaBarraDoNavegador(REGUA_DO_PRODUTO),
+  // Sem tema escuro, a barra do navegador não pode escurecer num SO escuro
+  // enquanto a página fica clara: só a cor do claro, sem `media`, vale sempre.
+  themeColor: TEMA_ESCURO_HABILITADO
+    ? coresDaBarraDoNavegador(REGUA_DO_PRODUTO)
+    : coresDaBarraDoNavegador(REGUA_DO_PRODUTO)
+        .filter((c) => c.media.includes("light"))
+        .map((c) => ({ color: c.color })),
 };
 
 // Inline FOUC-prevention. Conteúdo é string literal estática (zero input do usuário),
 // portanto seguro. Lê localStorage + prefers-color-scheme antes do primeiro paint.
-const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('deskcomm-theme');var d=window.matchMedia('(prefers-color-scheme: dark)').matches;var r=(s==='dark'||s==='light')?s:((s==='system'||!s)&&d?'dark':'light');document.documentElement.setAttribute('data-theme',r);}catch(e){document.documentElement.setAttribute('data-theme','light');}})();`;
+//
+// Com o tema escuro desligado (`lib/tema-escuro.ts`) o script não consulta
+// nada: pinta claro e pronto. Consultar o localStorage aqui e deixar o
+// `ThemeProvider` corrigir depois seria exatamente o flash que o script existe
+// para impedir — um frame escuro para quem tinha "dark" salvo.
+const THEME_INIT_SCRIPT = TEMA_ESCURO_HABILITADO
+  ? `(function(){try{var s=localStorage.getItem('deskcomm-theme');var d=window.matchMedia('(prefers-color-scheme: dark)').matches;var r=(s==='dark'||s==='light')?s:((s==='system'||!s)&&d?'dark':'light');document.documentElement.setAttribute('data-theme',r);}catch(e){document.documentElement.setAttribute('data-theme','light');}})();`
+  : `document.documentElement.setAttribute('data-theme','light');`;
 
 /**
  * Motivos já registrados neste processo. `EstiloDaMarca` roda em TODA

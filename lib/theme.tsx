@@ -2,6 +2,8 @@
 
 import * as React from "react";
 
+import { preferenciaPermitida, TEMA_ESCURO_HABILITADO } from "@/lib/tema-escuro";
+
 export type Theme = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
 
@@ -21,19 +23,28 @@ type ThemeContextValue = {
 
 const ThemeContext = React.createContext<ThemeContextValue | null>(null);
 
+/**
+ * O default de quem nunca escolheu. Com o escuro desligado (`lib/tema-escuro.ts`)
+ * é "light" em vez de "system": "system" resolveria para escuro num SO escuro.
+ */
+const TEMA_PADRAO: Theme = TEMA_ESCURO_HABILITADO ? "system" : "light";
+
 function readStoredTheme(): Theme {
-  if (typeof window === "undefined") return "system";
+  if (typeof window === "undefined") return TEMA_PADRAO;
   try {
     const v = window.localStorage.getItem(STORAGE_KEY);
-    if (v === "light" || v === "dark" || v === "system") return v;
+    // A preferência salva de quem escolheu "dark" antes da chave desligar é
+    // respeitada só até onde a chave permite — e volta a valer quando religar,
+    // porque a leitura não a apaga.
+    if (v === "light" || v === "dark" || v === "system") return preferenciaPermitida(v);
   } catch {
     // localStorage indisponível (modo privado, sandbox) — segue com default.
   }
-  return "system";
+  return TEMA_PADRAO;
 }
 
 function getSystemTheme(): ResolvedTheme {
-  if (typeof window === "undefined") return "light";
+  if (typeof window === "undefined" || !TEMA_ESCURO_HABILITADO) return "light";
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
@@ -78,13 +89,16 @@ function getTemaSnapshot(): Theme {
   return temaEmCache;
 }
 function getTemaSnapshotDoServidor(): Theme {
-  return "system";
+  return TEMA_PADRAO;
 }
 function inscreverEmTema(ouvinte: Ouvinte): () => void {
   ouvintesDeTema.add(ouvinte);
   return () => ouvintesDeTema.delete(ouvinte);
 }
-function gravarTema(next: Theme) {
+function gravarTema(pedido: Theme) {
+  // Escrever o que a chave não permite deixaria o localStorage dizendo "dark"
+  // e a tela mostrando claro — e o botão, se existisse, mentiria o estado.
+  const next = preferenciaPermitida(pedido);
   temaEmCache = next;
   try {
     window.localStorage.setItem(STORAGE_KEY, next);
@@ -105,7 +119,7 @@ function getSistemaSnapshotDoServidor(): ResolvedTheme {
   return "light";
 }
 function inscreverEmSistema(ouvinte: Ouvinte): () => void {
-  if (ouvintesDeSistema.size === 0 && typeof window !== "undefined") {
+  if (ouvintesDeSistema.size === 0 && typeof window !== "undefined" && TEMA_ESCURO_HABILITADO) {
     // Só liga UM listener nativo, mesmo com N componentes inscritos — o
     // fan-out para os `ouvinte()` é responsabilidade deste módulo.
     const mql = window.matchMedia("(prefers-color-scheme: dark)");

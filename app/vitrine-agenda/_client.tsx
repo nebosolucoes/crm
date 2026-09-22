@@ -18,6 +18,7 @@ import { EmptyAgenda } from "@/components/empty";
 import { Button } from "@/components/ui/button";
 import { CalendarPlus, CaretLeft, CaretRight } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
+import { TEMA_ESCURO_HABILITADO } from "@/lib/tema-escuro";
 import { useTheme } from "@/lib/theme";
 
 const VISOES: Array<{ id: VisaoDaAgenda; rotulo: string }> = [
@@ -72,14 +73,16 @@ export function VitrineDaAgenda() {
         <div className="flex shrink-0 items-center gap-2">
           {/* O alternador existe para a prova: a spec troca o tema e remede as
               cores, porque uma paleta só está certa quando está certa nos dois. */}
-          <Button
-            variant="outline"
-            size="sm"
-            data-testid="alternar-tema"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          >
-            Tema: {theme === "dark" ? "escuro" : "claro"}
-          </Button>
+          {TEMA_ESCURO_HABILITADO && (
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="alternar-tema"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            >
+              Tema: {theme === "dark" ? "escuro" : "claro"}
+            </Button>
+          )}
         </div>
       </header>
 

@@ -58,6 +58,16 @@ import type { ThemeToggle as ThemeToggleType } from "@/components/theme/theme-to
 
 vi.mock("react-hotkeys-hook", () => ({ useHotkeys: () => {} }));
 
+// Este arquivo prova a mecânica de hidratação do tema — que só existe quando o
+// escuro está LIGADO. A decisão de produto de mantê-lo desligado por enquanto
+// (`lib/tema-escuro.ts`) é provada em `tests/unit/tema-escuro-desligado.test.tsx`;
+// aqui a chave é forçada para "ligado", para a mecânica seguir vigiada e a
+// prova não sumir junto com o botão.
+vi.mock("@/lib/tema-escuro", () => ({
+  TEMA_ESCURO_HABILITADO: true,
+  preferenciaPermitida: (pref: string) => pref,
+}));
+
 function stubMatchMedia(prefersDark: boolean) {
   window.matchMedia = vi.fn().mockImplementation((query: string) => ({
     matches: query.includes("dark") && prefersDark,
