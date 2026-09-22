@@ -40,6 +40,24 @@ O script recusa subir quando: o `.env` da VPS não aponta para `ghcr.io/nebosolu
 na VPS tem mudança local; ou a imagem no GHCR não é do commit que está na branch (o passo 2
 ainda não terminou). `--force` passa por cima do último.
 
+### Há uma janela sem atendimento, e ela é o tempo do baseline
+
+Antes de reaplicar o `baseline.sql` o script **para `app`, `worker` e `scheduler`**, e só o
+`up -d` do passo seguinte os traz de volta. Não é zelo: o apêndice do baseline refaz trigger e
+policy em `drop` + `create`, o `create` pede `ACCESS EXCLUSIVE`, e com os três atendendo esse
+lock disputa com o tráfego vivo. Em 22/09/2026 ele perdeu as **três** passadas de
+`reaplicar_baseline` (`deadlock detected`) e o deploy parou no meio — com `ai_reply_drafts`
+sem policy, porque o `drop` commitou e o `create` não.
+
+O WAHA fica de pé (reiniciá-lo é churn de sessão do WhatsApp), então o que chegar na janela
+depende da retentativa de webhook dele.
+
+Se qualquer passo falhar com os três parados — o baseline inclusive — o script os **religa com
+`docker compose start`** antes de sair, na imagem em que já estavam. Nunca com `up -d`: isso
+recriaria na imagem nova, que é justamente "app novo sobre banco pela metade", o que a recusa
+existe para impedir. Coberto por `tests/shell/deploy-nebo-para-quem-escreve.test.sh`
+(`pnpm test:shell`).
+
 **Não use `hostgator-setup-kit/update.sh`** neste fork: ele faz checkout da maior tag `v*` e
 grava no `.env` as imagens de `ghcr.io/melgarafael` — as do upstream, sem as customizações.
 

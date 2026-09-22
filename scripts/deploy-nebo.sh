@@ -17,6 +17,10 @@
 # Ciclo completo: push na `nebo-custom` → Actions › "Publicar imagem Docker
 # (GHCR)" › Run workflow → Actions › "Deploy na VPS (fork)" › Run workflow
 # (ou este script à mão por SSH).
+#
+# ⚠️ O deploy PARA `app`, `worker` e `scheduler` enquanto reaplica o baseline
+# (passo 4, e o porquê está lá). A janela sem atendimento deixa de ser os
+# segundos do `up -d` e passa a ser o tempo do baseline.
 
 BRANCH="${DEPLOY_BRANCH:-nebo-custom}"
 NS_DO_FORK="${DEPLOY_IMG_NS:-ghcr.io/nebosolucoes}"
@@ -86,7 +90,56 @@ else
   c_grn "✓ imagem do app corresponde ao código (${SHA_CODIGO:0:7})"
 fi
 
-# ── 4. Banco: reaplicar o baseline (idempotente; é o que o update.sh faz) ────
+# ── 4. Banco: parar quem escreve e reaplicar o baseline ──────────────────────
+# O baseline é idempotente (é o que o update.sh faz), mas ele NÃO é só `create
+# if not exists`: o apêndice refaz trigger e policy em `drop` + `create`, e o
+# `create` pede ACCESS EXCLUSIVE. Com o app, o worker e o scheduler atendendo,
+# esse lock disputa com o tráfego vivo — e perde. Medido nesta VPS em
+# 22/09/2026: as TRÊS passadas de `reaplicar_baseline` morreram em `deadlock
+# detected`, cada uma numa linha diferente (trigger de `crm_leads`, trigger de
+# `conversations`, policy de `ai_reply_drafts`), e o deploy parou aqui.
+#
+# E a disputa não deixa o banco como estava: sem ON_ERROR_STOP o psql roda em
+# autocommit, então o `drop policy` commitou e o `create` da linha seguinte deu
+# rollback — `ai_reply_drafts` ficou com RLS ligada e ZERO policy (falha
+# fechada: some da tela) até a próxima aplicação.
+#
+# A retentativa de `reaplicar_baseline` não cura isso porque ela só ESPERA.
+# Quem some com a disputa é parar quem escreve, e essa é a ordem de qualquer
+# deploy: derruba o app velho → migra o banco → sobe o app novo (passo 5, que
+# já faz `up -d` e recria na imagem nova).
+#
+# O WAHA fica DE PÉ de propósito: ele guarda a sessão do WhatsApp e reiniciá-lo
+# é churn de sessão. O preço é que o que chegar na janela depende da retentativa
+# de webhook dele — mesma exposição de qualquer deploy, só que mais longa.
+ESCRITORES_PARADOS=""
+religar_escritores() {
+  [ -n "$ESCRITORES_PARADOS" ] || return 0
+  ESCRITORES_PARADOS=""
+  c_ylw "• religando app, worker e scheduler para não deixar a instalação no chão"
+  # `start`, NUNCA `up -d`: o pull do passo 3 já trocou o que o .env aponta, e
+  # `up -d` aqui RECRIARIA os três na imagem NOVA — app novo sobre banco pela
+  # metade, exatamente o que a recusa lá embaixo existe para impedir. `start`
+  # religa o contêiner que já existe, na imagem em que ele foi criado.
+  if dc start app worker scheduler >/dev/null 2>&1; then
+    c_ylw "  ✓ de pé de novo, na imagem que já estava rodando"
+  else
+    c_red "  ✖ não consegui religar — rode à mão: docker compose $(dc_files) start app worker scheduler"
+  fi
+}
+# EXIT cobre o caminho normal e todo `die` (que é `exit 1`). Os sinais só
+# convertem em `exit` para que o EXIT rode uma vez: sem isso, um cancelamento do
+# workflow (o ssh morre, chega SIGHUP) deixaria a instalação parada no chão.
+trap religar_escritores EXIT
+trap 'exit 130' INT TERM HUP
+
+step "Parando quem escreve no banco (app, worker, scheduler)"
+# A marca vem ANTES do `stop`: se ele parar dois e falhar no terceiro, o trap
+# ainda tem de religar os dois.
+ESCRITORES_PARADOS=1
+dc stop app worker scheduler || die "Não consegui parar app/worker/scheduler."
+c_grn "✓ parados — o baseline aplica sem disputar lock com o tráfego"
+
 step "Atualizando o banco (baseline.sql)"
 docker run --rm postgres:17-alpine psql "$(url_do_schema)" -c \
   "create extension if not exists vector with schema public; create extension if not exists citext with schema public; create extension if not exists pg_trgm with schema public;" \
@@ -103,6 +156,9 @@ fi
 step "Subindo os contêineres"
 garantir_rede_do_proxy
 dc up -d
+# Os três voltaram, e na imagem NOVA — o trap não tem mais o que religar. Daqui
+# para baixo uma falha (saúde, 404 do proxy) é diagnóstico com o app no ar.
+ESCRITORES_PARADOS=""
 # Caddyfile entra por bind mount de arquivo (preso ao inode): sem recriar, uma
 # mudança de proxy que veio no git pull não vale. Com proxy externo não há Caddy.
 case "${REVERSE_PROXY:-caddy}" in
