@@ -30,6 +30,8 @@ source "$RAIZ/hostgator-setup-kit/_common.sh"
 cd "$RAIZ"
 enter_project
 
+# Guardados para o reexec do passo 1 (o `while` abaixo consome "$@").
+ARGS_ORIGINAIS=("$@")
 SKIP_BACKUP=""; FORCE=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -62,8 +64,28 @@ git fetch --quiet origin "$BRANCH" || die "Não consegui falar com o GitHub."
 atual="$(git rev-parse --abbrev-ref HEAD)"
 [ "$atual" = "$BRANCH" ] || die "Este clone está em '$atual', não em '$BRANCH'. Rode: git checkout $BRANCH"
 [ -z "$(git status --porcelain)" ] || die "Há mudanças locais neste clone. O deploy só entra em árvore limpa (git status)."
+SHA_ANTES="$(git rev-parse HEAD)"
 git merge --ff-only --quiet "origin/$BRANCH" || die "A branch local divergiu de origin/$BRANCH — resolva à mão."
 SHA_CODIGO="$(git rev-parse HEAD)"
+
+# O merge acabou de poder reescrever ESTE arquivo — e o bash lê o script do disco
+# conforme executa, por OFFSET DE BYTE, nao de uma vez. Trocar o arquivo debaixo
+# dele faz a leitura seguinte cair no meio de outra linha e executar pedaco de
+# comando, com os conteineres possivelmente ja parados. O mesmo vale para o
+# `_common.sh`: ele foi lido ANTES do merge, entao as funcoes em memoria ainda
+# sao as velhas. A cura e recomecar uma vez, ja na versao nova; a variavel de
+# ambiente impede laco, e ela e a unica condicao que nao depende do git.
+precisa_reexecutar() {
+  [ "$SHA_CODIGO" != "$SHA_ANTES" ] || return 1
+  [ "${DEPLOY_NEBO_REEXEC:-}" != "1" ] || return 1
+  git diff --quiet "$SHA_ANTES" "$SHA_CODIGO" -- scripts/deploy-nebo.sh hostgator-setup-kit && return 1
+  return 0
+}
+if precisa_reexecutar; then
+  c_ylw "• o deploy se atualizou (script ou kit mudaram neste merge) — recomecando na versao nova"
+  export DEPLOY_NEBO_REEXEC=1
+  exec bash "$RAIZ/scripts/deploy-nebo.sh" ${ARGS_ORIGINAIS[@]+"${ARGS_ORIGINAIS[@]}"}
+fi
 c_grn "✓ código em ${SHA_CODIGO:0:7} ($(git log -1 --format=%s | cut -c1-70))"
 
 # ── 2. Backup antes de tocar no banco ────────────────────────────────────────

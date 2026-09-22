@@ -58,6 +58,22 @@ recriaria na imagem nova, que é justamente "app novo sobre banco pela metade", 
 existe para impedir. Coberto por `tests/shell/deploy-nebo-para-quem-escreve.test.sh`
 (`pnpm test:shell`).
 
+### O deploy se atualiza sozinho antes de rodar
+
+O passo 1 do script faz `git merge` — e isso reescreve o arquivo que o bash está
+executando. O bash lê script do disco por **offset de byte**, conforme executa: trocar o
+arquivo debaixo dele faz a leitura seguinte cair no meio de outra linha e rodar pedaço de
+comando, possivelmente com os contêineres já parados. Nunca mordeu enquanto o script não
+mudava; o commit que o fez parar os escritores inseriu 58 linhas bem na região ainda não lida.
+
+Dois guardas, um para cada caminho:
+
+- **Pelo botão do Actions:** o workflow dá o `fetch`/`merge --ff-only` na VPS **antes** de
+  invocar o script, então o bash já abre a versão nova.
+- **Pelo `ssh` à mão:** o próprio script detecta que o merge mudou `scripts/deploy-nebo.sh`
+  ou `hostgator-setup-kit/` e **recomeça uma vez** (`exec`), preservando os argumentos.
+  `DEPLOY_NEBO_REEXEC=1` impede laço.
+
 **Não use `hostgator-setup-kit/update.sh`** neste fork: ele faz checkout da maior tag `v*` e
 grava no `.env` as imagens de `ghcr.io/melgarafael` — as do upstream, sem as customizações.
 

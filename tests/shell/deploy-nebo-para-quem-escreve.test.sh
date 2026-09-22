@@ -20,7 +20,11 @@
 #      e app novo sobre banco pela metade — o que a recusa existe para impedir;
 #   4. `stop` que falha no meio tambem religa (a marca e armada antes dele);
 #   5. depois do `up -d` o trap esta desarmado: falha de saude nao religa nada
-#      por cima do que ja subiu.
+#      por cima do que ja subiu;
+#   6. o merge do passo 1 pode reescrever ESTE script — o bash le do disco por
+#      offset de byte, entao seguir lendo executaria pedaco de linha. O script
+#      reexecuta uma vez, na versao nova, com os argumentos originais, e a
+#      variavel de ambiente impede laco.
 set -uo pipefail
 
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -138,6 +142,38 @@ rodar
 check "o deploy reprova (saida 1)"        test "$RC" -eq 1
 check "o up -d aconteceu"                 tem "docker-compose.prod.yml up -d"
 check "o trap ja estava desarmado"        nao_tem "start app worker scheduler"
+
+printf '\n6. Merge que reescreve o proprio script: reexecuta na versao nova\n'
+# origin de verdade, separado, para poder ficar A FRENTE do clone.
+ORIGEM="$WORK/origem.git"
+git init -q --bare "$ORIGEM"
+git -C "$PROJ" remote set-url origin "$ORIGEM"
+git -C "$PROJ" push -q origin nebo-custom
+C1="$(git -C "$PROJ" rev-parse HEAD)"
+# C2 troca o script por um que so grava o marcador: o que esta sob prova e QUEM
+# roda depois do merge, nao o que ele faz.
+cat > "$PROJ/scripts/deploy-nebo.sh" <<'NOVA'
+#!/usr/bin/env bash
+printf 'VERSAO NOVA args=[%s] reexec=[%s]\n' "$*" "${DEPLOY_NEBO_REEXEC:-}" >> "$MARCADOR"
+exit 7
+NOVA
+git -C "$PROJ" -c user.email=t@t -c user.name=t commit -q -am "C2: troca o script"
+git -C "$PROJ" push -q origin nebo-custom
+git -C "$PROJ" reset -q --hard "$C1"          # clone volta a C1, origin fica em C2
+git -C "$PROJ" fetch -q origin nebo-custom
+
+novo_caso reexec
+MARCADOR="$WORK/marcador.txt"; : > "$MARCADOR"
+PATH="$WORK/bin:$PATH" DOCKER_LOG="$WORK/docker.log" ROTEIRO="$ROTEIRO" MARCADOR="$MARCADOR" \
+  bash "$PROJ/scripts/deploy-nebo.sh" --skip-backup > "$WORK/tela.log" 2>&1
+RC=$?
+
+check "saiu com o codigo da versao NOVA (7), nao da velha" test "$RC" -eq 7
+check "a versao nova rodou"          grep -q "VERSAO NOVA" "$MARCADOR"
+check "os argumentos sobreviveram"   grep -q "args=.--skip-backup." "$MARCADOR"
+check "o guard de laco foi marcado"  grep -q "reexec=.1." "$MARCADOR"
+check "reexecutou UMA vez, sem laco" test "$(grep -c 'VERSAO NOVA' "$MARCADOR")" -eq 1
+check "nao parou ninguem antes de reexecutar" nao_tem "stop app worker scheduler"
 
 printf '\n'
 if [ "$FAILS" -eq 0 ]; then printf '✓ tudo passou\n'; else printf '✗ %s falha(s)\n' "$FAILS"; fi

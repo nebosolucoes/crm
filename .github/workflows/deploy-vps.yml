@@ -76,7 +76,27 @@ jobs:
           flags=""
           [ "$SKIP_BACKUP" = "true" ] && flags="$flags --skip-backup"
           [ "$FORCE" = "true" ]       && flags="$flags --force"
+          # O clone da VPS e atualizado ANTES de invocar o script, e nao e
+          # zelo: o passo 1 do proprio script faz `git merge`, que reescreve
+          # o arquivo que o bash esta executando. O bash le script do disco
+          # por OFFSET DE BYTE, conforme executa — trocar o arquivo debaixo
+          # dele faz a leitura seguinte cair no meio de outra linha e rodar
+          # pedaco de comando, possivelmente com os conteineres ja parados.
+          #
+          # Ate 22/09/2026 isso nunca mordeu porque o script nao mudava; o
+          # commit que o fez parar os conteineres antes do baseline inseriu
+          # 58 linhas no meio dele, bem na regiao ainda nao lida. Aqui o
+          # merge acontece antes do primeiro byte ser lido, entao o bash ja
+          # abre a versao nova; o script refaz o merge (vira no-op) e mantem
+          # as recusas dele — arvore suja, branch errada, divergencia.
+          #
+          # `|| true` porque a falha nao e nossa de diagnosticar: se o merge
+          # nao passa, o merge DENTRO do script tambem nao passa, e ele morre
+          # com a mensagem boa em vez desta linha crua.
+          #
+          # Quem roda o script a mao por ssh nao passa por aqui — esse caminho
+          # e coberto pelo reexec do passo 1 do script.
           # A pasta e a branch vão como argumentos citados; o resto é fixo.
           ssh -i ~/.ssh/vps -p "${VPS_PORT:-22}" -o BatchMode=yes -o ConnectTimeout=15 \
             "${VPS_USER}@${VPS_HOST}" \
-            "cd $(printf '%q' "$PASTA") && DEPLOY_BRANCH=$(printf '%q' "$BRANCH") bash scripts/deploy-nebo.sh $flags"
+            "set -e; cd $(printf '%q' "$PASTA"); { git fetch --quiet origin $(printf '%q' "$BRANCH") && git merge --ff-only --quiet origin/$(printf '%q' "$BRANCH"); } || true; DEPLOY_BRANCH=$(printf '%q' "$BRANCH") bash scripts/deploy-nebo.sh $flags"
