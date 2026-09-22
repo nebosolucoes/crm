@@ -2694,6 +2694,12 @@ export const DICIONARIO: Traducoes = {
   "A IA parou porque o gasto do mês atingiu o limite que você definiu. Ajuste o limite (ou desligue a parada) em Uso de IA › Orçamento.": {
     es: "La IA se detuvo porque el gasto del mes llegó al límite que definiste. Ajusta el límite (o apaga la parada) en Uso de IA › Presupuesto.",
   },
+  "O provedor barrou o pedido pelo filtro de segurança dele e não gerou nada (0 tokens). Não é chave nem rede: revise o prompt e os materiais do agente, ou troque de modelo nesse ponto.": {
+    es: "El proveedor bloqueó el pedido por su filtro de seguridad y no generó nada (0 tokens). No es clave ni red: revisa el prompt y los materiales del agente, o cambia de modelo en ese punto.",
+  },
+  "O provedor respondeu, mas num formato que esta versão do sistema não reconheceu — costuma ser modelo mais novo que o SDK, ou um proxy no caminho devolvendo HTML. O resumo da resposta está abaixo; se persistir, troque de modelo nesse ponto.": {
+    es: "El proveedor respondió, pero en un formato que esta versión del sistema no reconoció — suele ser un modelo más nuevo que el SDK, o un proxy en el camino devolviendo HTML. El resumen de la respuesta está abajo; si persiste, cambia de modelo en ese punto.",
+  },
   "Não conseguimos classificar esta falha. A mensagem original do provedor está abaixo.": {
     es: "No pudimos clasificar esta falla. El mensaje original del proveedor está abajo.",
   },

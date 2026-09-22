@@ -45,6 +45,10 @@ const O_QUE_FAZER: Record<string, string> = {
   // caso em que o silêncio é intencional.
   orcamento_esgotado:
     "A IA parou porque o gasto do mês atingiu o limite que você definiu. Ajuste o limite (ou desligue a parada) em Uso de IA › Orçamento.",
+  bloqueado_pelo_provedor:
+    "O provedor barrou o pedido pelo filtro de segurança dele e não gerou nada (0 tokens). Não é chave nem rede: revise o prompt e os materiais do agente, ou troque de modelo nesse ponto.",
+  resposta_invalida:
+    "O provedor respondeu, mas num formato que esta versão do sistema não reconheceu — costuma ser modelo mais novo que o SDK, ou um proxy no caminho devolvendo HTML. O resumo da resposta está abaixo; se persistir, troque de modelo nesse ponto.",
   erro_desconhecido:
     "Não conseguimos classificar esta falha. A mensagem original do provedor está abaixo.",
 };

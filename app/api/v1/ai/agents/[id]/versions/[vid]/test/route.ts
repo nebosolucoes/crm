@@ -61,6 +61,10 @@ function orientarFalhaDoTeste(codigo: string, t: (texto: string) => string): str
       "Este modelo não oferece as ferramentas necessárias ao agente. Escolha um modelo compatível com tools.",
     orcamento_esgotado:
       "O orçamento de IA da organização foi atingido. Ajuste o orçamento em Uso de IA e tente novamente.",
+    bloqueado_pelo_provedor:
+      "O provedor barrou o pedido pelo filtro de segurança dele e não gerou resposta. Revise o prompt e os materiais do agente, ou escolha outro modelo.",
+    resposta_invalida:
+      "O provedor respondeu num formato que o sistema não reconheceu (modelo mais novo que o SDK, ou proxy no caminho). Veja o detalhe da execução; se persistir, escolha outro modelo.",
   };
 
   return t(

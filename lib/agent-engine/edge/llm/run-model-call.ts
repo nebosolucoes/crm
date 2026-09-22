@@ -16,7 +16,7 @@ import { guardServiceTools } from "@/lib/atendimento/fronteira-server";
  * cacheWriteTokens}. Validado no ai@7 via scripts/smoke-llm.sh (modelo real) —
  * upgrade de major re-valida esses paths pelo mesmo gate (regra dura 16).
  */
-import { generateText, stepCountIs, type ModelMessage, type ToolSet } from 'ai';
+import { APICallError, generateText, stepCountIs, type ModelMessage, type ToolSet } from 'ai';
 import type pg from 'pg';
 import { z } from 'zod';
 
@@ -580,6 +580,14 @@ export function normalizarErro(err: unknown): {
     return { error_code: 'orcamento_esgotado', error_message: redigirMensagemDoProvedor(bruto), http_status: null };
   }
 
+  // Resposta 2xx cujo corpo o SDK não reconheceu. A mensagem do SDK é sempre a
+  // mesma ("Invalid JSON response") e o motivo real fica em `responseBody` e
+  // `cause` — campos que o `err.message` acima descarta. Sem este ramo a tela
+  // mostrava "erro_desconhecido" para o caso em que o provedor MAIS explicou.
+  if (APICallError.isInstance(err) && /invalid json response/i.test(bruto)) {
+    return classificarCorpoIrreconhecivel(err);
+  }
+
   let codigo = 'erro_desconhecido';
   if (status === 401 || status === 403 || /unauthor|invalid.*api.?key|authentication|incorrect api key/i.test(bruto)) {
     codigo = 'credencial_recusada';
@@ -611,6 +619,98 @@ export function normalizarErro(err: unknown): {
 }
 
 /**
+ * Dá nome ao "Invalid JSON response": o provedor respondeu 2xx e o SDK recusou
+ * o corpo. Medido com Gemini 3.5 Flash Lite em 2026-09-21: 7,4 s, 0 tokens, e a
+ * tela dizia só a frase do SDK.
+ *
+ * Dois baldes, porque exigem conversas diferentes com quem opera:
+ * - `bloqueado_pelo_provedor` — o Gemini barrou o PEDIDO pelo filtro de
+ *   segurança dele: a resposta traz `promptFeedback.blockReason` e NENHUM
+ *   `candidates`, e o schema do `@ai-sdk/google` exige `candidates`. Não é
+ *   defeito de rede nem de chave; é o conteúdo do prompt/materiais.
+ * - `resposta_invalida` — o corpo não é JSON (proxy devolvendo HTML com 200,
+ *   corpo truncado) ou é um JSON que a versão instalada do SDK não conhece
+ *   (modelo mais novo que o provider). A mensagem carrega o início do corpo ou
+ *   a razão do validador, redigidos, para a tela não exigir acesso ao servidor.
+ */
+function classificarCorpoIrreconhecivel(err: APICallError): {
+  error_code: string;
+  error_message: string;
+  http_status: number | null;
+} {
+  const http_status = typeof err.statusCode === 'number' ? err.statusCode : null;
+  const corpo = typeof err.responseBody === 'string' ? err.responseBody : '';
+  let json: unknown = null;
+  try {
+    json = corpo.trim() === '' ? null : JSON.parse(corpo);
+  } catch {
+    json = null;
+  }
+
+  if (json !== null && typeof json === 'object') {
+    const obj = json as {
+      promptFeedback?: { blockReason?: unknown };
+      candidates?: unknown;
+      error?: { message?: unknown; code?: unknown; status?: unknown };
+    };
+    const motivo = obj.promptFeedback?.blockReason;
+    const semCandidatos = !Array.isArray(obj.candidates) || obj.candidates.length === 0;
+    if (typeof motivo === 'string' && semCandidatos) {
+      return {
+        error_code: 'bloqueado_pelo_provedor',
+        error_message: redigirMensagemDoProvedor(
+          `O provedor bloqueou o pedido pelo filtro de segurança dele antes de gerar qualquer resposta (blockReason: ${motivo}).`,
+        ),
+        http_status,
+      };
+    }
+    // Gateway que embrulha um erro num 200: o texto dele vale mais que o nosso.
+    if (obj.error && typeof obj.error.message === 'string') {
+      const detalhe = [obj.error.status, obj.error.code].filter((x) => x != null).join(' ');
+      return {
+        error_code: 'resposta_invalida',
+        error_message: redigirMensagemDoProvedor(
+          `O provedor respondeu HTTP ${http_status ?? '?'} com um erro no corpo${detalhe ? ` (${detalhe})` : ''}: ${obj.error.message}`,
+        ),
+        http_status,
+      };
+    }
+    const chaves = Object.keys(obj).slice(0, 8).join(', ') || '(objeto vazio)';
+    return {
+      error_code: 'resposta_invalida',
+      error_message: redigirMensagemDoProvedor(
+        `O provedor respondeu HTTP ${http_status ?? '?'} com um JSON que esta versão do SDK não reconheceu (chaves: ${chaves}). ${razaoDoValidador(err.cause)}`,
+      ),
+      http_status,
+    };
+  }
+
+  const inicio = corpo.trim().replace(/\s+/g, ' ').slice(0, 160);
+  return {
+    error_code: 'resposta_invalida',
+    error_message: redigirMensagemDoProvedor(
+      inicio === ''
+        ? `O provedor respondeu HTTP ${http_status ?? '?'} com o corpo vazio.`
+        : `O provedor respondeu HTTP ${http_status ?? '?'} com um corpo que não é JSON (início: "${inicio}").`,
+    ),
+    http_status,
+  };
+}
+
+/**
+ * A parte útil do `TypeValidationError`: a mensagem dele é
+ * "Type validation failed: Value: <corpo inteiro>. Error message: <razão>", e
+ * o corpo inteiro é o que já resumimos pelas chaves. Fica só a razão.
+ */
+function razaoDoValidador(causa: unknown): string {
+  const msg = causa instanceof Error ? causa.message : typeof causa === 'string' ? causa : '';
+  if (msg === '') return '';
+  const idx = msg.lastIndexOf('Error message:');
+  const razao = (idx >= 0 ? msg.slice(idx + 'Error message:'.length) : msg).trim();
+  return razao === '' ? '' : `Motivo do validador: ${razao.slice(0, 240)}`;
+}
+
+/**
  * Tira da mensagem do provedor o que não pode aparecer numa tela: segredo e
  * dado do titular. Trunca DEPOIS de redigir — cortar antes deixaria meia chave
  * passar, e meia chave ainda identifica de quem ela é.
@@ -622,12 +722,12 @@ export function redigirMensagemDoProvedor(bruto: string): string {
   const semSegredo = bruto
     // Chaves de API dos provedores que este produto fala: `sk-ant-…`,
     // `sk-or-v1-…`, `sk-proj-…`, `sk-…`, e as do Google (`AIza…`).
-    .replace(/sk-[A-Za-z0-9_-]{8,}/g, '[CHAVE]')
-    .replace(/AIza[A-Za-z0-9_-]{10,}/g, '[CHAVE]')
+    .replace(/\bsk-[A-Za-z0-9_-]{8,}/g, '[CHAVE]')
+    .replace(/\bAIza[A-Za-z0-9_-]{10,}/g, '[CHAVE]')
     // O header inteiro, em qualquer caixa, com ou sem `Authorization:` na
     // frente — é assim que ele costuma aparecer ecoado num corpo de erro.
-    .replace(/[Bb]earer\s+[A-Za-z0-9._-]{8,}/g, 'Bearer [CHAVE]')
-    .replace(/(x-api-key|api[-_]?key|authorization)\s*[:=]\s*\S+/gi, '$1: [CHAVE]');
+    .replace(/\b[Bb]earer\s+[A-Za-z0-9._-]{8,}/g, 'Bearer [CHAVE]')
+    .replace(/\b(x-api-key|api[-_]?key|authorization)\b\s*[:=]\s*\S+/gi, '$1: [CHAVE]');
   return scrubMessage(semSegredo).slice(0, 500);
 }
 
