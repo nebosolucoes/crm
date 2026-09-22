@@ -14,6 +14,10 @@ name: Deploy na VPS (fork)
 #   VPS_USER      usuário do SSH (o mesmo que instalou o CRM)
 #   VPS_SSH_KEY   chave PRIVADA (ed25519) cuja pública está no authorized_keys da VPS
 #   VPS_PORT      (opcional) porta do SSH, default 22
+#
+# Registro: o GitHub só lista um workflow depois de um push que TOQUE o arquivo
+# na branch padrão. Este ficou invisível na aba Actions após o push inicial do
+# fork (2026-09-21); esta linha existe para o push que o registrou.
 
 on:
   workflow_dispatch:
