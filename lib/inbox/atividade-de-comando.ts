@@ -43,7 +43,8 @@ export type AtividadeDeComando =
   | "conversation_claimed"
   | "conversation_transferred"
   | "conversation_released"
-  | "conversation_ai_paused";
+  | "conversation_ai_paused"
+  | "conversation_sector_transferred";
 
 interface Entrada {
   /**

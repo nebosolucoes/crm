@@ -101,6 +101,8 @@ export type ActivityType =
   | "conversation_transferred"
   | "conversation_released"
   | "conversation_ai_paused"
+  /** Transferência para um SETOR (spec 20): a conversa fica sem dono na fila do setor. */
+  | "conversation_sector_transferred"
   /**
    * Chamada de voz WhatsApp (WaCalls, spec 18) encerrada — gravada na timeline
    * junto com mensagens/notas. Emitida pela ponte de eventos do worker
@@ -256,6 +258,7 @@ export const ACTIVITY_LABELS: Record<ActivityType, string> = {
   // arquivos e o controle NEGATIVO de `handoff-por-orcamento.test.ts` usa
   // literalmente "Voltar para a IA" como a sabotagem que deve reprovar.
   conversation_ai_paused: "Pausou o automático",
+  conversation_sector_transferred: "Transferiu a conversa para um setor",
   voice_call: "Chamada de voz",
   voice_call_missed: "Chamada de voz perdida",
   voice_call_unanswered: "Chamada de voz sem resposta",

@@ -60,6 +60,8 @@ export const RECURSO_POR_ROTA: ReadonlyArray<readonly [prefixo: string, recurso:
   ["agenda", "inbox"],
   ["conversation-tags", "inbox"],
   ["voice", "inbox"],
+  // Setores de atendimento (spec 20): parte do módulo de atendimento.
+  ["sectors", "inbox"],
 
   // ── Do produto: Canais e Organização ──
   ["channel-sessions", null],

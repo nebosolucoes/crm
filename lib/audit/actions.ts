@@ -96,6 +96,12 @@ export const AUDIT_ACTIONS = [
   "conversation.created",
   "conversation.claimed",
   "conversation.transferred",
+  // Transferência para um SETOR (spec 20 §3.4): sem dono, roteamento reaberto.
+  "conversation.sector_transferred",
+  "sector.created",
+  "sector.updated",
+  "sector.deleted",
+  "sector.members_changed",
   "conversation.released",
   "conversation.closed",
   // O arquivamento é terminal como o fechamento, e o evento é separado de

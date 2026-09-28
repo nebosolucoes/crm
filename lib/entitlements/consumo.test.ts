@@ -33,10 +33,10 @@ beforeEach(() => {
 });
 
 describe("consumoDaOrg", () => {
-  it("mede as cinco chaves, sempre filtrando organization_id, e marca excedido só com teto", async () => {
+  it("mede as seis chaves, sempre filtrando organization_id, e marca excedido só com teto", async () => {
     const filtros: Record<string, unknown[]> = {};
     const a = admin(
-      { channel_sessions: 2, user_organizations: 3, team_invites: 1, ai_agents: 1, scheduled_group_message_runs: 40, contacts: 500 },
+      { channel_sessions: 2, user_organizations: 3, team_invites: 1, ai_agents: 1, scheduled_group_message_runs: 40, contacts: 500, sectors: 2 },
       (tabela, ops) => {
         filtros[tabela] = ops.filter(([m]) => m === "eq").map(([, a]) => a);
       },
@@ -48,6 +48,7 @@ describe("consumoDaOrg", () => {
     expect(por.max_ai_agents).toMatchObject({ teto: undefined, uso: 1, excedido: false });
     expect(por.broadcast_monthly_sends).toMatchObject({ teto: undefined, uso: 40, enforced: false });
     expect(por.max_contacts).toMatchObject({ teto: undefined, uso: 500, enforced: false });
+    expect(por.max_sectors).toMatchObject({ teto: undefined, uso: 2, enforced: true });
     for (const tabela of Object.keys(filtros)) {
       expect(filtros[tabela], `${tabela} sem filtro de organization_id`).toEqual(expect.arrayContaining([["organization_id", ORG]]));
     }

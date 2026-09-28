@@ -115,6 +115,8 @@ export const agentPatchSchema = z
     system_prompt: z.string().min(20).max(10000).optional(),
     config: agentConfigSchema.partial().optional(),
     guardrails: guardrailsSchema.optional(),
+    /** Setor de entrega (spec 20): para onde o handoff deste agente manda a conversa. `null` desliga. */
+    sector_id: z.string().uuid().nullable().optional(),
   })
   .strict();
 export type AgentPatch = z.infer<typeof agentPatchSchema>;

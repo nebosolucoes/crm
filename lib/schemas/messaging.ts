@@ -127,10 +127,20 @@ export const claimConversationSchema = z.object({
 export type ClaimConversationInput = z.infer<typeof claimConversationSchema>;
 
 /** G3-01: transferência imediata (decisão G1-06d) — reatribui com motivo opcional. */
-export const transferConversationSchema = z.object({
-  to_user_id: z.string().uuid(),
-  reason: z.string().trim().min(1).max(500).optional(),
-});
+/**
+ * Transferir para uma PESSOA (`to_user_id`) ou para um SETOR (`to_sector_id`),
+ * nunca os dois (spec 20 §3.4). Uma rota, um diálogo na tela.
+ */
+export const transferConversationSchema = z
+  .object({
+    to_user_id: z.string().uuid().optional(),
+    to_sector_id: z.string().uuid().optional(),
+    reason: z.string().trim().min(1).max(500).optional(),
+  })
+  .refine((d) => (d.to_user_id === undefined) !== (d.to_sector_id === undefined), {
+    message: "Informe to_user_id OU to_sector_id.",
+    path: ["to_user_id"],
+  });
 
 export type TransferConversationInput = z.infer<typeof transferConversationSchema>;
 

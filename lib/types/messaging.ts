@@ -25,6 +25,11 @@ export interface Conversation {
   assigned_to_user_name: string | null;
   assignee_kind: string | null;
   assigned_at: string | null;
+  /** Setor da conversa (migration 0278, spec 20). `null` = sem setor. Opcional porque fixtures antigas não o trazem. */
+  sector_id?: string | null;
+  /** Passagem de bastão (spec 20 §2.4): quem transferiu e ainda vê/responde até o novo dono responder. */
+  handover_from_user_id?: string | null;
+  handover_started_at?: string | null;
   last_inbound_at: string | null;
   last_outbound_at: string | null;
   last_message_at: string | null;

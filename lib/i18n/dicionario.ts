@@ -9471,6 +9471,18 @@ export const DICIONARIO: Traducoes = {
   "Limite mensal": { es: "Límite mensual" },
   "O custo da IA para tudo isto acontecer.": { es: "El costo de la IA para que todo esto ocurra." },
   "Escolha o que acontece quando o gasto do mês chega no limite. Os valores são em real, pela cotação definida por quem administra a instalação.": { es: "Elige qué pasa cuando el gasto del mes llega al límite. Los valores son en reales, según la cotización definida por quien administra la instalación." },
+  // ── Setores de atendimento (spec 20) ──
+  "Setor não encontrado.": { es: "Sector no encontrado." },
+  "Setor não encontrado ou inativo.": { es: "Sector no encontrado o inactivo." },
+  "Já existe um setor com este identificador.": { es: "Ya existe un sector con este identificador." },
+  "O nome precisa ter ao menos uma letra ou número.": { es: "El nombre debe tener al menos una letra o número." },
+  "Há conversas abertas neste setor. Transfira-as ou desative o setor em vez de excluir.": { es: "Hay conversaciones abiertas en este sector. Transfiérelas o desactiva el sector en lugar de eliminarlo." },
+  "Só atendentes ativos desta organização podem entrar num setor.": { es: "Solo agentes activos de esta organización pueden entrar en un sector." },
+  "Informe a pessoa ou o setor de destino.": { es: "Indica la persona o el sector de destino." },
+  "Você só pode transferir para pessoas dos seus setores.": { es: "Solo puedes transferir a personas de tus sectores." },
+  "Você não tem acesso a esta conversa.": { es: "No tienes acceso a esta conversación." },
+  "Esta conversa já foi encerrada.": { es: "Esta conversación ya fue cerrada." },
+  "Transferiu a conversa para um setor": { es: "Transfirió la conversación a un sector" },
 };
 
 /**

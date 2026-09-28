@@ -24,7 +24,7 @@ import {
 export const dynamic = "force-dynamic";
 
 const AGENT_COLUMNS =
-  "id, organization_id, name, description, model, system_prompt, is_active, is_default, kind, priority, published_version_id, paused_at, operation_mode, operation_revision, archived_at, config, guardrails, active_kb_version_id, created_at, updated_at";
+  "id, organization_id, name, description, model, system_prompt, is_active, is_default, kind, priority, published_version_id, paused_at, operation_mode, operation_revision, archived_at, config, guardrails, active_kb_version_id, sector_id, created_at, updated_at";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -177,6 +177,22 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
   if (patch.model !== undefined) update.model = patch.model;
   if (patch.system_prompt !== undefined) update.system_prompt = patch.system_prompt;
   if (patch.guardrails !== undefined) update.guardrails = patch.guardrails;
+  if (patch.sector_id !== undefined) {
+    // Setor de entrega (spec 20): tem que ser um setor ATIVO desta organização.
+    // A FK composta recusaria outro tenant, mas com 23503 mudo; aqui é 422 nomeado.
+    if (patch.sector_id !== null) {
+      const { data: setor, error: setorErr } = await admin
+        .from("sectors")
+        .select("id")
+        .eq("organization_id", activeOrg.orgId)
+        .eq("id", patch.sector_id)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (setorErr) return fail("internal_error", setorErr.message, 500, { requestId });
+      if (!setor) return fail("unprocessable_entity", t("Setor não encontrado ou inativo."), 422, { requestId });
+    }
+    update.sector_id = patch.sector_id;
+  }
 
   if (priorityPatch !== null) update.priority = priorityPatch;
 

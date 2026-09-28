@@ -38,6 +38,7 @@ export const CHAVES_DE_LIMITE = [
   "max_ai_agents",
   "broadcast_monthly_sends",
   "max_contacts",
+  "max_sectors",
 ] as const;
 export type ChaveDeLimite = (typeof CHAVES_DE_LIMITE)[number];
 
@@ -96,6 +97,15 @@ export const LIMITES: Record<ChaveDeLimite, LimiteMeta> = {
     descricao: "Quantos contatos a organização pode ter cadastrados.",
     unidade: "quantidade",
     enforced: false,
+  },
+  max_sectors: {
+    chave: "max_sectors",
+    recurso: "inbox",
+    rotulo: "Setores de atendimento",
+    descricao: "Quantos setores ativos (financeiro, comercial…) a organização pode ter. 0 = plano sem setores.",
+    unidade: "quantidade",
+    // Barra em POST /sectors (spec 20 §2.3).
+    enforced: true,
   },
 };
 

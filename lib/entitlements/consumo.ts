@@ -78,6 +78,9 @@ export const MEDIDORES: Record<ChaveDeLimite, (admin: SupabaseClient, orgId: str
     ),
   max_contacts: (admin, orgId) =>
     contar(admin, "contacts", (q) => q.eq("organization_id", orgId).eq("is_anonymized", false)),
+  // Só os ativos: desativar um setor devolve a vaga do plano.
+  max_sectors: (admin, orgId) =>
+    contar(admin, "sectors", (q) => q.eq("organization_id", orgId).eq("is_active", true)),
 };
 
 /** Todas as chaves, medidas em paralelo — para a aba Plano do admin e a tela de Billing. */
