@@ -885,6 +885,7 @@ export type Database = {
         Row: {
           operation_mode: string
           paused_at: string | null
+          sector_id: string | null
           operation_revision: number
           active_kb_version_id: string | null
           archived_at: string | null
@@ -908,6 +909,7 @@ export type Database = {
         Insert: {
           operation_mode?: string
           paused_at?: string | null
+          sector_id?: string | null
           operation_revision?: number
           active_kb_version_id?: string | null
           archived_at?: string | null
@@ -931,6 +933,7 @@ export type Database = {
         Update: {
           operation_mode?: string
           paused_at?: string | null
+          sector_id?: string | null
           operation_revision?: number
           active_kb_version_id?: string | null
           archived_at?: string | null
@@ -952,6 +955,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "ai_agents_sector_fk"
+            columns: ["organization_id", "sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["organization_id", "id"]
+          },
           {
             foreignKeyName: "ai_agents_active_kb_version_id_fkey"
             columns: ["active_kb_version_id"]
@@ -3322,6 +3332,8 @@ export type Database = {
           conversation_id: string
           created_at: string
           from_user_id: string | null
+          from_sector_id: string | null
+          to_sector_id: string | null
           id: string
           organization_id: string
           reason: string
@@ -3332,6 +3344,8 @@ export type Database = {
           conversation_id: string
           created_at?: string
           from_user_id?: string | null
+          from_sector_id?: string | null
+          to_sector_id?: string | null
           id?: string
           organization_id: string
           reason: string
@@ -3342,12 +3356,28 @@ export type Database = {
           conversation_id?: string
           created_at?: string
           from_user_id?: string | null
+          from_sector_id?: string | null
+          to_sector_id?: string | null
           id?: string
           organization_id?: string
           reason?: string
           to_user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "cae_from_sector_fk"
+            columns: ["from_sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cae_to_sector_fk"
+            columns: ["to_sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "conversation_assignment_events_conversation_id_fkey"
             columns: ["conversation_id"]
@@ -3419,6 +3449,9 @@ export type Database = {
           assigned_to_user_id: string | null
           assigned_to_user_name: string | null
           assignee_kind: string | null
+          handover_from_user_id: string | null
+          handover_started_at: string | null
+          sector_id: string | null
           bot_silenced_until: string | null
           channel: string
           channel_session_id: string
@@ -3462,6 +3495,9 @@ export type Database = {
           assigned_to_user_id?: string | null
           assigned_to_user_name?: string | null
           assignee_kind?: string | null
+          handover_from_user_id?: string | null
+          handover_started_at?: string | null
+          sector_id?: string | null
           bot_silenced_until?: string | null
           channel?: string
           channel_session_id: string
@@ -3505,6 +3541,9 @@ export type Database = {
           assigned_to_user_id?: string | null
           assigned_to_user_name?: string | null
           assignee_kind?: string | null
+          handover_from_user_id?: string | null
+          handover_started_at?: string | null
+          sector_id?: string | null
           bot_silenced_until?: string | null
           channel?: string
           channel_session_id?: string
@@ -3540,6 +3579,13 @@ export type Database = {
           usable_for_rag_marked_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "conversations_sector_fk"
+            columns: ["organization_id", "sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["organization_id", "id"]
+          },
           {
             foreignKeyName: "conversations_active_ai_agent_id_fkey"
             columns: ["active_ai_agent_id"]
@@ -7182,6 +7228,96 @@ export type Database = {
           },
         ]
       }
+      sector_members: {
+        Row: {
+          created_at: string
+          organization_id: string
+          sector_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          organization_id: string
+          sector_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          organization_id?: string
+          sector_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sector_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sector_members_organization_id_sector_id_fkey"
+            columns: ["organization_id", "sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "sector_members_organization_id_user_id_fkey"
+            columns: ["organization_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "user_organizations"
+            referencedColumns: ["organization_id", "user_id"]
+          },
+        ]
+      }
+      sectors: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string
+          id: string
+          is_active: boolean
+          name: string
+          organization_id: string
+          scope: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          organization_id: string
+          scope?: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          organization_id?: string
+          scope?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sectors_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       send_ledger: {
         Row: {
           body_hash: string
@@ -8461,7 +8597,14 @@ export type Database = {
         }[]
       }
       fn_can_view_conversation: {
-        Args: { p_assigned_to_user_id: string; p_org: string }
+        Args:
+          | { p_assigned_to_user_id: string; p_org: string }
+          | {
+              p_assigned_to_user_id: string
+              p_handover_from_user_id: string
+              p_org: string
+              p_sector_id: string
+            }
         Returns: boolean
       }
       fn_can_view_lead: {
@@ -8517,6 +8660,58 @@ export type Database = {
           p_organization_id: string
           p_reason: string
           p_to_user_id: string
+        }
+        Returns: {
+          active_agent_set_at: string | null
+          active_ai_agent_id: string | null
+          active_intent: string | null
+          assigned_at: string | null
+          assigned_to_user_id: string | null
+          assigned_to_user_name: string | null
+          assignee_kind: string | null
+          bot_silenced_until: string | null
+          channel: string
+          channel_session_id: string
+          contact_id: string
+          created_at: string
+          group_chat_id: string | null
+          id: string
+          is_group: boolean
+          last_handoff_at: string | null
+          last_handoff_reason: string | null
+          last_inbound_at: string | null
+          last_message_at: string | null
+          last_message_preview: string | null
+          last_outbound_at: string | null
+          metadata: Json
+          organization_id: string
+          provider_conversation_id: string | null
+          rag_review_status: string | null
+          snooze_until: string | null
+          snoozed_at: string | null
+          snoozed_by_user_id: string | null
+          status: string
+          status_changed_at: string
+          tags: string[]
+          unread_count_for_assignee: number
+          updated_at: string
+          usable_for_rag: boolean
+          usable_for_rag_marked_at: string | null
+          usable_for_rag_marked_by: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "conversations"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      fn_conversation_transfer_sector: {
+        Args: {
+          p_actor: string
+          p_conversation: string
+          p_org: string
+          p_to_sector: string
         }
         Returns: {
           active_agent_set_at: string | null
@@ -8720,6 +8915,17 @@ export type Database = {
       fn_upsert_wa_conversation: {
         Args: { p_contact: string; p_org: string; p_session: string }
         Returns: string
+      }
+      fn_user_can_view_conversation: {
+        Args: {
+          p_assigned_to_user_id: string
+          p_handover_from_user_id: string
+          p_org: string
+          p_role: string
+          p_sector_id: string
+          p_user: string
+        }
+        Returns: boolean
       }
       fn_user_org_ids: { Args: never; Returns: string[] }
       fn_user_role_in: { Args: { p_org: string }; Returns: number }

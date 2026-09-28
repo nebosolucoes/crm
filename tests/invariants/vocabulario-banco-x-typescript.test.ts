@@ -49,6 +49,24 @@ const PARES: Array<{
   simbolo: string;
 }> = [
   {
+    tabela: "sectors",
+    coluna: "scope",
+    // Setores de atendimento (0278). `own` vê só o próprio setor; `all` é o setor
+    // que vê tudo. A tela de Setores pinta o rótulo por valor (ROTULO_DO_ESCOPO).
+    arquivo: "lib/setores/vocabulario.ts",
+    simbolo: "SECTOR_SCOPES",
+  },
+  {
+    tabela: "conversation_assignment_events",
+    coluna: "reason",
+    // Nasce com o sexto motivo (`sector_transfer`, 0278). Até aqui o vocabulário
+    // vivia só no CHECK e cada emissor escrevia a string à mão — o par entra para
+    // que um motivo novo só no banco vire linha sem rótulo na linha do tempo, e
+    // só no TypeScript vire 23514 num INSERT dentro de uma RPC.
+    arquivo: "lib/routing/assignment-reasons.ts",
+    simbolo: "ASSIGNMENT_REASONS",
+  },
+  {
     tabela: "platform_settings",
     coluna: "ai_cost_currency",
     arquivo: "lib/ai/custo/moeda.ts",
