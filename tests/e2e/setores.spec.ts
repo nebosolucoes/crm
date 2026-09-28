@@ -93,7 +93,7 @@ test("setores: criar pela tela, ver só o seu, transferir para outro setor com p
     for (const [nome, descricao] of [
       ["Financeiro", "boletos, segunda via, reembolso"],
       ["Comercial", "orçamento, proposta, preço"],
-    ]) {
+    ] as const) {
       await pg.getByLabel("Nome", { exact: true }).first().fill(nome);
       await pg.getByLabel("Quando mandar para cá (a IA lê isto)").first().fill(descricao);
       await pg.getByRole("button", { name: "Criar setor" }).click();
@@ -127,7 +127,7 @@ test("setores: criar pela tela, ver só o seu, transferir para outro setor com p
       organization_id: org, contact_id: contatoCom, channel_session_id: canal, status: "claimed", sector_id: idCom,
       assigned_to_user_id: bruno.id, assigned_at: new Date().toISOString(), last_inbound_at: new Date().toISOString(),
     });
-    for (const [conv, contato, texto] of [[convFin, contatoFin, "quero a segunda via do boleto"], [convCom, contatoCom, "quanto custa o plano?"]]) {
+    for (const [conv, contato, texto] of [[convFin, contatoFin, "quero a segunda via do boleto"], [convCom, contatoCom, "quanto custa o plano?"]] as const) {
       await insert("messages", { organization_id: org, conversation_id: conv, channel_session_id: canal, contact_id: contato, type: "text", direction: "inbound", status: "received", body: texto });
     }
 
