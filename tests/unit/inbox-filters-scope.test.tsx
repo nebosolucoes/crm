@@ -80,11 +80,13 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("visibleInboxTabs (lógica pura de visões)", () => {
-  it("agent em own_and_unassigned NÃO vê 'all'", () => {
-    expect(visibleInboxTabs("agent", "own_and_unassigned")).not.toContain("all");
+  // Desde 28/09 "Todas" é a única porta para fechadas e arquivadas (as abas
+  // saíram), então ela aparece para TODO papel — a RLS é quem escopa.
+  it("agent em own_and_unassigned VÊ 'all' (é a porta para as que ele encerrou)", () => {
+    expect(visibleInboxTabs("agent", "own_and_unassigned")).toContain("all");
   });
-  it("agent em 'own' NÃO vê 'all'", () => {
-    expect(visibleInboxTabs("agent", "own")).not.toContain("all");
+  it("agent em 'own' VÊ 'all'", () => {
+    expect(visibleInboxTabs("agent", "own")).toContain("all");
   });
   it("agent em 'all' VÊ 'all'", () => {
     expect(visibleInboxTabs("agent", "all")).toContain("all");
@@ -105,12 +107,12 @@ describe("visibleInboxTabs (lógica pura de visões)", () => {
 });
 
 describe("InboxFilters render — 3 visões + escopo", () => {
-  it("agent em modo own*: mostra Minhas e Fila, esconde Todas", () => {
+  it("agent em modo own*: mostra Minhas, Fila e Todas", () => {
     setOrg("agent", "own_and_unassigned");
     render(<InboxFilters value={VALUE} onChange={() => {}} />);
     expect(screen.getByRole("tab", { name: /Minhas/ })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /Fila/ })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: /Todas/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Todas/ })).toBeInTheDocument();
   });
 
   it("manager: mostra Todas", () => {

@@ -37,13 +37,19 @@ const INBOX_TABS: { value: InboxTab; label: string }[] = [
 ];
 
 /**
- * Visões visíveis por papel + escopo (G4-02, acceptance 1). 'Todas' fica oculta
- * para `agent` quando visibility_mode ≠ 'all'; viewer/manager/admin sempre veem.
- * É apenas cosmético — a RLS (G4-01) é quem garante o escopo mesmo via ?filter=all.
+ * Visões visíveis por papel + escopo. Hoje são as MESMAS para todo papel: a RLS
+ * (G4-01) é quem garante o escopo, então "Todas" para um `agent` em modo own* é
+ * "tudo o que ele vê" — as dele, a fila, as do setor dele e as que ele encerrou.
+ *
+ * Até 28/09 a G4-02 ocultava "Todas" do `agent` fora do modo `all`, e isso era
+ * cosmético enquanto existiam as abas Fechadas e Arquivadas. Quando as duas
+ * viraram parte de "Todas" (a ordem pedida pelo dono: Minhas | Fila | Robô |
+ * Todas), esconder "Todas" deixava o atendente sem NENHUM caminho pela tela para
+ * uma conversa que ele mesmo encerrou — "Minhas" exclui fechadas de propósito.
+ * Os parâmetros ficam para a assinatura não mudar em quem chama.
  */
-export function visibleInboxTabs(role: Role, mode: VisibilityMode | undefined): InboxTab[] {
-  const hideAll = role === "agent" && mode !== "all";
-  return INBOX_TABS.filter((t) => !(t.value === "all" && hideAll)).map((t) => t.value);
+export function visibleInboxTabs(_role: Role, _mode: VisibilityMode | undefined): InboxTab[] {
+  return INBOX_TABS.map((t) => t.value);
 }
 
 export interface InboxFiltersValue {

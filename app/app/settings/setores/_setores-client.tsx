@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { showApiError } from "@/components/feedback/ApiErrorToast";
@@ -62,7 +63,19 @@ function rascunhoDe(s: SectorRow): Rascunho {
 export function SetoresClient({ initial }: { initial: Initial }) {
   const t = useT();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [setores, setSetores] = useState<SectorRow[]>(initial.setores);
+  /**
+   * Depois de cada escrita: o servidor re-renderiza esta tela (`router.refresh`)
+   * E o cache de `useSetores` (`["sectors"]`, staleTime 60 s) é invalidado —
+   * senão o filtro do inbox e o diálogo de transferir seguiam oferecendo por
+   * um minuto um setor recém-desativado (a rota responde 422) e não mostravam
+   * o recém-criado.
+   */
+  function refletir() {
+    void queryClient.invalidateQueries({ queryKey: ["sectors"] });
+    router.refresh();
+  }
   const [rascunhos, setRascunhos] = useState<Record<string, Rascunho>>(
     Object.fromEntries(initial.setores.map((s) => [s.id, rascunhoDe(s)])),
   );
@@ -91,7 +104,7 @@ export function SetoresClient({ initial }: { initial: Initial }) {
       setMembrosPorSetor((m) => ({ ...m, [data.id]: [] }));
       setNovo({ name: "", description: "", scope: "own" });
       toast.success(t("Setor criado. Agora escolha quem atende nele."));
-      router.refresh();
+      refletir();
     } catch (e) {
       showApiError(e);
     } finally {
@@ -113,7 +126,7 @@ export function SetoresClient({ initial }: { initial: Initial }) {
       setSetores((lista) => lista.map((s) => (s.id === setor.id ? { ...s, ...data } : s)));
       setRascunhos((r) => ({ ...r, [setor.id]: rascunhoDe({ ...setor, ...data }) }));
       toast.success(t("Setor salvo."));
-      router.refresh();
+      refletir();
     } catch (e) {
       showApiError(e);
     } finally {
@@ -127,7 +140,7 @@ export function SetoresClient({ initial }: { initial: Initial }) {
       const { data } = await apiClient.patch<{ data: SectorRow }>(`/api/v1/sectors/${setor.id}`, { is_active: ativo });
       setSetores((lista) => lista.map((s) => (s.id === setor.id ? { ...s, ...data } : s)));
       toast.success(t(ativo ? "Setor ativado." : "Setor desativado. As conversas dele voltam à regra geral de visibilidade."));
-      router.refresh();
+      refletir();
     } catch (e) {
       showApiError(e);
     } finally {
@@ -142,7 +155,7 @@ export function SetoresClient({ initial }: { initial: Initial }) {
       await apiClient.put(`/api/v1/sectors/${setor.id}/members`, { user_ids });
       setSetores((lista) => lista.map((s) => (s.id === setor.id ? { ...s, members: user_ids } : s)));
       toast.success(t("Membros do setor salvos."));
-      router.refresh();
+      refletir();
     } catch (e) {
       showApiError(e);
     } finally {
@@ -157,7 +170,7 @@ export function SetoresClient({ initial }: { initial: Initial }) {
       setSetores((lista) => lista.filter((s) => s.id !== setor.id));
       toast.success(t("Setor excluído."));
       setParaExcluir(null);
-      router.refresh();
+      refletir();
     } catch (e) {
       showApiError(e);
     } finally {

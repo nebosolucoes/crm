@@ -741,3 +741,16 @@ create policy "conversations_select" on public.conversations
   );
 
 notify pgrst, 'reload schema';
+
+-- ---- travas do modo somente leitura do suporte nas tabelas novas ----
+-- No baseline elas entram pelo último bloco do arquivo; na CADEIA de migrations
+-- ninguém as replanta depois da 0274, e `sectors`/`sector_members` nasceriam sem
+-- `support_write_{insert,update,delete}`. Idempotente (drop + create). Guardado
+-- pela existência da função: num banco que ainda não recebeu a 0274 é a própria
+-- 0274, ao chegar, que planta as travas em TODA tabela — inclusive nestas.
+do $f$
+begin
+  if to_regprocedure('public.fn_aplicar_travas_de_suporte()') is not null then
+    perform public.fn_aplicar_travas_de_suporte();
+  end if;
+end $f$;
