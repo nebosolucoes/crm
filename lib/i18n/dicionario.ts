@@ -9541,6 +9541,10 @@ export const DICIONARIO: Traducoes = {
   "Nenhum setor ativo. Crie setores em Configurações › Setores de atendimento.": { es: "Ningún sector activo. Crea sectores en Configuración › Sectores de atención." },
   "Conversas abertas contadas até 5.000; \"sem dono\" inclui a fila do setor e as que a IA ainda atende.": { es: "Conversaciones abiertas contadas hasta 5.000; \"sin responsable\" incluye la cola del sector y las que la IA todavía atiende." },
   "Muitas transferências para fora de um setor são sinal de que a IA está encaminhando para o setor errado: revise a descrição do setor.": { es: "Muchas transferencias hacia fuera de un sector indican que la IA está derivando al sector equivocado: revisa la descripción del sector." },
+  // ── Visual do inbox e menu (28/09) ──
+  "Robô": { es: "Robot" },
+  "Mostrar ficha do contato": { es: "Mostrar la ficha del contacto" },
+  "Os pedidos que a IA abriu para uma pessoa resolver, do início ao desfecho.": { es: "Los pedidos que la IA abrió para que una persona resuelva, de principio a fin." },
 };
 
 /**

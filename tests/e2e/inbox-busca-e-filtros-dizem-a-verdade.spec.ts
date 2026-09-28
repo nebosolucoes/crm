@@ -146,7 +146,7 @@ test("trocar de aba logo após digitar NÃO volta à aba anterior", async ({ pag
   ).toHaveAttribute("aria-selected", "true");
 });
 
-test('a aba "Fechadas" mostra número', async ({ page }) => {
+test('a aba "Todas" inclui a conversa fechada e mostra número', async ({ page }) => {
   // Ela existia sem contador nenhum. Num inbox antigo é o número que diz o
   // tamanho do arquivo, e a ausência fazia a aba parecer um lugar vazio.
   //
@@ -173,5 +173,9 @@ test('a aba "Fechadas" mostra número', async ({ page }) => {
   expect(fechada.ok(), await fechada.text()).toBe(true);
 
   await page.reload();
-  await expect(page.getByRole("tab", { name: /Fechadas/i })).toHaveText(/\d/);
+  // Desde 28/09 fechadas e arquivadas vivem dentro de "Todas" (Minhas | Fila | Robô | Todas).
+  await expect(page.getByRole("tab", { name: /Fechadas/i })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: /Todas/i })).toHaveText(/\d/);
+  await page.getByRole("tab", { name: /Todas/i }).click();
+  await expect(page.getByText("Arquivo do teste").first()).toBeVisible();
 });

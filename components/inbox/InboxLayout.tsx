@@ -27,10 +27,11 @@ import { InboxKeyboardShortcuts } from "./InboxKeyboardShortcuts";
 import { ShortcutsHelpDialog } from "./ShortcutsHelpDialog";
 import { OpenConversationProvider } from "@/hooks/notifications/OpenConversationContext";
 // ADR-05: ícone de feature sai do mapa canônico, nunca do pacote direto.
-import { CaretLeft, ChatCircle, IdentificationCard } from "@/lib/ui/icons";
+import { CaretLeft, CaretRight, ChatCircle, IdentificationCard } from "@/lib/ui/icons";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { gravarFichaRecolhida, useFichaRecolhida } from "@/lib/inbox/ficha-recolhida";
 import { comandosDaFila } from "@/lib/inbox/comando-da-conversa";
 import { buscaValeConsulta } from "@/lib/inbox/termo-de-busca";
 import { useAutomaticoAtivo } from "@/hooks/ai/useAutomaticoAtivo";
@@ -164,6 +165,13 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
   const [helpOpen, setHelpOpen] = useState(false);
   /** A ficha do contato como painel deslizante — só existe abaixo do `xl`. */
   const [fichaAberta, setFichaAberta] = useState(false);
+  /**
+   * A coluna da ficha (≥ xl) RECOLHIDA por padrão (pedido do dono, 28/09): a
+   * conversa ganha a largura, e a ficha abre quando a pessoa pede. A escolha
+   * fica no navegador — conveniência por pessoa, não estado do produto.
+   */
+  const fichaRecolhida = useFichaRecolhida();
+  const alternarFicha = useCallback(() => gravarFichaRecolhida(!fichaRecolhida), [fichaRecolhida]);
   /**
    * A mensagem escolhida para responder "em cima".
    *
@@ -376,7 +384,12 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
   return (
     <OpenConversationProvider conversationId={selectedId}>
     <div
-      className="grid h-[calc(100dvh-3.5rem-2*var(--space-6))] w-full grid-cols-1 md:grid-cols-[300px_1fr] xl:grid-cols-[272px_1fr_296px] 2xl:grid-cols-[300px_1fr_320px]"
+      className={cn(
+        "grid h-[calc(100dvh-3.5rem-2*var(--space-6))] w-full grid-cols-1 md:grid-cols-[300px_1fr]",
+        fichaRecolhida
+          ? "xl:grid-cols-[272px_1fr_2.5rem] 2xl:grid-cols-[300px_1fr_2.5rem]"
+          : "xl:grid-cols-[272px_1fr_296px] 2xl:grid-cols-[300px_1fr_320px]",
+      )}
       /*
        * O ESTADO DO TEMPO REAL, LEGÍVEL DE FORA — mesmo par que o dossiê do lead
        * já publica (`LeadDossier`), e pela mesma razão: quando a entrega morre,
@@ -523,9 +536,39 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
         )}
       </div>
 
-      <div className="hidden h-full min-h-0 xl:block">
-        <CRMSidePanel conversation={selectedConversation} />
-      </div>
+      {fichaRecolhida ? (
+        <div className="hidden h-full min-h-0 border-l xl:flex xl:flex-col xl:items-center xl:pt-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={alternarFicha}
+            aria-label={t("Mostrar ficha do contato")}
+            title={t("Mostrar ficha do contato")}
+            data-testid="ficha-mostrar"
+          >
+            <CaretLeft size={16} aria-hidden />
+          </Button>
+        </div>
+      ) : (
+        <div className="hidden h-full min-h-0 xl:flex xl:flex-col">
+          <div className="flex shrink-0 justify-end border-b px-1 py-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 px-2 text-xs"
+              onClick={alternarFicha}
+              data-testid="ficha-recolher"
+            >
+              <CaretRight size={14} aria-hidden />
+              {t("Recolher")}
+            </Button>
+          </div>
+          <div className="min-h-0 flex-1">
+            <CRMSidePanel conversation={selectedConversation} />
+          </div>
+        </div>
+      )}
 
       <InboxKeyboardShortcuts
         visibleIds={visibleIds}

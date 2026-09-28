@@ -135,7 +135,11 @@ function montar() {
 }
 
 describe("deep-link para conversa fora do filtro", () => {
-  beforeEach(() => get.mockClear());
+  beforeEach(() => {
+    get.mockClear();
+    // A ficha do contato nasce RECOLHIDA (28/09); este caso mede o painel, então abre.
+    window.localStorage.setItem("inbox.ficha.recolhida.v1", "0");
+  });
 
   it("pede a conversa por id SEM esperar a lista responder", async () => {
     montar();

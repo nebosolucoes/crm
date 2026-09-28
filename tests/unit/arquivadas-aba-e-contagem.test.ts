@@ -81,10 +81,14 @@ describe("aba Arquivadas — filtro da lista", () => {
 });
 
 describe("aba Arquivadas — rótulo e badge", () => {
-  it("tem rótulo próprio em pt-BR e no tipo de aba", () => {
+  it("desde 28/09 não é mais uma aba: vive dentro de Todas, e o deep-link ?filter=archived segue valendo", () => {
+    // Pedido do dono: Minhas | Fila | Robô | Todas, com fechadas e arquivadas
+    // dentro de Todas. `archived` fica no TIPO e em FILTER_TABS (deep-link), mas
+    // não é mais uma aba visível — e Todas não pode filtrar status nenhum.
     const filtros = fonte("components/inbox/InboxFilters.tsx");
-    expect(filtros).toContain('{ value: "archived", label: "Arquivadas" }');
+    expect(filtros).not.toContain('{ value: "archived", label: "Arquivadas" }');
     expect(filtros).toContain('"archived"');
+    expect(tabToFilter("all")).toEqual({});
   });
 
   it("o badge lê a contagem archived (não a de fechadas)", () => {

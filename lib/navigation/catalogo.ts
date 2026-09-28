@@ -129,6 +129,19 @@ export const NAV_CATALOG = [
     sidebar: true,
   },
   {
+    // Casos no menu de ATENDIMENTO (pedido do dono, 28/09): é a fila de pedidos
+    // que a IA abriu para uma pessoa resolver — trabalho de quem atende, não de
+    // quem configura o agente. O recurso do plano continua `ai_agents`
+    // (RECURSO_POR_DESTINO em lib/entitlements/recursos.ts).
+    href: "/app/ai/cases",
+    label: "Casos",
+    description: "Os pedidos que a IA abriu para uma pessoa resolver, do início ao desfecho.",
+    icon: "ClipboardText",
+    group: "atendimento",
+    sidebar: true,
+    minRole: "agent",
+  },
+  {
     // Entra em "atendimento", e não em "organizacao", porque a Agenda é onde o
     // dia acontece e não onde ele se configura: quem atende abre isto de manhã
     // junto com o Inbox. Os TIPOS de agendamento — que são configuração de
@@ -402,15 +415,6 @@ export const NAV_CATALOG = [
     group: "ia",
     section: "Ensinar o agente",
     minRole: "manager",
-  },
-  {
-    href: "/app/ai/cases",
-    label: "Casos",
-    description: "Os atendimentos que o agente conduziu, do início ao desfecho.",
-    icon: "ClipboardText",
-    group: "ia",
-    section: "Acompanhar o agente",
-    minRole: "agent",
   },
   {
     href: "/app/ai/inbox",

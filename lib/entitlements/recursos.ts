@@ -120,6 +120,13 @@ export const GRUPO_PARA_RECURSO: Record<NavGroupId, Recurso | null> = {
 export const DESTINOS_SEM_RECURSO: ReadonlySet<string> = new Set(["/app/audit", "/app/ai/inbox"]);
 
 /**
+ * Destinos cujo recurso NÃO é o do grupo em que aparecem no menu. Casos mora
+ * em Atendimento porque é onde o operador passa o dia, mas só existe porque um
+ * agente de IA o abre — o recurso continua sendo `ai_agents`.
+ */
+export const RECURSO_POR_DESTINO: Readonly<Record<string, Recurso>> = { "/app/ai/cases": "ai_agents" };
+
+/**
  * O recurso que uma URL do app exige.
  *
  *   - `Recurso`   → a organização precisa tê-lo;
@@ -144,6 +151,8 @@ export function recursoDoDestino(pathname: string): Recurso | null | undefined {
   }
   if (!melhor) return undefined;
   if (DESTINOS_SEM_RECURSO.has(melhor.href)) return null;
+  const proprio = RECURSO_POR_DESTINO[melhor.href];
+  if (proprio !== undefined) return proprio;
   return GRUPO_PARA_RECURSO[melhor.group];
 }
 

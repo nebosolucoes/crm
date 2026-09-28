@@ -21,22 +21,19 @@ import type { Role, VisibilityMode } from "@/lib/auth/types";
 
 export type InboxTab = "unassigned" | "mine" | "all" | "closed" | "archived" | "ai";
 
+/**
+ * As abas VISÍVEIS, na ordem pedida pelo dono (28/09): Minhas | Fila | Robô | Todas.
+ * "Todas" inclui fechadas e arquivadas (é `{}` em tabToFilter: nenhum filtro de
+ * status). `closed` e `archived` continuam no tipo e em FILTER_TABS para o
+ * deep-link `?filter=` seguir valendo — só deixaram de ser abas.
+ */
 const INBOX_TABS: { value: InboxTab; label: string }[] = [
-  { value: "unassigned", label: "Fila" },
   { value: "mine", label: "Minhas" },
+  { value: "unassigned", label: "Fila" },
+  // "Robô" é o rótulo da aba; o ESTADO segue se chamando "automático" em todo o
+  // resto do produto (botão "Devolver ao automático", `comando_da_conversa`).
+  { value: "ai", label: "Robô" },
   { value: "all", label: "Todas" },
-  { value: "closed", label: "Fechadas" },
-  // "Arquivadas" fica ao lado de "Fechadas" porque as duas são passado — e
-  // separada dela porque são passados diferentes (#923): fechada é atendimento
-  // encerrado, arquivada é o que saiu da fila de trabalho sem ser destruído.
-  { value: "archived", label: "Arquivadas" },
-  // "Automático", não "IA": a palavra deste ator já é contrato em quatro arquivos
-  // e no dicionário, e `handoff-por-orcamento.test.ts` usa literalmente "Voltar
-  // para a IA" como a sabotagem que deve reprovar. A aba era a última fora do
-  // padrão — e ela mudou de significado junto (deixou de filtrar `ai_handling` e
-  // passou a perguntar a régua do motor), então o rótulo velho descreveria outra
-  // coisa.
-  { value: "ai", label: "Automático" },
 ];
 
 /**
