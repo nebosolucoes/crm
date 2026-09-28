@@ -6,7 +6,16 @@ import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import type { AgentRow } from "@/hooks/ai/useAgent";
-export function AgentOperation({ agent, readOnly }: { agent: AgentRow; readOnly?: boolean }) {
+export function AgentOperation({
+  agent,
+  readOnly,
+  setores = [],
+}: {
+  agent: AgentRow;
+  readOnly?: boolean;
+  /** Setores ativos da organização (spec 20) — vazio esconde o seletor. */
+  setores?: Array<{ id: string; name: string }>;
+}) {
   const t = useT(),
     router = useRouter(),
     [busy, setBusy] = useState(false);
@@ -48,6 +57,28 @@ export function AgentOperation({ agent, readOnly }: { agent: AgentRow; readOnly?
       >
         {t(agent.paused_at ? "Retomar automático" : "Pausar automático")}
       </Button>
+      {setores.length > 0 || agent.sector_id ? (
+        <label className="text-sm">
+          {t("Setor de entrega")}{" "}
+          <select
+            className="ml-2 rounded-md border bg-background p-2"
+            aria-label={t("Setor de entrega")}
+            value={agent.sector_id ?? ""}
+            disabled={readOnly || busy}
+            onChange={(e) => change({ sector_id: e.target.value === "" ? null : e.target.value })}
+          >
+            <option value="">{t("Sem setor: quem estiver disponível")}</option>
+            {setores.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+            {agent.sector_id && !setores.some((s) => s.id === agent.sector_id) ? (
+              <option value={agent.sector_id}>{t("Setor inativo")}</option>
+            ) : null}
+          </select>
+        </label>
+      ) : null}
       <p className="w-full text-xs text-muted-foreground">
         {t(
           agent.paused_at

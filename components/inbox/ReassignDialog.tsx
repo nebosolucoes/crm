@@ -22,6 +22,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { useTransferConversation } from "@/hooks/inbox/useTransferConversation";
+import { useSetoresAtivos } from "@/hooks/setores/useSetores";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Props {
   conversationId: string;
@@ -46,17 +48,24 @@ export function ReassignDialog({ conversationId, open, onOpenChange }: Props) {
   const members = useAssignableMembers(open);
   const transfer = useTransferConversation();
   const [toUserId, setToUserId] = useState<string>("");
+  const [toSectorId, setToSectorId] = useState<string>("");
+  const [destino, setDestino] = useState<"pessoa" | "setor">("pessoa");
   const [reason, setReason] = useState("");
+  const setores = useSetoresAtivos(open);
+  const temSetores = (setores.data?.length ?? 0) > 0;
 
   const options = (members.data ?? []).filter((m) => m.user_id !== user.id);
 
   function close(v: boolean) {
     if (!v) {
       setToUserId("");
+      setToSectorId("");
+      setDestino("pessoa");
       setReason("");
     }
     onOpenChange(v);
   }
+  const podeTransferir = destino === "setor" ? Boolean(toSectorId) : Boolean(toUserId);
 
   return (
     <Dialog open={open} onOpenChange={close}>
@@ -65,13 +74,38 @@ export function ReassignDialog({ conversationId, open, onOpenChange }: Props) {
           <DialogTitle>{t("Transferir conversa")}</DialogTitle>
           <DialogDescription>
             {t(
-              "A transferência é imediata: o atendente escolhido vira o responsável agora e a mudança fica registrada no histórico.",
+              destino === "setor"
+                ? "A conversa vai para a fila do setor e o rodízio escolhe quem atende. Você continua vendo e respondendo até alguém do setor responder ao cliente."
+                : "A transferência é imediata: o atendente escolhido vira o responsável agora e a mudança fica registrada no histórico. Você continua vendo a conversa até ele responder ao cliente.",
             )}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="space-y-1.5">
+          {temSetores ? (
+            <Tabs value={destino} onValueChange={(v) => setDestino(v as "pessoa" | "setor")}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="pessoa">{t("Para uma pessoa")}</TabsTrigger>
+                <TabsTrigger value="setor">{t("Para um setor")}</TabsTrigger>
+              </TabsList>
+              <TabsContent value="setor" className="space-y-1.5 pt-2">
+                <Label htmlFor="reassign-sector">{t("Setor de destino")}</Label>
+                <Select value={toSectorId} onValueChange={setToSectorId}>
+                  <SelectTrigger id="reassign-sector" className="w-full">
+                    <SelectValue placeholder={t("Escolha o setor")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {setores.data?.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </TabsContent>
+            </Tabs>
+          ) : null}
+          <div className="space-y-1.5" hidden={destino === "setor"}>
             <Label htmlFor="reassign-target">{t("Transferir para")}</Label>
             <Select value={toUserId} onValueChange={setToUserId}>
               <SelectTrigger id="reassign-target" className="w-full">
@@ -115,12 +149,12 @@ export function ReassignDialog({ conversationId, open, onOpenChange }: Props) {
             {t("Cancelar")}
           </Button>
           <Button
-            disabled={!toUserId || transfer.isPending}
+            disabled={!podeTransferir || transfer.isPending}
             onClick={() =>
               transfer.mutate(
                 {
                   conversation_id: conversationId,
-                  to_user_id: toUserId,
+                  ...(destino === "setor" ? { to_sector_id: toSectorId } : { to_user_id: toUserId }),
                   reason: reason.trim() || undefined,
                 },
                 { onSuccess: () => close(false) },

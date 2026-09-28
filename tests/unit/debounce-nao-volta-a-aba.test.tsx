@@ -20,6 +20,11 @@ const activeOrgRef: { current: ActiveOrg | null } = {
   current: { orgId: "org-1", name: "Org", role: "admin", visibility_mode: "all" },
 };
 
+// Setores (spec 20): a lista e os filtros leem os setores por react-query; aqui não há provedor.
+vi.mock("@/hooks/setores/useSetores", () => ({
+  useSetores: () => ({ data: [] }),
+  useSetoresAtivos: () => ({ data: [] }),
+}));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
   useAuth: () => ({ activeOrg: activeOrgRef.current }),
 }));

@@ -5,7 +5,10 @@ import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import Link from "next/link";
+
 import { useT } from "@/hooks/i18n/useT";
+import { useSetores } from "@/hooks/setores/useSetores";
 import { useTeamMembers, type TeamMember } from "@/hooks/team/useTeamMembers";
 import { useChangeRole } from "@/hooks/team/useChangeRole";
 import { useReactivateMember } from "@/hooks/team/useReactivateMember";
@@ -53,6 +56,13 @@ export function TeamMembersClient({ currentUserId, canManage }: Props) {
   const tagDoIdioma = useTagDeIdioma();
   const t = useT();
   const { data, isLoading, isError } = useTeamMembers();
+  // Setores (spec 20): só leitura aqui — quem edita é Configurações › Setores.
+  const setores = useSetores();
+  const setoresPorMembro = new Map<string, string[]>();
+  for (const s of setores.data ?? []) {
+    if (!s.is_active) continue;
+    for (const u of s.members) setoresPorMembro.set(u, [...(setoresPorMembro.get(u) ?? []), s.name]);
+  }
   const changeRole = useChangeRole();
   const revoke = useRevokeMember();
   const reativar = useReactivateMember();
@@ -82,6 +92,7 @@ export function TeamMembersClient({ currentUserId, canManage }: Props) {
               <TableHead>{t("Interface")}</TableHead>
               <TableHead>{t("Status")}</TableHead>
               <TableHead>{t("Última atividade")}</TableHead>
+              <TableHead>{t("Setores")}</TableHead>
               {canManage ? <TableHead className="w-[80px]" /> : null}
             </TableRow>
           </TableHeader>
@@ -164,6 +175,21 @@ export function TeamMembersClient({ currentUserId, canManage }: Props) {
                   {m.last_sign_in_at
                     ? new Date(m.last_sign_in_at).toLocaleString(tagDoIdioma)
                     : "—"}
+                </TableCell>
+                <TableCell>
+                  {(setoresPorMembro.get(m.user_id) ?? []).length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {setoresPorMembro.get(m.user_id)!.map((nome) => (
+                        <Badge key={nome} variant="info">
+                          {nome}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <Link href="/app/settings/setores" className="text-xs text-muted-foreground underline-offset-2 hover:underline">
+                      {t("Sem setor")}
+                    </Link>
+                  )}
                 </TableCell>
                 {canManage ? (
                   <TableCell>

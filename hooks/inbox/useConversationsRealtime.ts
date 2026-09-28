@@ -92,6 +92,8 @@ export interface ConversationsFilters {
    */
   unread?: boolean;
   channel_session_id?: string;
+  /** Setor da conversa (spec 20). */
+  sector_id?: string;
   tag?: string;
 }
 
@@ -129,6 +131,7 @@ export function useConversationsRealtime(
       if (filters.search) qs.set("search", filters.search);
       if (filters.unread) qs.set("unread", "true");
       if (filters.channel_session_id) qs.set("channel_session_id", filters.channel_session_id);
+      if (filters.sector_id) qs.set("sector_id", filters.sector_id);
       if (filters.tag) qs.set("tag", filters.tag);
       if (pageParam) qs.set("cursor", pageParam);
       qs.set("limit", "50");

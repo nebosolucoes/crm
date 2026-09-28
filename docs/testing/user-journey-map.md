@@ -2568,3 +2568,21 @@ Cobertura automática desta entrega: `tests/unit/scheduled-group-worker-query.te
 gates de cron/scheduler já existentes. A spec e2e mocka as rotas de escrita (o que se prova é
 a cadeia da tela e o contrato que ela manda); o envio real por WAHA com vários arquivos ainda
 não foi provado com número pareado.
+
+## J28 — Setores de atendimento: quem atende o quê, e a passagem de bastão `[P0]`
+
+Spec: `docs/specs/20-spec-setores-de-atendimento.md`. Prova: `tests/e2e/setores.spec.ts`
+(org própria e isolada; evidência em `.superpowers/evidence/setores/`).
+
+| # | Caso | Prioridade | Prova |
+|---|---|---|---|
+| 28.1 | A gestora cria Financeiro e Comercial em Configurações › Setores e escolhe quem atende em cada um | `[P0]` | e2e: tela + `sectors`/`sector_members` no banco |
+| 28.2 | Ana (Financeiro) vê a conversa do Financeiro com o chip do setor e NÃO vê a do Comercial | `[P0]` | e2e: inbox de Ana |
+| 28.3 | Bruno transfere a dele para o Financeiro pela aba "Para um setor" do diálogo de transferir | `[P0]` | e2e: diálogo + `sector_id`/`handover_from_user_id` no banco |
+| 28.4 | Passagem de bastão: Bruno continua vendo até Ana responder; depois deixa de ver | `[P0]` | e2e: inbox dos dois + `handover_from_user_id` nulo |
+| 28.5 | Plano no teto recusa o terceiro setor com mensagem na tela | `[P1]` | pendente (unit da rota cobre a recusa; falta a tela) |
+| 28.6 | Painel por setor: pendente × respondido | `[P1]` | fase 5 |
+
+**Achado ao escrever a tela (2026-09-28):** a spec pedia `exigirRecurso("inbox")` na página, mas o grupo
+`organizacao` do catálogo não tem recurso de plano e a cerca `paginas-exigem-recurso` reprova a chamada.
+A API já gateia por `feature: "inbox"`; a página não chama. Registrado na spec 20 §2.

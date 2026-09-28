@@ -1,5 +1,6 @@
 "use client";
 import { useT } from "@/hooks/i18n/useT";
+import { useSetoresAtivos } from "@/hooks/setores/useSetores";
 import { useEffect, useRef, useState } from "react";
 import { MagnifyingGlass } from "@/lib/ui/icons";
 import { Input } from "@/components/ui/input";
@@ -54,6 +55,8 @@ export interface InboxFiltersValue {
   onlyUnread: boolean;
   channel_session_id?: string;
   tag?: string;
+  /** Setor da conversa (spec 20). */
+  sector_id?: string;
 }
 
 interface Props {
@@ -100,7 +103,11 @@ export function InboxFilters({ value, onChange }: Props) {
     unread: value.onlyUnread,
     tag: value.tag,
     channel_session_id: value.channel_session_id,
+    sector_id: value.sector_id,
   });
+  // Setores (spec 20): o seletor só aparece quando a organização tem setor ativo.
+  const setores = useSetoresAtivos();
+  const mostrarSeletorDeSetor = (setores.data?.length ?? 0) > 0 || value.sector_id != null;
 
   const tabs = activeOrg
     ? visibleInboxTabs(activeOrg.role, activeOrg.visibility_mode)
@@ -220,8 +227,35 @@ export function InboxFilters({ value, onChange }: Props) {
           </button>
         </div>
 
-        {(showChannelSwitch || mostrarSeletorDeTag) && (
+        {(showChannelSwitch || mostrarSeletorDeTag || mostrarSeletorDeSetor) && (
           <div className="flex gap-2">
+            {mostrarSeletorDeSetor && (
+              <Select
+                value={value.sector_id ?? "all"}
+                onValueChange={(v) => onChange({ ...value, sector_id: v === "all" ? undefined : v })}
+              >
+                <SelectTrigger
+                  className={cn(
+                    "h-8 min-w-0 flex-1 rounded-full border-transparent bg-surface-elevated px-3 text-xs shadow-none",
+                    value.sector_id != null && "border-accent bg-accent-soft text-accent",
+                  )}
+                  aria-label={t("Filtrar por setor")}
+                >
+                  <SelectValue placeholder={t("Todos os setores")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("Todos os setores")}</SelectItem>
+                  {value.sector_id != null && !setores.data?.some((s) => s.id === value.sector_id) && (
+                    <SelectItem value={value.sector_id}>{t("Setor removido")}</SelectItem>
+                  )}
+                  {setores.data?.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             {showChannelSwitch && (
               <Select
                 value={value.channel_session_id ?? "all"}

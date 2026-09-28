@@ -54,6 +54,8 @@ interface Props {
    * afirme nada".
    */
   automaticoDaOrg?: boolean;
+  /** Nome do setor da conversa (spec 20); `null`/ausente = sem chip. */
+  nomeDoSetor?: string | null;
 }
 
 /**
@@ -119,6 +121,7 @@ export function ConversationListItem({
   mostrarAtendente,
   mostrarAutomatico = true,
   automaticoDaOrg,
+  nomeDoSetor,
 }: Props) {
   const localeDaData = useLocaleDeData();
   const t = useT();
@@ -186,6 +189,7 @@ export function ConversationListItem({
     visibleTags.length > 0 ||
     (mostrarAtendente && comando.quem === "humano") ||
     (mostrarCanal && rotuloCanal != null) ||
+    Boolean(nomeDoSetor) ||
     Boolean(c?.is_blocked) ||
     Boolean(c?.is_anonymized);
 
@@ -305,6 +309,11 @@ export function ConversationListItem({
               >
                 <Phone size={9} weight="regular" aria-hidden />
                 {rotuloCanal}
+              </Badge>
+            )}
+            {nomeDoSetor && (
+              <Badge variant="info" className="h-4 px-1.5 text-[10px]" data-testid="chip-setor">
+                {nomeDoSetor}
               </Badge>
             )}
             {c?.is_blocked && (

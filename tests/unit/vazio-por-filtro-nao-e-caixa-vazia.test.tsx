@@ -21,6 +21,11 @@ import type { ConversationsFilters } from "@/hooks/inbox/useConversationsRealtim
  * motivos diferentes, então são testes diferentes.
  */
 
+// Setores (spec 20): a lista e os filtros leem os setores por react-query; aqui não há provedor.
+vi.mock("@/hooks/setores/useSetores", () => ({
+  useSetores: () => ({ data: [] }),
+  useSetoresAtivos: () => ({ data: [] }),
+}));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
 vi.mock("@/hooks/channels/useChannelSessions", () => ({
   useChannelSessions: () => ({ data: [] }),

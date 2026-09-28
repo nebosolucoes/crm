@@ -630,6 +630,17 @@ export const NAV_CATALOG = [
     minRole: "manager",
   },
   {
+    // Setores de atendimento (spec 20): financeiro, comercial, suporte… quem
+    // atende cada assunto, e para onde a IA encaminha a conversa.
+    href: "/app/settings/setores",
+    label: "Setores de atendimento",
+    description: "Financeiro, comercial, suporte: quem atende cada assunto, e para onde a IA encaminha.",
+    icon: "Buildings",
+    group: "organizacao",
+    section: "Sua empresa",
+    minRole: "manager",
+  },
+  {
     // A porta que faltava para o vocabulário de etiquetas (issue #852). Até
     // aqui a etiqueta só ENTRAva no vocabulário — cada agente escrevia a que
     // quisesse em `add_tag` — e não havia por onde corrigir, juntar as duas

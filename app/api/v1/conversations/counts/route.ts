@@ -53,6 +53,8 @@ export function filtrosAuxiliaresDaContagem(
   if (canal) filtros.push(["channel_session_id", canal]);
   const tag = sp.get("tag");
   if (tag) filtros.push(["tag", tag]);
+  const setor = sp.get("sector_id");
+  if (setor) filtros.push(["sector_id", setor]);
   return filtros;
 }
 

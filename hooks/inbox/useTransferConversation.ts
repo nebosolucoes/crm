@@ -6,9 +6,11 @@ import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { useT } from "@/hooks/i18n/useT";
 import type { Conversation } from "@/lib/types/messaging";
 
+/** Para uma PESSOA (`to_user_id`) ou para um SETOR (`to_sector_id`) — spec 20 §3.4. */
 interface TransferArgs {
   conversation_id: string;
-  to_user_id: string;
+  to_user_id?: string;
+  to_sector_id?: string;
   reason?: string;
 }
 
@@ -21,7 +23,10 @@ export function useTransferConversation() {
     mutationFn: async (args: TransferArgs) =>
       apiClient.post<{ data: Conversation }>(
         `/api/v1/conversations/${args.conversation_id}/transfer`,
-        { to_user_id: args.to_user_id, ...(args.reason ? { reason: args.reason } : {}) },
+        {
+          ...(args.to_sector_id ? { to_sector_id: args.to_sector_id } : { to_user_id: args.to_user_id }),
+          ...(args.reason ? { reason: args.reason } : {}),
+        },
       ),
     onError: (err, args) => {
       qc.invalidateQueries({ queryKey: ["conversations"] });

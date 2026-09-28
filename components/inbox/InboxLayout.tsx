@@ -196,6 +196,7 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
         ? filterValue.search
         : undefined,
       channel_session_id: filterValue.channel_session_id,
+      sector_id: filterValue.sector_id,
       tag: filterValue.tag,
       unread: filterValue.onlyUnread || undefined,
     }),
@@ -204,6 +205,7 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
       automaticoDaOrg,
       filterValue.search,
       filterValue.channel_session_id,
+      filterValue.sector_id,
       filterValue.tag,
       filterValue.onlyUnread,
     ],

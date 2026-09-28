@@ -32,6 +32,11 @@ import type { InboxFiltersValue } from "@/components/inbox/InboxFilters";
  * medido. Quem mexer ali não será avisado por estes testes; o aviso está escrito
  * no próprio componente.
  */
+// Setores (spec 20): a lista e os filtros leem os setores por react-query; aqui não há provedor.
+vi.mock("@/hooks/setores/useSetores", () => ({
+  useSetores: () => ({ data: [] }),
+  useSetoresAtivos: () => ({ data: [] }),
+}));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
 vi.mock("@/hooks/channels/useChannelSessions", () => ({
   useChannelSessions: () => ({ data: [] }),

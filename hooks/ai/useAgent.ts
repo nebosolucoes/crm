@@ -24,6 +24,8 @@ export interface AgentRow {
   paused_at?: string | null;
   operation_mode?: "automatic" | "assisted";
   operation_revision?: number;
+  /** Setor de entrega (spec 20): para onde o handoff manda a conversa. `null` = sem setor. */
+  sector_id?: string | null;
   /**
    * Provedor e modelo da versão PUBLICADA — o que de fato responde. Vem por join
    * na lista, e é opcional porque nem todo chamador precisa dele. Sem isto, a
