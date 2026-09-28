@@ -2581,7 +2581,8 @@ Spec: `docs/specs/20-spec-setores-de-atendimento.md`. Prova: `tests/e2e/setores.
 | 28.3 | Bruno transfere a dele para o Financeiro pela aba "Para um setor" do diálogo de transferir | `[P0]` | e2e: diálogo + `sector_id`/`handover_from_user_id` no banco |
 | 28.4 | Passagem de bastão: Bruno continua vendo até Ana responder; depois deixa de ver | `[P0]` | e2e: inbox dos dois + `handover_from_user_id` nulo |
 | 28.5 | Plano no teto recusa o terceiro setor com mensagem na tela | `[P1]` | pendente (unit da rota cobre a recusa; falta a tela) |
-| 28.6 | Painel por setor: pendente × respondido | `[P1]` | fase 5 |
+| 28.6 | Painel por setor em Análise › Setores: sem dono, com dono, respondidas (24 h), transferidas para fora | `[P1]` | `lib/setores/painel.test.ts` (agregação); tela pendente de prova visual |
+| 28.7 | Setor sem ninguém disponível: a Central diz "Uma conversa do setor Financeiro aguarda um responsável" | `[P1]` | `tests/invariants/setores-aviso-nomeia-o-setor.test.ts` |
 
 **Achado ao escrever a tela (2026-09-28):** a spec pedia `exigirRecurso("inbox")` na página, mas o grupo
 `organizacao` do catálogo não tem recurso de plano e a cerca `paginas-exigem-recurso` reprova a chamada.

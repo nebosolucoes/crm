@@ -22684,16 +22684,25 @@ create unique index if not exists agent_inbox_routing_unique on public.agent_inb
 
 create or replace function public.fn_routing_unassigned_notice(p_org uuid,p_conversation uuid,p_reason text)
 returns void language plpgsql security definer set search_path=public as $$
+declare v_setor text;
 begin
  if not exists(select 1 from public.conversations where organization_id=p_org and id=p_conversation and assigned_to_user_id is null
   and status in('open','pending','claimed','ai_handling')) then return;end if;
+ -- Setores (migration 0279): o aviso nomeia o setor da conversa e aponta para a
+ -- tela certa — quem lê a Central precisa saber QUAL fila está parada.
+ select s.name into v_setor from public.conversations c
+  join public.sectors s on s.organization_id=c.organization_id and s.id=c.sector_id and s.is_active
+  where c.organization_id=p_org and c.id=p_conversation;
  insert into public.agent_inbox_items(organization_id,kind,severity,title,body,ref_kind,ref_id)
- values(p_org,'routing_unassigned','warn','Uma conversa aguarda um responsável',
+ values(p_org,'routing_unassigned','warn',
+  case when v_setor is null then 'Uma conversa aguarda um responsável'
+   else 'Uma conversa do setor '||v_setor||' aguarda um responsável' end,
   case when p_reason='invalid_channel' then 'Confira o canal de origem desta conversa nas Conexões.'
+   when v_setor is not null then 'Confira quem atende no setor '||v_setor||' em Configurações → Setores de atendimento e a disponibilidade dessas pessoas. A distribuição continuará tentando.'
    else 'Confira os responsáveis do canal em Configurações → Atendimento e a disponibilidade da equipe. A distribuição continuará tentando.' end,
   'conversation',p_conversation)
  on conflict(organization_id,ref_id,kind) where kind='routing_unassigned'
- do update set status='open',body=excluded.body;
+ do update set status='open',title=excluded.title,body=excluded.body;
 end;
 $$;
 revoke all on function public.fn_routing_unassigned_notice(uuid,uuid,text) from public,anon,authenticated;

@@ -534,6 +534,17 @@ export const NAV_CATALOG = [
     sidebar: true,
   },
   {
+    // Setores (spec 20 §4): o que está pendente e o que foi respondido em cada
+    // setor — a pergunta de quem supervisiona o atendimento por área.
+    href: "/app/analise/setores",
+    label: "Setores",
+    description: "Pendente, com dono e respondido em cada setor; transferências e handoffs por setor.",
+    icon: "Buildings",
+    group: "analise",
+    section: "Os números do período",
+    minRole: "manager",
+  },
+  {
     // Logo abaixo de Desempenho porque responde a metade da MESMA pergunta: lá
     // está o que aconteceu depois que a pessoa chegou; aqui, quanto custou
     // trazê-la. Ler as duas juntas é o que fecha a conta do custo por cliente.

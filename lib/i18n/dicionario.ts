@@ -9530,6 +9530,17 @@ export const DICIONARIO: Traducoes = {
   "Escolha o setor": { es: "Elige el sector" },
   "A conversa vai para a fila do setor e o rodízio escolhe quem atende. Você continua vendo e respondendo até alguém do setor responder ao cliente.": { es: "La conversación va a la cola del sector y el reparto elige quién atiende. Sigues viendo y respondiendo hasta que alguien del sector responda al cliente." },
   "A transferência é imediata: o atendente escolhido vira o responsável agora e a mudança fica registrada no histórico. Você continua vendo a conversa até ele responder ao cliente.": { es: "La transferencia es inmediata: el agente elegido pasa a ser el responsable ahora y el cambio queda registrado en el historial. Sigues viendo la conversación hasta que él responda al cliente." },
+  // ── Setores: painel (spec 20, fase 5) ──
+  "Pendente, com dono e respondido em cada setor; transferências e handoffs por setor.": { es: "Pendiente, con responsable y respondido en cada sector; transferencias y handoffs por sector." },
+  "Setores: pendente e respondido": { es: "Sectores: pendiente y respondido" },
+  "O que cada setor tem na fila agora, o que já foi respondido nas últimas 24 horas, e quanto saiu de cada setor por transferência nos últimos 30 dias.": { es: "Lo que cada sector tiene en cola ahora, lo que ya fue respondido en las últimas 24 horas y cuánto salió de cada sector por transferencia en los últimos 30 días." },
+  "Com dono": { es: "Con responsable" },
+  "Respondidas (24 h)": { es: "Respondidas (24 h)" },
+  "Transferidas para fora (30 d)": { es: "Transferidas hacia fuera (30 d)" },
+  "Handoffs da IA recebidos (30 d)": { es: "Handoffs de la IA recibidos (30 d)" },
+  "Nenhum setor ativo. Crie setores em Configurações › Setores de atendimento.": { es: "Ningún sector activo. Crea sectores en Configuración › Sectores de atención." },
+  "Conversas abertas contadas até 5.000; \"sem dono\" inclui a fila do setor e as que a IA ainda atende.": { es: "Conversaciones abiertas contadas hasta 5.000; \"sin responsable\" incluye la cola del sector y las que la IA todavía atiende." },
+  "Muitas transferências para fora de um setor são sinal de que a IA está encaminhando para o setor errado: revise a descrição do setor.": { es: "Muchas transferencias hacia fuera de un sector indican que la IA está derivando al sector equivocado: revisa la descripción del sector." },
 };
 
 /**
