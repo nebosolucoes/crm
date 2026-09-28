@@ -2572,7 +2572,7 @@ não foi provado com número pareado.
 ## J28 — Setores de atendimento: quem atende o quê, e a passagem de bastão `[P0]`
 
 Spec: `docs/specs/20-spec-setores-de-atendimento.md`. Prova: `tests/e2e/setores.spec.ts`
-(org própria e isolada; evidência em `.superpowers/evidence/setores/`).
+(org própria e isolada; evidência em `.superpowers/evidence/setores/`). **Rodou verde em 28/09/2026** contra o servidor local; achados: o login recusa domínio `.e2e` (usar `.test`), e o servidor de dev compila cada rota na primeira chamada, então o spec espera a resposta da rota e não o toast.
 
 | # | Caso | Prioridade | Prova |
 |---|---|---|---|
@@ -2581,7 +2581,7 @@ Spec: `docs/specs/20-spec-setores-de-atendimento.md`. Prova: `tests/e2e/setores.
 | 28.3 | Bruno transfere a dele para o Financeiro pela aba "Para um setor" do diálogo de transferir | `[P0]` | e2e: diálogo + `sector_id`/`handover_from_user_id` no banco |
 | 28.4 | Passagem de bastão: Bruno continua vendo até Ana responder; depois deixa de ver | `[P0]` | e2e: inbox dos dois + `handover_from_user_id` nulo |
 | 28.5 | Plano no teto recusa o terceiro setor com mensagem na tela | `[P1]` | pendente (unit da rota cobre a recusa; falta a tela) |
-| 28.6 | Painel por setor em Análise › Setores: sem dono, com dono, respondidas (24 h), transferidas para fora | `[P1]` | `lib/setores/painel.test.ts` (agregação); tela pendente de prova visual |
+| 28.6 | Painel por setor em Análise › Setores: sem dono, com dono, respondidas (24 h), transferidas para fora | `[P1]` | `lib/setores/painel.test.ts` (agregação); tela vista em `.superpowers/evidence/setores/07-analise-setores.png` |
 | 28.7 | Setor sem ninguém disponível: a Central diz "Uma conversa do setor Financeiro aguarda um responsável" | `[P1]` | `tests/invariants/setores-aviso-nomeia-o-setor.test.ts` |
 
 **Achado ao escrever a tela (2026-09-28):** a spec pedia `exigirRecurso("inbox")` na página, mas o grupo
