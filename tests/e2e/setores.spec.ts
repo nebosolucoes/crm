@@ -31,7 +31,7 @@ test.describe.configure({ timeout: 240_000 });
 const SENHA = "Setores!2026";
 
 async function criarUsuario(nome: string): Promise<{ id: string; email: string }> {
-  const email = `${nome.toLowerCase()}-${randomUUID().slice(0, 8)}@setores.e2e`;
+  const email = `${nome.toLowerCase()}-${randomUUID().slice(0, 8)}@setores.test`;
   const { data, error } = await db.auth.admin.createUser({
     email,
     password: SENHA,
@@ -99,14 +99,17 @@ test("setores: criar pela tela, ver só o seu, transferir para outro setor com p
       await pg.getByRole("button", { name: "Criar setor" }).click();
       await expect(pg.getByRole("group", { name: new RegExp(`^${nome}`) })).toBeVisible();
     }
-    const financeiro = pg.getByRole("group", { name: /^Financeiro/ });
-    await financeiro.getByLabel("Ana").check();
-    await financeiro.getByRole("button", { name: "Salvar membros" }).click();
-    await expect(pg.getByText("Membros do setor salvos.")).toBeVisible();
-    const comercial = pg.getByRole("group", { name: /^Comercial/ });
-    await comercial.getByLabel("Bruno").check();
-    await comercial.getByRole("button", { name: "Salvar membros" }).click();
-    await expect(pg.getByText("Membros do setor salvos.").last()).toBeVisible();
+    // Espera a RESPOSTA do PUT, não o toast: o toast do primeiro salvamento ainda
+    // está na tela quando o segundo dispara, e o texto é o mesmo.
+    const salvarMembros = async (grupo: ReturnType<typeof pg.getByRole>, nome: string) => {
+      await grupo.getByLabel(nome).check();
+      const resposta = pg.waitForResponse((r) => r.url().includes("/members") && r.request().method() === "PUT");
+      await grupo.getByRole("button", { name: "Salvar membros" }).click();
+      expect((await resposta).status()).toBe(200);
+    };
+    await salvarMembros(pg.getByRole("group", { name: /^Financeiro/ }), "Ana");
+    await salvarMembros(pg.getByRole("group", { name: /^Comercial/ }), "Bruno");
+    await expect(pg.getByText("Membros do setor salvos.").first()).toBeVisible();
     await pg.screenshot({ path: `${evidence}/01-setores-criados.png`, fullPage: true });
 
     const { data: setores } = await db.from("sectors").select("id, slug").eq("organization_id", org);
@@ -150,8 +153,12 @@ test("setores: criar pela tela, ver só o seu, transferir para outro setor com p
     await pb.getByRole("tab", { name: "Para um setor" }).click();
     await pb.getByRole("combobox", { name: /setor de destino/i }).click();
     await pb.getByRole("option", { name: "Financeiro" }).click();
+    // A resposta da rota é a prova; o toast some sozinho e o servidor de dev
+    // compila a rota na primeira chamada.
+    const transferido = pb.waitForResponse((r) => r.url().includes("/transfer") && r.request().method() === "POST", { timeout: 120_000 });
     await pb.getByRole("button", { name: "Transferir", exact: true }).click();
-    await expect(pb.getByText("Conversa transferida.")).toBeVisible();
+    expect((await transferido).status()).toBe(200);
+    await expect(pb.getByRole("dialog", { name: "Transferir conversa" })).toHaveCount(0);
     await pb.screenshot({ path: `${evidence}/03-bruno-transferiu-para-financeiro.png`, fullPage: true });
 
     const { data: depois } = await db.from("conversations").select("sector_id, assigned_to_user_id, handover_from_user_id, status").eq("id", convCom).single();
