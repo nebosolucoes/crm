@@ -58,3 +58,47 @@ describe("elegibilidade com origem explícita", () => {
     await expect(loadEligibleAttendants(db, "org", now, scope)).rejects.toThrow("offline");
   });
 });
+
+describe("elegibilidade por setor (spec 20 §3.1)", () => {
+  const comSetor = { ...scope, sectorId: "fin" } as const;
+  const base = {
+    sectors: { id: "fin" },
+    user_organizations: [{ user_id: "ana" }, { user_id: "bruno" }],
+    attendant_availability: [
+      { user_id: "ana", capacity: 2, schedule: {} },
+      { user_id: "bruno", capacity: 2, schedule: {} },
+    ],
+  };
+  it("só membro do setor recebe", async () => {
+    const { db } = fixture({ ...base, sector_members: [{ user_id: "ana" }] });
+    expect(await loadEligibleAttendants(db, "org", now, comSetor)).toMatchObject([{ userId: "ana" }]);
+  });
+  it("setor ativo sem membro = ninguém (restrição explícita)", async () => {
+    const { db } = fixture({ ...base, sector_members: [] });
+    expect(await loadEligibleAttendants(db, "org", now, comSetor)).toEqual([]);
+  });
+  it("setor inativo é ignorado: vale o conjunto sem setor", async () => {
+    const { db, filters } = fixture({ ...base, sectors: null, sector_members: [{ user_id: "ana" }] });
+    const r = await loadEligibleAttendants(db, "org", now, comSetor);
+    expect(r.map((c) => c.userId).sort()).toEqual(["ana", "bruno"]);
+    expect(filters.some(([table]) => table === "sector_members")).toBe(false);
+  });
+  it("setor E política por número: interseção", async () => {
+    const { db } = fixture({
+      ...base,
+      channel_routing_policies: { id: "policy" },
+      channel_routing_responsibles: [{ user_id: "bruno" }],
+      sector_members: [{ user_id: "ana" }, { user_id: "bruno" }],
+    });
+    expect(await loadEligibleAttendants(db, "org", now, comSetor)).toMatchObject([{ userId: "bruno" }]);
+  });
+  it("sem setor na conversa nada muda, e o setor é lido filtrando organization_id", async () => {
+    const { db, filters } = fixture({ ...base, sector_members: [{ user_id: "ana" }] });
+    await loadEligibleAttendants(db, "org", now, comSetor);
+    expect(filters).toContainEqual(["sectors", "organization_id", "org"]);
+    expect(filters).toContainEqual(["sector_members", "organization_id", "org"]);
+    const { db: semSetor, filters: f2 } = fixture(base);
+    await loadEligibleAttendants(semSetor, "org", now, { ...scope, sectorId: null });
+    expect(f2.some(([table]) => table === "sectors")).toBe(false);
+  });
+});

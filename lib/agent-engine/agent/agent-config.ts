@@ -42,6 +42,11 @@ export interface PublishedAgentConfig {
   /** tool_ids do catálogo MCP habilitadas na tela (2B-tools). */
   toolIds: string[];
   /**
+   * Setor de ENTREGA (spec 20): para onde o handoff deste agente manda a conversa
+   * quando a ferramenta não diz outro. `null` = sem setor (comportamento antigo).
+   */
+  sectorId: string | null;
+  /**
    * Materiais que ESTE agente consulta (`ai_agent_versions.knowledge_source_ids`).
    * Vazio = NENHUM: a ferramenta de busca some do turno.
    */
@@ -111,6 +116,7 @@ interface Row {
   multimodal_input: boolean;
   cases_enabled: boolean;
   tool_ids: string[] | null;
+  sector_id?: string | null;
   active_kb_version_id: string | null;
   config: Record<string, unknown> | null;
   operator_enabled: boolean | null;
@@ -142,6 +148,7 @@ const SELECT_AGENT_CONFIG_COLUMNS = `a.operation_mode,a.paused_at,a.operation_re
             v.tool_ids,
             a.active_kb_version_id,
             a.config,
+            a.sector_id,
             v.operator_enabled,
             v.operator_model,
             v.operator_tool_ids,
@@ -195,6 +202,8 @@ function mapAgentConfigRow(r: Row): PublishedAgentConfig {
     multimodalInput: r.multimodal_input,
     casesEnabled: r.cases_enabled,
     toolIds: r.tool_ids ?? [],
+    // `?? null` cobre o clone sem a 0278: sem a coluna, o handoff cai sem setor.
+    sectorId: r.sector_id ?? null,
     // `?? []` cobre o clone sem a 0181: sem a coluna, o agente cai no ponteiro
     // legado abaixo em vez de ficar sem material nenhum.
     knowledgeSourceIds: r.knowledge_source_ids ?? [],

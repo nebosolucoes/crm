@@ -42,6 +42,7 @@ const AGENT: PublishedAgentConfig = {
   multimodalInput: false,
   casesEnabled: false,
   toolIds: [],
+  sectorId: null,
   knowledgeSourceIds: [],
   activeKbVersionId: null,
   ragTopK: 5,

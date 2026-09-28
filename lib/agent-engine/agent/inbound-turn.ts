@@ -92,6 +92,7 @@ import {
   isLeadInHandoff,
   performHumanHandoff,
 } from './human-handoff';
+import { carregarSetoresAtivos, renderBlocoDeSetores } from './setores';
 import {
   maybeCompact,
   renderCompactedSummary,
@@ -309,6 +310,10 @@ export const AGENT_TOOL_DEFS = {
     inputSchema: z
       .object({
         reason: z.string().optional().describe('por que passar ao humano (curto)'),
+        sector: z
+          .string()
+          .optional()
+          .describe('slug do setor de destino, escolhido da lista SETORES DE ATENDIMENTO do prompt; omita se nenhum se aplicar'),
       })
       .passthrough(),
   },
@@ -2074,6 +2079,12 @@ async function executarTurnoDoAgente(
   if (agentConfig !== null && agentConfig.casesEnabled) blocosResidentes.push(CASES_SYSTEM_BLOCK);
   const blocoDaAgenda = agentConfig === null ? null : blocoResidenteDaAgenda(agentConfig.toolIds);
   if (blocoDaAgenda !== null) blocosResidentes.push(blocoDaAgenda);
+  // Setores (spec 20 §3.2): a lista só entra quando há setor ativo E a tool de
+  // handoff está no turno — sem ela o modelo não tem onde usar o slug.
+  if (agentConfig === null || agentConfig.handoffToolEnabled) {
+    const blocoDeSetores = renderBlocoDeSetores(await carregarSetoresAtivos(pool, tenantId));
+    if (blocoDeSetores !== null) blocosResidentes.push(blocoDeSetores);
+  }
   if (preview)
     blocosResidentes.push(
       'MODO PRÉVIA: proponha a resposta com send_message. Operações são propostas separadas; nunca diga que executou uma proposta. Nenhum envio real acontece.',
@@ -2201,6 +2212,8 @@ async function executarTurnoDoAgente(
         reason: 'requested_human',
         conversationSummary: buildHandoffSummary(previous),
         avisoAoLead: aviso,
+        // Pedido por frase não escolhe setor: vai para o de entrega do agente.
+        sectorId: agentConfig?.sectorId ?? null,
         log: runLog,
       },
     );
@@ -2235,6 +2248,7 @@ async function executarTurnoDoAgente(
         conversationSummary: buildHandoffSummary(previous),
         inboxTitle: 'Suspeita de opt-out — confirmar bloqueio do contato no CRM',
         avisoAoLead: aviso,
+        sectorId: agentConfig?.sectorId ?? null,
         log: runLog,
       },
     );
@@ -3225,7 +3239,12 @@ async function executarTurnoDoAgente(
           const res = await applyRequestHumanHandoff(
             pool,
             { tenantId, leadId, conversationId: input.conversationId },
-            { conversationSummary: buildHandoffSummary(previous), avisoAoLead: aviso, log: runLog },
+            {
+              conversationSummary: buildHandoffSummary(previous),
+              avisoAoLead: aviso,
+              agentSectorId: agentConfig?.sectorId ?? null,
+              log: runLog,
+            },
             raw,
           );
           if (!res.ok) return res; // erro de ensino (payload fora da whitelist)

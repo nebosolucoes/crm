@@ -33,6 +33,8 @@ const inputShape = {
   urgency: z.enum(["low", "normal", "high"]).default("normal"),
   /** Atendente alvo opcional: só atribui se elegível agora; senão cai no rodízio G5. */
   target_user_id: z.string().uuid().optional(),
+  /** Setor de destino (spec 20): a conversa vai para a fila dele e só membros o recebem. */
+  sector_id: z.string().uuid().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 };
 
@@ -59,6 +61,14 @@ export const crmRequestHumanHandoff: McpToolDefinition<typeof inputShape> = {
     if (convErr) throw new Error(convErr.message);
     if (!conv || conv.organization_id !== ctx.organizationId) {
       throw new Error("conversation_not_found");
+    }
+
+    if (input.sector_id) {
+      const { data: sector, error: sectorErr } = await ctx.supabase
+        .from("sectors").select("id").eq("organization_id", ctx.organizationId)
+        .eq("id", input.sector_id).eq("is_active", true).maybeSingle();
+      if (sectorErr) throw new Error(sectorErr.message);
+      if (!sector) throw new Error("sector_not_found");
     }
 
     const boundary = conv.contact_id ? await beginServiceAtOrigin(ctx.supabase, ctx.organizationId, conv.contact_id, conv.channel_session_id) : undefined;
@@ -99,9 +109,16 @@ export const crmRequestHumanHandoff: McpToolDefinition<typeof inputShape> = {
 
     if (result.triggered) {
       const now = new Date();
+      if (input.sector_id) {
+        const { error: sectorErr } = await ctx.supabase.from("conversations")
+          .update({ sector_id: input.sector_id })
+          .eq("id", input.conversation_id).eq("organization_id", ctx.organizationId);
+        if (sectorErr) throw new Error(sectorErr.message);
+      }
       // INB-12: mesmos elegíveis do worker de roteamento (G5) — um algoritmo só.
       const eligibles = await loadEligibleAttendants(ctx.supabase, ctx.organizationId, now, {
         kind: "conversation_channel", channelSessionId: conv.channel_session_id,
+        sectorId: input.sector_id ?? null,
       });
       const picked =
         input.target_user_id && eligibles.some((e) => e.userId === input.target_user_id)

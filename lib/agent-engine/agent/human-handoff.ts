@@ -31,6 +31,8 @@ import type { Logger } from '../obs/logger';
 import { cancelPendingCronsForLead } from '../cron/scheduler';
 import { findForbiddenKey, zodIssuesSummary } from './lead-state';
 import { renderDeclaracaoParaHumano, type DeclaracaoDoTurno } from './declaracao';
+import { resolverSetorDoHandoff } from './setores';
+import { SECTOR_SLUG_RE } from '@/lib/setores/vocabulario';
 
 /** Postgres `infinity`: o bot nunca reassume após handoff. */
 const SILENCE_INFINITY = 'infinity';
@@ -134,9 +136,27 @@ export async function performHumanHandoff(
      * aberto na informação.
      */
     avisoAoLead?: { avisado: boolean; porque?: string };
+    /**
+     * Setor de destino (spec 20 §3.2), já resolvido pelo chamador: slug do
+     * payload > setor de entrega do agente. `null`/ausente = a conversa fica no
+     * setor em que já estava. Setor inativo é ignorado aqui, não lançado — o
+     * handoff acontece de qualquer jeito; o que falha é só o encaminhamento.
+     */
+    sectorId?: string | null;
     log: Logger;
   },
 ): Promise<void> {
+  // (0) O setor, se houver: nome para o aviso da Central e id para a conversa.
+  let setor: { id: string; name: string } | null = null;
+  if (opts.sectorId) {
+    const { rows } = await db.query<{ id: string; name: string }>(
+      `select id, name from sectors where organization_id = $1 and id = $2 and is_active`,
+      [ids.tenantId, opts.sectorId],
+    );
+    setor = rows[0] ?? null;
+    if (setor === null) opts.log.warn('handoff: setor de destino inativo ou inexistente, ignorado');
+  }
+
   // (a) FONTE DA VERDADE: force_human no contato — irrevogável pelo agente (regra dura 2).
   await guardServiceEffect();
   await db.query(`update contacts set force_human = true where organization_id = $1 and id = $2`, [
@@ -158,9 +178,10 @@ export async function performHumanHandoff(
             last_handoff_reason = $4,
             active_ai_agent_id = null,
             active_intent = null,
-            active_agent_set_at = null
+            active_agent_set_at = null,
+            sector_id = coalesce($5::uuid, sector_id)
       where organization_id = $1 and id = $2`,
-    [ids.tenantId, ids.conversationId, SILENCE_INFINITY, opts.reason],
+    [ids.tenantId, ids.conversationId, SILENCE_INFINITY, opts.reason, setor?.id ?? null],
   );
 
   // (c) Cancela os crons PENDENTES do lead (follow-ups agendados — F3-01/02). Idempotente,
@@ -180,8 +201,8 @@ export async function performHumanHandoff(
      )`,
     [
       ids.tenantId,
-      opts.inboxTitle ?? 'Handoff humano solicitado — assumir a conversa',
-      `Motivo: ${opts.reason}. ${linhaDoAviso(opts.avisoAoLead)}Resumo da conversa até aqui:\n${opts.conversationSummary}`,
+      opts.inboxTitle ?? (setor ? `Handoff humano solicitado — setor ${setor.name}` : 'Handoff humano solicitado — assumir a conversa'),
+      `${setor ? `Setor: ${setor.name}. ` : ''}Motivo: ${opts.reason}. ${linhaDoAviso(opts.avisoAoLead)}Resumo da conversa até aqui:\n${opts.conversationSummary}`,
       ids.leadId,
     ],
   );
@@ -239,11 +260,14 @@ function linhaDoAviso(aviso: { avisado: boolean; porque?: string } | undefined):
 /** Whitelist EXATA do payload da tool (mesmo padrão .strict() da F2-10/F3-02). */
 export const requestHumanHandoffInputSchema = z.strictObject({
   reason: z.string().min(1).max(500).optional(),
+  /** Slug de um setor ATIVO da organização (spec 20 §3.2). Desconhecido = erro de ensino com a lista. */
+  sector: z.string().regex(SECTOR_SLUG_RE).optional(),
 });
 
 const PAYLOAD_TEACHING =
-  'Campo aceito: reason (por que passar ao humano) — opcional, nada além. Lead, organização e ' +
-  'conversa vêm do runtime, nunca do payload da tool.';
+  'Campos aceitos: reason (por que passar ao humano) e sector (slug do setor de destino, da lista ' +
+  'do prompt) — os dois opcionais, nada além. Lead, organização e conversa vêm do runtime, nunca ' +
+  'do payload da tool.';
 
 export type RequestHumanHandoffResult =
   | { ok: true; status: 'handoff_solicitado'; message: string }
@@ -261,6 +285,8 @@ export async function applyRequestHumanHandoff(
     conversationSummary: string;
     /** Ver `performHumanHandoff` — o desfecho do aviso vira linha no aviso da Central. */
     avisoAoLead?: { avisado: boolean; porque?: string };
+    /** Setor de entrega do agente que está atendendo (`PublishedAgentConfig.sectorId`). */
+    agentSectorId?: string | null;
     log: Logger;
   },
   rawInput: unknown,
@@ -274,10 +300,29 @@ export async function applyRequestHumanHandoff(
     return { ok: false, error: { code: 'invalid_payload', message: `payload inválido em request_human_handoff (${zodIssuesSummary(parsed.error)}). ${PAYLOAD_TEACHING}` } };
   }
 
+  // Setor (spec 20 §3.2): slug do payload > setor de entrega do agente. Slug que
+  // não existe (ou está inativo) volta como ERRO DE ENSINO com a lista válida —
+  // o modelo corrige e chama de novo; nada foi gravado ainda.
+  const setor = await resolverSetorDoHandoff(db, ids.tenantId, {
+    slug: parsed.data.sector,
+    agentSectorId: opts.agentSectorId ?? null,
+  });
+  if (!setor.ok) {
+    const lista = setor.slugsValidos.length > 0 ? setor.slugsValidos.join(', ') : 'nenhum setor ativo';
+    return {
+      ok: false,
+      error: {
+        code: 'invalid_payload',
+        message: `setor desconhecido em request_human_handoff: "${setor.slugDesconhecido}". Setores válidos: ${lista}. Chame de novo com um slug da lista, ou sem \`sector\`.`,
+      },
+    };
+  }
+
   await performHumanHandoff(db, ids, {
     reason: parsed.data.reason ?? 'requested_human',
     conversationSummary: opts.conversationSummary,
     ...(opts.avisoAoLead !== undefined ? { avisoAoLead: opts.avisoAoLead } : {}),
+    sectorId: setor.sectorId,
     log: opts.log,
   });
 

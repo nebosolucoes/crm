@@ -17,7 +17,17 @@ import type { RoutingCandidate } from "./decide";
 import { availabilityScheduleSchema } from "@/lib/schemas/routing";
 
 export type RoutingScope =
-  | { kind: "conversation_channel"; channelSessionId: string }
+  | {
+      kind: "conversation_channel";
+      channelSessionId: string;
+      /**
+       * Setor da conversa (spec 20 §3.1). Presente e ATIVO: só membros dele
+       * recebem, somado ao filtro por número (interseção). Setor inativo é
+       * tratado como ausente. Setor sem membro = ninguém — restrição explícita,
+       * mesma leitura da política por número vazia.
+       */
+      sectorId?: string | null;
+    }
   | { kind: "organization_summary" };
 export class InvalidRoutingChannel extends Error {
   constructor() { super("routing_channel_invalid"); }
@@ -46,6 +56,19 @@ export async function loadEligibleAttendants(
       allowed = new Set((responsibles ?? []).map((r: { user_id: string }) => r.user_id));
       // Policy existente vazia é restrição explícita, não ausência de configuração.
       if (allowed.size === 0) return [];
+    }
+    if (scope.sectorId) {
+      const { data: sector, error: sectorError } = await supabase.from("sectors")
+        .select("id").eq("organization_id", organizationId).eq("id", scope.sectorId).eq("is_active", true).maybeSingle();
+      if (sectorError) throw new Error(sectorError.message);
+      if (sector) {
+        const { data: members, error } = await supabase.from("sector_members")
+          .select("user_id").eq("organization_id", organizationId).eq("sector_id", scope.sectorId);
+        if (error) throw new Error(error.message);
+        const doSetor = new Set((members ?? []).map((m: { user_id: string }) => m.user_id));
+        allowed = allowed === null ? doSetor : new Set([...allowed].filter((u) => doSetor.has(u)));
+        if (allowed.size === 0) return [];
+      }
     }
   }
   const { data: members, error: memberError } = await supabase.from("user_organizations")
