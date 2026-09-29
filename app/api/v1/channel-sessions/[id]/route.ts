@@ -31,6 +31,7 @@ import { resolverSaudeDaConexaoRemovida } from "@/lib/channels/health";
 import { numeroObservadoDaSessao } from "@/lib/channels/numero-observado";
 import { isChannelStatus } from "@/lib/schemas/channels";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { revogarConexaoSocialNoProvedor } from "@/lib/channels/social";
 import { createClient } from "@/lib/supabase/server";
 import { getWahaClient, wahaFriendlyError } from "@/lib/waha/client";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -361,6 +362,10 @@ export async function DELETE(
     // sentido no ramo que PRESERVA a linha — no hard delete ela some inteira.
     patch.meta_token_encrypted = null;
     patch.webhook_path_token = randomUUID().replace(/-/g, "");
+    // Conexão de Instagram/Messenger (spec 21): o webhook foi registrado no
+    // provedor pelo CRM, então é o CRM que o desfaz. Best-effort — o token
+    // rotacionado acima já recusa qualquer entrega que chegue depois.
+    await revogarConexaoSocialNoProvedor(createAdminClient(), activeOrg.orgId, id);
   }
 
   if (arquivar) {

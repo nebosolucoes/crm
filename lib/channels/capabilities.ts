@@ -6,6 +6,7 @@
  * nasce de uma diferença real e medida entre WAHA e Meta Cloud; capability que
  * ninguém consome é código morto, e o teste de matriz reprova.
  */
+import { ehPlataformaSocial } from "./plataformas";
 import type { ChannelCapabilities, ChannelProvider, ProviderDeMensagem } from "./types";
 
 export type { ChannelProvider, ChannelCapabilities, ProviderDeMensagem };
@@ -29,6 +30,7 @@ export const CHANNEL_CAPABILITIES: Record<ProviderDeMensagem, ChannelCapabilitie
     voiceNote: "server-convert",
     groups: "full",
     costPerMessage: false,
+    humanAgentWindowHours: null,
   },
   // Hetero-restrição: não me banem, mas a Meta me proíbe e me cobra.
   meta_cloud: {
@@ -42,6 +44,7 @@ export const CHANNEL_CAPABILITIES: Record<ProviderDeMensagem, ChannelCapabilitie
     voiceNote: "opus-only",
     groups: "limited",
     costPerMessage: true,
+    humanAgentWindowHours: null,
   },
   // Mesma hetero-restrição do canal oficial, por baixo: é um BSP: a WABA é da
   // Meta, os templates são aprovados pela Meta e a janela de 24h é da Meta. O
@@ -75,7 +78,35 @@ export const CHANNEL_CAPABILITIES: Record<ProviderDeMensagem, ChannelCapabilitie
     voiceNote: "opus-only",
     groups: "limited",
     costPerMessage: true,
+    humanAgentWindowHours: null,
   },
+};
+
+/**
+ * DM de Instagram e Messenger pelo intermediário (spec 21 §5).
+ *
+ * A chave da matriz é o PROVIDER porque até a spec 21 provider e rede
+ * coincidiam. Agora o mesmo intermediário fala com três redes, e a física de
+ * DM social é outra — por isso esta linha é escolhida pela REDE, dentro de
+ * `capabilitiesOf`, e nenhum chamador precisa saber disso.
+ *
+ *  - janela de 24h da Meta, sem template: fora dela a IA cala; um humano ainda
+ *    responde por 7 dias com a tag `HUMAN_AGENT` (`humanAgentWindowHours`);
+ *  - sem risco de banimento por volume (é resposta a quem escreveu), sem
+ *    grupos, sem custo por mensagem na faixa comum do provedor;
+ *  - `voiceNote: "opus-only"` é o valor mais conservador do tipo: nenhuma das
+ *    duas redes converte áudio para nós.
+ */
+export const CAPACIDADES_DE_DM_SOCIAL: ChannelCapabilities = {
+  freeformOutsideWindow: false,
+  requiresTemplates: false,
+  canManageTemplates: false,
+  banRisk: false,
+  minIntervalMs: null,
+  voiceNote: "opus-only",
+  groups: "none",
+  costPerMessage: false,
+  humanAgentWindowHours: 168,
 };
 
 /**
@@ -171,7 +202,13 @@ export function canalConhecidoSemMensagem(provider: string | null | undefined): 
   return (PROVIDERS_SEM_MENSAGEM as readonly string[]).includes(provider ?? "");
 }
 
-export function capabilitiesOf(provider: ChannelProvider): ChannelCapabilities {
+/**
+ * O que o canal permite. `plataforma` é o segundo eixo da sessão (spec 21):
+ * ausente ou `whatsapp` = a matriz por provider, como sempre; rede social
+ * pelo intermediário = `CAPACIDADES_DE_DM_SOCIAL`.
+ */
+export function capabilitiesOf(provider: ChannelProvider, plataforma?: string | null): ChannelCapabilities {
+  if (provider === CHANNEL_PROVIDER_ZERNIO && ehPlataformaSocial(plataforma)) return CAPACIDADES_DE_DM_SOCIAL;
   const caps = CHANNEL_CAPABILITIES[provider as ProviderDeMensagem];
   // Fail-closed: provider fora da matriz não herda o default do WAHA. O tipo
   // barra em compilação; isto barra o que vem do banco em runtime.

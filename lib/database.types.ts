@@ -2879,6 +2879,41 @@ export type Database = {
           },
         ]
       }
+      channel_provider_keys: {
+        Row: {
+          api_key_encrypted: string
+          created_at: string
+          created_by: string | null
+          organization_id: string
+          provider: string
+          updated_at: string
+        }
+        Insert: {
+          api_key_encrypted: string
+          created_at?: string
+          created_by?: string | null
+          organization_id: string
+          provider: string
+          updated_at?: string
+        }
+        Update: {
+          api_key_encrypted?: string
+          created_at?: string
+          created_by?: string | null
+          organization_id?: string
+          provider?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_provider_keys_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       channel_session_health: {
         Row: {
           channel_session_id: string
@@ -3000,6 +3035,7 @@ export type Database = {
           metadata: Json
           organization_id: string
           phone_number: string | null
+          platform: string
           provider: string
           status: string
           status_reason: string | null
@@ -3033,6 +3069,7 @@ export type Database = {
           metadata?: Json
           organization_id: string
           phone_number?: string | null
+          platform?: string
           provider?: string
           status?: string
           status_reason?: string | null
@@ -3066,6 +3103,7 @@ export type Database = {
           metadata?: Json
           organization_id?: string
           phone_number?: string | null
+          platform?: string
           provider?: string
           status?: string
           status_reason?: string | null
@@ -3183,6 +3221,70 @@ export type Database = {
             columns: ["proposed_by_agent_id"]
             isOneToOne: false
             referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contact_platform_identities: {
+        Row: {
+          avatar_url: string | null
+          channel_session_id: string | null
+          contact_id: string
+          created_at: string
+          display_name: string | null
+          id: string
+          organization_id: string
+          platform: string
+          platform_user_id: string
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          channel_session_id?: string | null
+          contact_id: string
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          organization_id: string
+          platform: string
+          platform_user_id: string
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          channel_session_id?: string | null
+          contact_id?: string
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          organization_id?: string
+          platform?: string
+          platform_user_id?: string
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_platform_identities_channel_session_id_fkey"
+            columns: ["channel_session_id"]
+            isOneToOne: false
+            referencedRelation: "channel_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_platform_identities_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_platform_identities_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -8900,6 +9002,17 @@ export type Database = {
       fn_semear_tipos_de_agendamento: {
         Args: { p_organization_id: string }
         Returns: number
+      }
+      fn_upsert_social_contact: {
+        Args: {
+          p_name: string
+          p_org: string
+          p_platform: string
+          p_session: string
+          p_user_id: string
+          p_username: string
+        }
+        Returns: string
       }
       fn_upsert_wa_contact: {
         Args: {

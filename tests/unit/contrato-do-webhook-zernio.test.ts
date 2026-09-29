@@ -30,7 +30,21 @@ const SECRET = "segredo-longo-o-suficiente";
 const arquivoFechado: { status: string; erro?: string | null; validSignature: boolean | null }[] = [];
 const ingeridos: unknown[] = [];
 
-vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({}) }));
+// O único `from()` que sobra fora dos mocks abaixo é a leitura da rede e da
+// conta da sessão (spec 21, `lib/channels/inbound.ts`). Responde WhatsApp,
+// que é o que esta sessão é.
+vi.mock("@/lib/supabase/admin", () => ({
+  createAdminClient: () => ({
+    from: () => {
+      const q = {
+        select: () => q,
+        eq: () => q,
+        maybeSingle: async () => ({ data: { platform: "whatsapp", zernio_account_id: null }, error: null }),
+      };
+      return q;
+    },
+  }),
+}));
 
 vi.mock("@/lib/channels/archived", () => ({
   ARCHIVED_AT: "archived_at",

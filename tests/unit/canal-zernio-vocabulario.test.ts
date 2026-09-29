@@ -34,6 +34,7 @@ describe("capabilities do canal intermediado", () => {
       voiceNote: "opus-only",
       groups: "limited",
       costPerMessage: true,
+      humanAgentWindowHours: null,
     });
   });
 
@@ -133,11 +134,15 @@ describe("o envelope carrega a thread do provider", () => {
     // A resposta para o cartão de contato é a mesma das outras três: o canal
     // oficial endereça por thread própria, e um cartão enviado sem ela abriria
     // conversa nova em vez de continuar a que está aberta.
+    //
+    // CINCO desde a spec 21: o `resolveRecipient` também a recebe, porque numa
+    // DM de Instagram/Messenger a pessoa não tem telefone nem identidade de
+    // WhatsApp — a thread é o único destinatário que existe.
     const passagens = [...fonte.matchAll(/providerConversationId:\s*c\.provider_conversation_id/g)];
     expect(
       passagens.length,
-      "todos os call sites (texto, mídia, modelo e contato) precisam passar",
-    ).toBe(4);
+      "todos os call sites (destinatário, texto, mídia, modelo e contato) precisam passar",
+    ).toBe(5);
   });
 });
 

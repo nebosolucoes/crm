@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { CanalOficialClient } from "./CanalOficialClient";
 import { CanalParceiroClient } from "./CanalParceiroClient";
+import { CanalSocialClient } from "./CanalSocialClient";
 import { CanalVozClient } from "./CanalVozClient";
 import { ConnectionsClient } from "./ConnectionsClient";
 import { TemplatesClient } from "./TemplatesClient";
@@ -52,7 +53,9 @@ export function ConexoesShell({
         ? "parceiro"
         : abaParam === "voz"
           ? "voz"
-          : "numeros";
+          : abaParam === "social"
+            ? "social"
+            : "numeros";
   const sub = params.get("sub") === "templates" ? "templates" : "conexao";
 
   const irPara = (proximaAba: string, proximaSub?: string): void => {
@@ -85,11 +88,19 @@ export function ConexoesShell({
             porque no dia em que houver um segundo parceiro esta aba não muda.
             Aqui fica o CONCEITO; lá dentro o cartão diz de quem se trata. */}
         <TabsTrigger value="parceiro">{t("Provedor parceiro")}</TabsTrigger>
+        {/* Instagram Direct e Messenger (spec 21). Aba própria, e não sub-aba do
+            parceiro, porque a pergunta de quem abre é "quero o meu Instagram no
+            atendimento" — ninguém procura isso dentro de "Provedor parceiro". */}
+        <TabsTrigger value="social">{t("Redes sociais")}</TabsTrigger>
         <TabsTrigger value="voz">{t("Chamada de voz")}</TabsTrigger>
       </TabsList>
 
       <TabsContent value="numeros" className="mt-0">
         <ConnectionsClient wahaConfigured={wahaConfigured} />
+      </TabsContent>
+
+      <TabsContent value="social" className="mt-0">
+        <CanalSocialClient />
       </TabsContent>
 
       <TabsContent value="voz" className="mt-0">

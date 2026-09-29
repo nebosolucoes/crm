@@ -154,6 +154,7 @@ interface ChannelSession {
   name?: string | null;
   phone_number?: string | null;
   provider?: string | null;
+  platform?: string | null;
   status?: string | null;
 }
 
@@ -215,7 +216,7 @@ function nomeDaConexao(c: ChannelSession): string {
 
 function conexaoTemGrupos(c: ChannelSession): boolean {
   if (!c.provider) return false;
-  return capabilitiesOf(c.provider as ChannelProvider).groups !== "none";
+  return capabilitiesOf(c.provider as ChannelProvider, c.platform).groups !== "none";
 }
 
 /** O tipo que a tela dá a um arquivo escolhido — a mesma régua da API (`validateOutboundMedia`). */

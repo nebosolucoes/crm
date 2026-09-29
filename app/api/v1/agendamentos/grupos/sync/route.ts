@@ -41,7 +41,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   const { data: session, error: sessionError } = await createAdminClient()
     .from("channel_sessions")
-    .select(`id, provider, ${CHANNEL_SESSION_REF_COLUMNS}`)
+    .select(`id, provider, platform, ${CHANNEL_SESSION_REF_COLUMNS}`)
     .eq("id", parsed.data.channel_session_id)
     .eq("organization_id", authz.org.orgId)
     .maybeSingle();
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     return fail("validation_failed", t("Conexão não encontrada."), 422, { requestId });
 
   const provider = session.provider as ChannelProvider;
-  if (capabilitiesOf(provider).groups === "none") {
+  if (capabilitiesOf(provider, (session as { platform?: string | null }).platform).groups === "none") {
     return fail(
       "validation_failed",
       t("Esta conexão não oferece consulta de grupos. Selecione outra conexão."),

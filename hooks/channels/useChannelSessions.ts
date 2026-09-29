@@ -2,6 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { apiClient } from "@/lib/api/client";
+import { ehPlataformaSocial, ROTULO_DA_PLATAFORMA } from "@/lib/channels/plataformas";
 
 export interface ChannelSession {
   id: string;
@@ -21,6 +22,10 @@ export interface ChannelSession {
   daily_message_limit: number;
   is_warmup_complete: boolean | null;
   created_at: string;
+  /** Quem transporta. Opcional: rotas antigas não o devolviam. */
+  provider?: string | null;
+  /** A rede (spec 21): `whatsapp` | `instagram` | `messenger`. Ausente = WhatsApp. */
+  platform?: string | null;
 }
 
 export type ConnectionHealth = "connected" | "connecting" | "down" | "none" | "unknown";
@@ -32,10 +37,13 @@ export type ConnectionHealth = "connected" | "connecting" | "down" | "none" | "u
  * rendia uma opção em branco no seletor.
  */
 export function channelLabel(
-  c: Pick<ChannelSession, "display_name" | "phone_number" | "waha_session_name">,
+  c: Pick<ChannelSession, "display_name" | "phone_number" | "waha_session_name"> & { platform?: string | null },
   t: (texto: string) => string = (texto) => texto,
 ): string {
-  return c.display_name || c.phone_number || c.waha_session_name || t("Número sem nome");
+  const nome = c.display_name || c.phone_number || c.waha_session_name || t("Número sem nome");
+  // Instagram/Messenger: a rede vem na frente. "@loja" sozinho no seletor não
+  // diz ao atendente se é a conta do Instagram ou a página do Facebook.
+  return ehPlataformaSocial(c.platform) ? `${ROTULO_DA_PLATAFORMA[c.platform]} · ${nome}` : nome;
 }
 
 /**

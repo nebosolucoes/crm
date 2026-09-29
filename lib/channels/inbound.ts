@@ -29,7 +29,30 @@ import {
 import { aplicarEdicaoZernio, ingestZernioInbound } from "./zernio/ingest";
 import { lerEnvelopeZernio } from "./zernio/envelope";
 import { parseZernioEdicao, verifyZernioSignature } from "./zernio/webhook";
+import { plataformaDe, type Plataforma } from "./plataformas";
 import type { ChannelProvider } from "./types";
+
+/**
+ * A rede e a conta da sessão que recebeu (spec 21 §4). Lidas aqui, e não na
+ * rota, porque o nome da coluna carrega o provider — e a rota não pode
+ * nomeá-lo. Banco sem a 0280 (sem `platform`) responde WhatsApp, que é o que
+ * toda sessão era antes dela.
+ */
+async function redeEContaDaSessao(
+  admin: SupabaseClient,
+  session: { id: string; organization_id: string },
+): Promise<{ plataforma: Plataforma; accountId: string | null }> {
+  const { data } = await admin
+    .from("channel_sessions")
+    .select("platform, zernio_account_id")
+    .eq("organization_id", session.organization_id)
+    .eq("id", session.id)
+    .maybeSingle();
+  return {
+    plataforma: plataformaDe(data?.platform),
+    accountId: (data?.zernio_account_id as string | null | undefined) ?? null,
+  };
+}
 
 /** Curto demais para ser segredo — placeholder ou lixo de decrypt. */
 const MIN_SECRET_LEN = 16;
@@ -192,6 +215,7 @@ async function zernioInbound(
     organizationId: input.session.organization_id,
     channelSessionId: input.session.id,
     payload,
+    sessao: await redeEContaDaSessao(admin, input.session),
   });
   return { ok: true, body: { ...r } };
 }

@@ -49,6 +49,26 @@ const PARES: Array<{
   simbolo: string;
 }> = [
   {
+    // Instagram Direct e Messenger (0280, spec 21). A rede da sessão, a da
+    // conversa e a da identidade social saem das mesmas tuplas.
+    tabela: "channel_sessions",
+    coluna: "platform",
+    arquivo: "lib/channels/plataformas.ts",
+    simbolo: "PLATAFORMAS",
+  },
+  {
+    tabela: "conversations",
+    coluna: "channel",
+    arquivo: "lib/channels/plataformas.ts",
+    simbolo: "PLATAFORMAS",
+  },
+  {
+    tabela: "contact_platform_identities",
+    coluna: "platform",
+    arquivo: "lib/channels/plataformas.ts",
+    simbolo: "PLATAFORMAS_SOCIAIS",
+  },
+  {
     tabela: "sectors",
     coluna: "scope",
     // Setores de atendimento (0278). `own` vê só o próprio setor; `all` é o setor

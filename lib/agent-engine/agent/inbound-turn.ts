@@ -152,6 +152,7 @@ import { readSkillReference, skillHasReferences } from './skill-references';
 import { READ_ONLY_TOOLS, wrapToolsWithBreaker, type ToolBreakerThresholds } from './tool-breaker';
 import {
   evaluateBeforeSend,
+  loadChannelPlatform,
   loadChannelProvider,
   nomesDasFerramentas,
   runBeforeSend,
@@ -3455,11 +3456,14 @@ async function executarTurnoDoAgente(
   // Num canal que fala livre a qualquer hora ela nunca teria uso — e tool inútil no
   // prompt não é neutra: gasta contexto e degrada a escolha do modelo.
   {
-    const provider =
-      preview && !preview.channelId
-        ? DEFAULT_CHANNEL_PROVIDER
-        : await loadChannelProvider(pool, tenantId, input.channelSessionId);
-    if (!capabilitiesOf(provider).requiresTemplates) {
+    const semSessao = preview && !preview.channelId;
+    const provider = semSessao
+      ? DEFAULT_CHANNEL_PROVIDER
+      : await loadChannelProvider(pool, tenantId, input.channelSessionId);
+    // A rede entra junto: o intermediário que exige template no WhatsApp não
+    // tem template nenhum no Instagram/Messenger (spec 21 §5).
+    const plataforma = semSessao ? null : await loadChannelPlatform(pool, tenantId, input.channelSessionId);
+    if (!capabilitiesOf(provider, plataforma).requiresTemplates) {
       delete rawTools.send_template;
     }
   }

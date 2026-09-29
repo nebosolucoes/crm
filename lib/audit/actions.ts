@@ -206,6 +206,11 @@ export const AUDIT_ACTIONS = [
   "ai_agent.run_completed",
   "ai_agent.run_failed",
   "channel.connected",
+  // Instagram Direct / Messenger (spec 21): a chave do intermediário da
+  // organização foi gravada ou trocada, e a tentativa de conexão que voltou do
+  // OAuth sem conectar. O sucesso usa `channel.connected`, como os outros.
+  "channel.provider_key_saved",
+  "channel.connect_failed",
   "channel.ai_access_updated",
   "channel.reconnected",
   // Duas ações distintas de propósito: `deleted` apagou a linha (canal virgem),

@@ -93,6 +93,12 @@ export interface GateContext {
    */
   provider: ChannelProvider;
   /**
+   * A rede da sessão (spec 21): `whatsapp`, `instagram` ou `messenger`. Vai
+   * junto com `provider` para `capabilitiesOf` — o mesmo intermediário fala
+   * com as três, e a física da DM social é outra. Ausente = WhatsApp.
+   */
+  platform?: string | null;
+  /**
    * Insumo da janela de 24h. Guardamos o CARIMBO, não o veredito: a janela é
    * derivada (ver `messaging-window.ts`), e passar um booleano já decidido faria o
    * gate confiar numa conta feita em outro lugar, em outro instante.
@@ -595,7 +601,7 @@ export const disclosureGate: Gate = {
 export const pacingGate: Gate = {
   name: 'pacing',
   evaluate: (ctx) => {
-    const { banRisk } = capabilitiesOf(ctx.provider);
+    const { banRisk } = capabilitiesOf(ctx.provider, ctx.platform);
     const decision = decidePacing({
       now: ctx.now,
       knobs: ctx.pacing.knobs,
@@ -636,7 +642,7 @@ export const pacingGate: Gate = {
 export const messagingWindowGate: Gate = {
   name: 'messaging_window',
   evaluate: (ctx) => {
-    const caps = capabilitiesOf(ctx.provider);
+    const caps = capabilitiesOf(ctx.provider, ctx.platform);
     // Canal que fala livre a qualquer hora não tem janela. `skipped`, nunca `pass`
     // silencioso: a diferença entre "não regrediu" e "consigo PROVAR que não
     // regrediu" é esta linha no trace (invariante 4 da doutrina).
@@ -651,9 +657,13 @@ export const messagingWindowGate: Gate = {
     return {
       pass: false,
       code: 'messaging_window_closed',
-      reason:
-        'a janela de 24 horas com este contato fechou; o canal vai recusar texto livre. ' +
-        'Use um template aprovado (ferramenta send_template) ou encerre o turno sem enviar.',
+      // A SAÍDA muda com o canal: onde não existe template (DM de Instagram e
+      // Messenger), mandar o modelo usá-lo seria apontar uma porta que não há.
+      reason: caps.requiresTemplates
+        ? 'a janela de 24 horas com este contato fechou; o canal vai recusar texto livre. ' +
+          'Use um template aprovado (ferramenta send_template) ou encerre o turno sem enviar.'
+        : 'a janela de 24 horas com este contato fechou; nesta rede a IA não pode mais escrever. ' +
+          'Encerre o turno sem enviar — uma pessoa da equipe ainda pode responder por alguns dias.',
     };
   },
 };
@@ -1020,6 +1030,7 @@ export async function runBeforeSend(args: RunBeforeSendArgs): Promise<BeforeSend
       body: args.body,
       optedOut,
       provider,
+      platform: await loadChannelPlatform(client, args.tenantId, args.channelSessionId),
       messagingWindow: { lastInboundAt, ...(args.isTemplate === true ? { isTemplate: true } : {}) },
       pacing: {
         knobs: pacingCfg.knobs,
@@ -1164,6 +1175,25 @@ export async function loadChannelProvider(
   );
   const provider = rows[0]?.provider;
   return provider === undefined ? DEFAULT_CHANNEL_PROVIDER : (provider as ChannelProvider);
+}
+
+/**
+ * A rede da sessão (spec 21). Lida por `to_jsonb(...)->>` e não pela coluna
+ * direta de propósito: esta consulta roda DENTRO da transação da cadeia, e num
+ * banco que ainda não recebeu a 0280 um `select platform` abortaria a
+ * transação inteira — o envio pararia por causa de uma coluna que só serve
+ * para dizer "é WhatsApp". Ausente = `null` = WhatsApp.
+ */
+export async function loadChannelPlatform(
+  db: Queryable,
+  organizationId: string,
+  channelSessionId: string,
+): Promise<string | null> {
+  const { rows } = await db.query<{ platform: string | null }>(
+    "select to_jsonb(cs)->>'platform' as platform from channel_sessions cs where organization_id = $1 and id = $2",
+    [organizationId, channelSessionId],
+  );
+  return rows[0]?.platform ?? null;
 }
 
 async function readStopFlags(

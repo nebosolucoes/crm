@@ -75,6 +75,8 @@ interface Excecao {
  * linhas da OUTRA organização, não uma leitura como superusuário.
  */
 const PROVA_PROPRIA: readonly Excecao[] = [
+  { tabela: "contact_platform_identities", razao: "tests/invariants/canais-sociais.test.ts — dois tenants com identidade social: leitura positiva local e negativa cruzada por JWT; escrita pela REST negada até para admin" },
+  { tabela: "channel_provider_keys", razao: "tests/invariants/canais-sociais.test.ts — server-side only: admin da própria organização leva permission denied; service role lê (controle positivo)" },
   { tabela: "sectors", razao: "tests/invariants/setores-de-atendimento.test.ts — dois tenants com setor de mesmo slug: leitura positiva local e negativa cruzada por JWT; escrita de agent negada e de manager aceita" },
   { tabela: "sector_members", razao: "tests/invariants/setores-de-atendimento.test.ts — JWT do tenant B não lê membros de A; FK composta recusa membro de outra organização" },
   { tabela: "organization_extensions", razao: "tests/invariants/extensoes-declarativas.test.ts — dois tenants com vínculos reais: leitura positiva local/negativa cruzada por JWT, revogação de membership e escrita direta negada" },

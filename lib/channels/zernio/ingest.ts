@@ -32,6 +32,7 @@ import { estamparAtribuicaoDoContato } from "@/lib/leads/atribuicao-de-anuncio";
 import { pausarIaPorAtendimentoManual } from "@/lib/escalacao/atendimento-manual";
 
 import { aplicarEfeitosPosEntrada } from "../pos-entrada";
+import { ehPlataformaSocial, PLATAFORMA_WHATSAPP, type Plataforma } from "../plataformas";
 
 import { parseZernioInbound, type ZernioIdentity, type ZernioInboundMessage } from "./webhook";
 
@@ -54,6 +55,9 @@ export interface ZernioIngestResult {
  */
 export function waIdentityFrom(identity: ZernioIdentity): string | null {
   if (!identity.anchor) return null;
+  // Identidade de rede social NÃO entra no vocabulário do WhatsApp: ela mora em
+  // `contact_platform_identities` (spec 21 §2.2).
+  if (identity.anchor.kind === "social") return null;
   return identity.anchor.kind === "phone"
     ? `phone:${identity.anchor.value}`
     : `lid:${identity.anchor.value}`;
@@ -68,10 +72,40 @@ export function waIdentityFrom(identity: ZernioIdentity): string | null {
  */
 export async function ingestZernioInbound(
   admin: SupabaseClient,
-  input: { organizationId: string; channelSessionId: string; payload: unknown },
+  input: {
+    organizationId: string;
+    channelSessionId: string;
+    payload: unknown;
+    /**
+     * A rede e a conta DA SESSÃO que recebeu (lidas do banco pelo token do
+     * webhook). Ausente = chamador antigo, que só conhecia WhatsApp.
+     */
+    sessao?: { plataforma: Plataforma; accountId: string | null };
+  },
 ): Promise<ZernioIngestResult> {
   const msg = parseZernioInbound(input.payload);
   if (!msg) return { status: "ignored", reason: "evento_sem_interesse" };
+
+  // ─── A mensagem é DESTA sessão? (spec 21 §4) ─────────────────────────────
+  //
+  // A mesma chave do provedor serve o WhatsApp parceiro e as contas sociais.
+  // Cada conexão social registra o próprio webhook restrito à conta, mas um
+  // webhook configurado à mão (o do WhatsApp parceiro) recebe TUDO — e sem esta
+  // conferência um DM de Instagram entraria como conversa de WhatsApp, com o
+  // agente errado respondendo pela conta errada.
+  const plataformaDaSessao = input.sessao?.plataforma ?? PLATAFORMA_WHATSAPP;
+  if (msg.plataforma !== plataformaDaSessao) {
+    return { status: "ignored", reason: "rede_de_outra_sessao" };
+  }
+  const contaDaSessao = input.sessao?.accountId ?? null;
+  if (
+    ehPlataformaSocial(msg.plataforma) &&
+    contaDaSessao &&
+    msg.contasDoEvento.length > 0 &&
+    !msg.contasDoEvento.includes(contaDaSessao)
+  ) {
+    return { status: "ignored", reason: "conta_de_outra_sessao" };
+  }
 
   // Evento de DESFECHO: a mensagem já existe (ou nem é nossa). Só atualiza o
   // status — inserir aqui criaria uma segunda linha para a mesma mensagem, uma
@@ -109,6 +143,13 @@ export async function ingestZernioInbound(
   // (âncora preferida) e a saída só traz o telefone do participante. Resolver
   // pela thread primeiro fecha isso na origem, e de quebra deixa a ingestão
   // imune a qualquer identidade nova que o provider invente depois.
+  // Eco do nosso próprio envio numa rede social, com id diferente do que o
+  // envio devolveu (não medido em conta real — spec 21 §9). Sem esta rede, ele
+  // viraria uma segunda linha e pausaria a IA como "atendimento manual".
+  if (await ecoDoNossoEnvioSocial(admin, input.organizationId, msg)) {
+    return { status: "duplicate", reason: "eco_do_proprio_envio" };
+  }
+
   const existente = await conversaPelaThread(admin, input.organizationId, msg.conversationId);
   if (existente) {
     const inseridaNaExistente = await insertMessage(admin, {
@@ -143,14 +184,18 @@ export async function ingestZernioInbound(
       : { status: "ingested", conversationId: existente.id, messageId: inseridaNaExistente };
   }
 
-  const identity = waIdentityFrom(msg.identity);
-  if (!identity) {
-    // Evento sem âncora utilizável. Recusar é o certo: criar contato anônimo
-    // faria a próxima mensagem da MESMA pessoa virar um segundo contato.
-    return { status: "ignored", reason: "sem_identidade_utilizavel" };
+  let contactId: string | null;
+  if (msg.identity.anchor?.kind === "social") {
+    contactId = await upsertContatoSocial(admin, input.organizationId, input.channelSessionId, msg);
+  } else {
+    const identity = waIdentityFrom(msg.identity);
+    if (!identity) {
+      // Evento sem âncora utilizável. Recusar é o certo: criar contato anônimo
+      // faria a próxima mensagem da MESMA pessoa virar um segundo contato.
+      return { status: "ignored", reason: "sem_identidade_utilizavel" };
+    }
+    contactId = await upsertContact(admin, input.organizationId, msg, identity);
   }
-
-  const contactId = await upsertContact(admin, input.organizationId, msg, identity);
   if (!contactId) return { status: "ignored", reason: "contato_nao_resolvido" };
 
   const conversationId = await upsertConversation(admin, {
@@ -180,7 +225,7 @@ export async function ingestZernioInbound(
   // SAÍDA feita por fora do CRM = uma pessoa respondeu o cliente à mão (celular,
   // outra plataforma na mesma conta). A IA para nesta conversa. O eco do nosso
   // próprio envio já saiu como `"duplicate"` acima. NÃO mexe na origem do lead.
-  if (msg.direction === "outbound") {
+  if (msg.direction === "outbound" && !enviadoPelaApi(msg)) {
     await pausarIaPorAtendimentoManual(admin, {
       organizationId: input.organizationId,
       conversationId,
@@ -386,6 +431,79 @@ async function upsertContact(
   }
 
   return contactId;
+}
+
+/**
+ * Contato de Instagram/Messenger pela identidade social (spec 21 §2.2).
+ *
+ * A RPC trava por identidade e reencontra a mesma pessoa; a foto entra depois,
+ * fora dela, porque é link de CDN que expira e não vale uma transação.
+ */
+async function upsertContatoSocial(
+  admin: SupabaseClient,
+  organizationId: string,
+  channelSessionId: string,
+  msg: ZernioInboundMessage,
+): Promise<string | null> {
+  const socialId = msg.identity.socialId ?? msg.identity.anchor?.value ?? null;
+  if (!socialId) return null;
+  const { data, error } = await admin.rpc("fn_upsert_social_contact", {
+    p_org: organizationId,
+    p_platform: msg.plataforma,
+    p_user_id: socialId,
+    p_session: channelSessionId,
+    p_username: msg.identity.username ?? "",
+    p_name: msg.identity.displayName ?? "",
+  });
+  if (error || !data) {
+    logger.warn("[zernio] contato social não resolvido", { detail: error?.message ?? "sem id" });
+    return null;
+  }
+  if (msg.identity.avatarUrl) {
+    await admin
+      .from("contact_platform_identities")
+      .update({ avatar_url: msg.identity.avatarUrl })
+      .eq("organization_id", organizationId)
+      .eq("platform", msg.plataforma)
+      .eq("platform_user_id", socialId);
+  }
+  return data as string;
+}
+
+/**
+ * A saída foi feita pelo CRM (ou outra integração pela API), e não por uma
+ * pessoa no app? Só as redes sociais declaram isto de forma confiável
+ * (`message.sentVia`); no WhatsApp o eco já sai como `duplicate` pelo wamid.
+ */
+function enviadoPelaApi(msg: ZernioInboundMessage): boolean {
+  return ehPlataformaSocial(msg.plataforma) && msg.sentVia === "api";
+}
+
+/**
+ * O eco de um envio NOSSO que não casou pelo id: mesma conversa, mesmo texto,
+ * saído do CRM nos últimos 10 minutos. Só para rede social com `sentVia=api`
+ * — no WhatsApp o id do envio é o mesmo do eco, e esta rede seria só custo.
+ */
+async function ecoDoNossoEnvioSocial(
+  admin: SupabaseClient,
+  organizationId: string,
+  msg: ZernioInboundMessage,
+): Promise<boolean> {
+  if (msg.direction !== "outbound" || !enviadoPelaApi(msg) || !msg.text) return false;
+  const conversa = await conversaPelaThread(admin, organizationId, msg.conversationId);
+  if (!conversa) return false;
+  const desde = new Date(Date.now() - 10 * 60_000).toISOString();
+  const { data } = await admin
+    .from("messages")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("conversation_id", conversa.id)
+    .eq("direction", "outbound")
+    .eq("body", msg.text)
+    .neq("sent_via", "external_device")
+    .gte("created_at", desde)
+    .limit(1);
+  return (data ?? []).length > 0;
 }
 
 async function upsertConversation(

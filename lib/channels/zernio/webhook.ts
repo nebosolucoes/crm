@@ -25,6 +25,9 @@
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+import { PLATAFORMA_WHATSAPP, type Plataforma } from "../plataformas";
+import { plataformaDoProvedor } from "./social";
+
 /** Assinatura HMAC-SHA256 no header `X-Zernio-Signature`. */
 export function verifyZernioSignature(
   rawBody: string,
@@ -58,6 +61,18 @@ export type ZernioEventKind =
   | "status";
 
 export interface ZernioInboundMessage {
+  /**
+   * Com que rede é a conversa. A mesma conta do provedor entrega WhatsApp,
+   * Instagram e Messenger no mesmo formato; quem grava confere que a rede é a
+   * da SESSÃO que recebeu (spec 21 §4).
+   */
+  plataforma: Plataforma;
+  /**
+   * Quem mandou a mensagem de SAÍDA, segundo o provedor: `api` (o próprio CRM),
+   * `human` (alguém pelo app), `null` (desconhecido — inclusive o envio feito
+   * direto no Instagram). Decide se a IA pausa por atendimento manual.
+   */
+  sentVia: string | null;
   /** De quem partiu. `outbound` cobre envio feito FORA do CRM. */
   direction: "inbound" | "outbound";
   /** `message` grava; `status` só atualiza o desfecho do que já existe. */
@@ -72,8 +87,15 @@ export interface ZernioInboundMessage {
   externalId: string;
   /** Conta conectada que recebeu — casa com `channel_sessions.zernio_account_id`. */
   accountId: string | null;
+  /**
+   * TODOS os ids de conta que o evento cita (`account.accountId`, `account.id`,
+   * `accountId` solto). A doc não publica o schema do bloco `account`, então a
+   * conferência de conta (spec 21 §4) casa se QUALQUER um bater — e recusa só
+   * quando o evento cita conta e nenhuma é a da sessão.
+   */
+  contasDoEvento: string[];
   text: string | null;
-  attachments: { type: string; url: string }[];
+  attachments: { type: string; url: string; originalType?: string | null }[];
   sentAt: string | null;
   identity: ZernioIdentity;
   /**
@@ -94,13 +116,22 @@ export interface ZernioIdentity {
   username: string | null;
   displayName: string | null;
   /**
+   * Instagram/Messenger: o id da pessoa escopado à conta conectada (IGSID /
+   * PSID). NUNCA vira telefone — é numérico e tem cara de telefone, e foi
+   * exatamente assim que a primeira leitura do participante o transformava em
+   * `+<id>`.
+   */
+  socialId?: string | null;
+  /** Foto de perfil na rede, quando o provedor manda. Link que expira: exibir, não guardar como verdade. */
+  avatarUrl?: string | null;
+  /**
    * Qual âncora usar para casar o contato, já decidida aqui.
    *
    * `null` = payload sem identidade utilizável. Não é erro de parsing: é um
    * evento que não dá para atribuir a ninguém, e quem grava precisa recusá-lo
    * em vez de criar um contato anônimo por engano.
    */
-  anchor: { kind: "bsuid" | "phone"; value: string } | null;
+  anchor: { kind: "bsuid" | "phone" | "social"; value: string } | null;
 }
 
 type Bruto = Record<string, unknown>;
@@ -130,6 +161,39 @@ export function resolveZernioIdentity(sender: Bruto | null): ZernioIdentity {
       : null;
 
   return { phone, bsuid, username, displayName, anchor };
+}
+
+/**
+ * Identidade numa rede social: o id escopado da pessoa é a âncora; nome,
+ * @usuário e foto servem para exibir.
+ *
+ * Nunca lê `phoneNumber` — o provedor não o manda nessas redes, e o
+ * participante é numérico: lê-lo como telefone criaria `+<IGSID>`.
+ */
+export function resolveIdentidadeSocial(fonte: {
+  id: string | null;
+  name: string | null;
+  username: string | null;
+  picture: string | null;
+}): ZernioIdentity {
+  return {
+    phone: null,
+    bsuid: null,
+    username: fonte.username,
+    displayName: fonte.name,
+    socialId: fonte.id,
+    avatarUrl: fonte.picture,
+    anchor: fonte.id ? { kind: "social", value: fonte.id } : null,
+  };
+}
+
+/**
+ * A rede da mensagem, no vocabulário do CRM. `null` = rede que o CRM não
+ * atende (X, Telegram, SMS…) — o evento é ignorado com 200.
+ */
+export function plataformaDaMensagem(valor: unknown): Plataforma | null {
+  if (valor === "whatsapp") return PLATAFORMA_WHATSAPP;
+  return plataformaDoProvedor(valor);
 }
 
 /**
@@ -175,9 +239,9 @@ export function parseZernioEdicao(payload: unknown): ZernioEdicao | null {
 
   const m = obj(p.message);
   if (!m) return null;
-  // Mesma regra do parser de mensagem: a conta serve outras plataformas, e uma
-  // edição de DM de outra rede não tem linha nossa para corrigir.
-  if (str(m.platform) !== "whatsapp") return null;
+  // Mesma regra do parser de mensagem: rede que o CRM não atende não tem linha
+  // nossa para corrigir.
+  if (!plataformaDaMensagem(m.platform)) return null;
 
   const externalId = str(m.platformMessageId) ?? str(m.id);
   if (!externalId) return null;
@@ -200,9 +264,12 @@ export function parseZernioInbound(payload: unknown): ZernioInboundMessage | nul
   const m = obj(p.message);
   if (!m) return null;
 
-  // Só WhatsApp: a mesma conta serve outras plataformas, e um DM de outra rede
-  // entrando como conversa de WhatsApp é pior que ignorá-lo.
-  if (str(m.platform) !== "whatsapp") return null;
+  // WhatsApp, Instagram e Messenger (spec 21). As outras redes que a mesma conta
+  // serve (X, Telegram, SMS…) seguem ignoradas: entrar como conversa de uma rede
+  // que o CRM não sabe responder é pior que não entrar.
+  const plataforma = plataformaDaMensagem(m.platform);
+  if (!plataforma) return null;
+  const social = plataforma !== PLATAFORMA_WHATSAPP;
 
   const conversationId = str(m.conversationId);
   const externalId = str(m.platformMessageId) ?? str(m.id);
@@ -212,12 +279,22 @@ export function parseZernioInbound(payload: unknown): ZernioInboundMessage | nul
   const attachments = anexosBrutos
     .map((a) => obj(a))
     .filter((a): a is Bruto => a !== null)
-    .map((a) => ({ type: str(a.type) ?? "file", url: str(a.url) ?? "" }))
+    .map((a) => {
+      // `originalType` só quando o provedor o manda (Instagram/Messenger: story,
+      // reel, post). Ausente não vira `null` na linha gravada.
+      const originalType = str(a.originalType);
+      return { type: str(a.type) ?? "file", url: str(a.url) ?? "", ...(originalType ? { originalType } : {}) };
+    })
     .filter((a) => a.url.length > 0);
 
   const saida = str(m.direction) === "outgoing";
 
+  const conversa = obj(p.conversation);
+  const remetente = obj(m.sender);
+
   return {
+    plataforma,
+    sentVia: str(m.sentVia),
     direction: saida ? "outbound" : "inbound",
     kind: deStatus ? "status" : "message",
     ...(deStatus ? { status: deStatus } : evento === "message.sent" ? { status: "sent" as const } : {}),
@@ -225,6 +302,9 @@ export function parseZernioInbound(payload: unknown): ZernioInboundMessage | nul
     conversationId,
     externalId,
     accountId: str(obj(p.account)?.id) ?? str(obj(p.account)?.accountId) ?? str(p.accountId),
+    contasDoEvento: [str(obj(p.account)?.accountId), str(obj(p.account)?.id), str(p.accountId)].filter(
+      (v): v is string => v !== null,
+    ),
     text: str(m.text),
     attachments,
     sentAt: str(m.sentAt),
@@ -234,9 +314,25 @@ export function parseZernioInbound(payload: unknown): ZernioInboundMessage | nul
     // traz o número da empresa. Usá-lo criaria um contato com o próprio número
     // do negócio, e toda conversa de saída viraria uma conversa com a gente
     // mesmo. Quem está do outro lado está em `conversation.participantId`.
-    identity: saida
-      ? resolveZernioIdentity(participanteDaConversa(obj(p.conversation)))
-      : resolveZernioIdentity(obj(m.sender)),
+    //
+    // Nas redes sociais vale o mesmo, e o participante NÃO é telefone.
+    identity: social
+      ? saida
+        ? resolveIdentidadeSocial({
+            id: str(conversa?.participantId),
+            name: str(conversa?.participantName),
+            username: str(conversa?.participantUsername),
+            picture: str(conversa?.participantPicture),
+          })
+        : resolveIdentidadeSocial({
+            id: str(remetente?.id),
+            name: str(remetente?.name) ?? str(remetente?.displayName),
+            username: str(remetente?.username),
+            picture: str(remetente?.picture),
+          })
+      : saida
+        ? resolveZernioIdentity(participanteDaConversa(conversa))
+        : resolveZernioIdentity(remetente),
     // Posição exata NÃO VERIFICADA contra o provider real (nunca chegou um
     // clique de anúncio nesta instalação) — tenta na mensagem primeiro (forma
     // documentada da Cloud API), cai para o nível do evento como fallback.

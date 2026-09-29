@@ -102,6 +102,10 @@ export const zernioAdapter: ChannelAdapter = {
 
     // Sem telefone, devolve o id opaco da plataforma em vez de `null`.
     //
+    // E sem id opaco (Instagram/Messenger: a pessoa não tem identidade de
+    // WhatsApp nenhuma), a própria thread — que é, de fato, o que endereça
+    // este envio. Ver a nota em `send`.
+    //
     // Medido em produção: um contato do rollout novo chega com BSUID e o envio
     // parava em `missing_phone_number` — mas para ESTE canal o telefone não
     // endereça nada. Quem endereça é a thread; `to` só existe para o handler
@@ -113,7 +117,10 @@ export const zernioAdapter: ChannelAdapter = {
     const opaco = input.waIdentity?.includes(":")
       ? input.waIdentity.slice(input.waIdentity.indexOf(":") + 1)
       : null;
-    return opaco && opaco.length > 0 ? opaco : null;
+    if (opaco && opaco.length > 0) return opaco;
+    return input.providerConversationId && input.providerConversationId.length > 0
+      ? input.providerConversationId
+      : null;
   },
 
   /**
@@ -201,6 +208,9 @@ export const zernioAdapter: ChannelAdapter = {
       // `wamid`. É o `external_id` da linha citada, nunca o `id` da nossa
       // tabela: o provider nunca viu o nosso. Só entra quando existe.
       ...(envelope.replyToExternalId ? { replyTo: envelope.replyToExternalId } : {}),
+      // Instagram/Messenger depois das 24h: a tag que a Meta exige para resposta
+      // de pessoa (o Instagram só aceita esta). Decidido pelo handler.
+      ...(envelope.humanAgentTag ? { messagingType: "MESSAGE_TAG", messageTag: "HUMAN_AGENT" } : {}),
     };
 
     await envelope.beforeSend?.();
@@ -340,7 +350,19 @@ export const zernioAdapter: ChannelAdapter = {
     assertSafeOutboundUrl(input.url);
     await assertDestinoResolvidoSeguro(new URL(input.url).hostname);
 
-    const res = await fetch(input.url, zernioMediaFetchInit(creds.apiKey));
+    // A chave SÓ vai para o host do provedor. No Instagram e no Messenger a
+    // URL do anexo é o CDN da Meta — público, com prazo — e mandar o Bearer
+    // para lá entregaria a credencial da organização a um terceiro a cada
+    // mídia recebida (spec 21 §4). O WhatsApp segue igual: a URL dele é do
+    // próprio provedor, autenticada.
+    //
+    // O domínio do provedor, não o host exato: a mídia pode sair de um
+    // subdomínio dele (medido só o caminho `/v1/whatsapp/media`, não o host).
+    const dominioDoProvedor = new URL(creds.baseUrl).hostname.split(".").slice(-2).join(".");
+    const hostDaMidia = new URL(input.url).hostname;
+    const doProvedor = hostDaMidia === dominioDoProvedor || hostDaMidia.endsWith(`.${dominioDoProvedor}`);
+    const init = doProvedor ? zernioMediaFetchInit(creds.apiKey) : {};
+    const res = await fetch(input.url, init);
     if (!res.ok) {
       // 400 costuma ser mídia já descartada pela plataforma, e 401 credencial —
       // desfechos diferentes, e o status no erro é o que distingue os dois para

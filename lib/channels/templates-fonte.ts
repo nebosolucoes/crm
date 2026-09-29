@@ -19,6 +19,7 @@
  * recusa — e o operador, que escolheu de uma lista que o CRM lhe ofereceu,
  * conclui que o sistema está quebrado. Melhor mostrar menos e certo.
  */
+import { ehPlataformaSocial } from "./plataformas";
 import type { ProviderDeMensagem } from "./types";
 
 export type FonteDeTemplates = "oficial" | "parceiro";
@@ -46,8 +47,13 @@ const FONTE: Record<ProviderDeMensagem, FonteDeTemplates | null> = {
 };
 
 /** `null` quando este canal não trabalha com definições aprovadas. */
-export function fonteDeTemplates(provider: string | null | undefined): FonteDeTemplates | null {
+export function fonteDeTemplates(
+  provider: string | null | undefined,
+  /** A rede da conversa. Instagram/Messenger não têm modelo aprovado (spec 21). */
+  plataforma?: string | null,
+): FonteDeTemplates | null {
   if (!provider) return null;
+  if (ehPlataformaSocial(plataforma)) return null;
   return FONTE[provider as ProviderDeMensagem] ?? null;
 }
 

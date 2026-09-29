@@ -35,6 +35,7 @@ import {
 } from "@/lib/channels";
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "@/lib/channels/archived";
 import { conferirDefinicao } from "@/lib/channels/conferir-definicao";
+import { precisaDaTagDeAtendimentoHumano } from "@/lib/channels/janela";
 import { isMediaPathOwnedBy } from "@/lib/messaging/media/upload-validation";
 import {
   buildVcard,
@@ -309,7 +310,7 @@ export async function sendMessageHandler(
   // envio com 42703. Sem a coluna, nada está arquivado — e a consulta sem ela é a
   // consulta certa (ver lib/channels/archived).
   const convSelect = (comArchived: boolean) =>
-    `id, organization_id, contact_id, channel_session_id, is_group, group_chat_id, bot_silenced_until, provider_conversation_id, contacts:contact_id(phone_number, wa_identity, wa_lid, is_blocked), channel_sessions:channel_session_id(${CHANNEL_SESSION_REF_COLUMNS}, status${comArchived ? `, ${ARCHIVED_AT}` : ""})`;
+    `id, organization_id, contact_id, channel_session_id, is_group, group_chat_id, bot_silenced_until, provider_conversation_id, last_inbound_at, channel, contacts:contact_id(phone_number, wa_identity, wa_lid, is_blocked), channel_sessions:channel_session_id(${CHANNEL_SESSION_REF_COLUMNS}, status${comArchived ? `, ${ARCHIVED_AT}` : ""})`;
   //
   // O filtro por `organization_id` NÃO é redundância com a RLS — é a única
   // proteção que existe na metade dos chamadores. Este handler é a porta de
@@ -366,6 +367,10 @@ export async function sendMessageHandler(
     bot_silenced_until: string | null;
     /** Thread do provider, quando ele endereça por thread própria (migration 0132). */
     provider_conversation_id: string | null;
+    /** Última mensagem do cliente — é dela que a janela de 24h se conta. */
+    last_inbound_at: string | null;
+    /** A rede da conversa (0280, spec 21). */
+    channel: string | null;
     contacts: {
       phone_number: string | null;
       wa_identity: string | null;
@@ -600,7 +605,21 @@ export async function sendMessageHandler(
     phoneNumber: c.contacts?.phone_number,
     waIdentity: c.contacts?.wa_identity,
     waLid: c.contacts?.wa_lid,
+    providerConversationId: c.provider_conversation_id,
   });
+
+  // Instagram/Messenger: resposta de PESSOA entre 24h e 7 dias leva a tag de
+  // atendimento humano (spec 21 §5). A IA nunca chega aqui fora das 24h — o
+  // guardrail dela veta antes —, e a tag é declaração à Meta de que há uma
+  // pessoa respondendo: não pode ser posta num envio automático.
+  const humanAgentTag =
+    ctx.actor.type === "user" &&
+    precisaDaTagDeAtendimentoHumano(
+      c.channel_sessions?.provider ?? null,
+      c.channel,
+      c.last_inbound_at,
+      new Date(),
+    );
 
   // Releitura no sink: o operador pode ter fechado o canal enquanto o modelo
   // gerava a resposta. Envio humano não passa por esta restrição da IA.
@@ -778,6 +797,7 @@ export async function sendMessageHandler(
           // O id que a PLATAFORMA conhece, lido da linha citada agora — não uma
           // cópia guardada no envio, que poderia divergir da linha.
           replyToExternalId: citada?.external_id ?? null,
+          humanAgentTag,
         }));
       } else if (input.type === "contact") {
         const sc = outboundMetadata.shared_contact as
@@ -819,6 +839,7 @@ export async function sendMessageHandler(
           kind: input.type,
           body: input.body ?? "",
           replyToExternalId: citada?.external_id ?? null,
+          humanAgentTag,
         }));
       }
 

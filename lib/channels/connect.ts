@@ -17,6 +17,7 @@ import { metadataInicialDoCanal } from "@/lib/ai/elegibilidade/pre-go-live";
 
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "./archived";
 import { CHANNEL_PROVIDER_ZERNIO } from "./capabilities";
+import { PLATAFORMA_WHATSAPP } from "./plataformas";
 import { zernioBaseUrl } from "./zernio/credentials";
 import type { ChannelProvider } from "./types";
 
@@ -166,12 +167,17 @@ export async function findPartnerSession(
   admin: SupabaseClient,
   organizationId: string,
 ): Promise<PartnerSession | null> {
+  // `platform = whatsapp`: desde a spec 21 o mesmo provedor também transporta
+  // Instagram e Messenger, e cada conta social é uma linha com este provider.
+  // Sem o filtro, a segunda linha fazia o `maybeSingle` falhar — a aba do
+  // parceiro dizia "não conectado" e o POST inseria uma duplicata.
   const buscar = (colunas: string) =>
     admin
       .from("channel_sessions")
       .select(colunas)
       .eq("organization_id", organizationId)
       .eq("provider", PARTNER_CHANNEL_PROVIDER)
+      .eq("platform", PLATAFORMA_WHATSAPP)
       .maybeSingle();
 
   const { data } = await queryTolerantToMissingArchived(

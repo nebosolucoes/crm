@@ -39,6 +39,9 @@ const CAPABILITIES = [
   "voiceNote",
   "groups",
   "costPerMessage",
+  // Spec 21: prazo estendido de resposta HUMANA (Instagram/Messenger, 7 dias).
+  // Consumido por `lib/channels/janela.ts` (composer e tag do envio).
+  "humanAgentWindowHours",
 ] as const;
 
 describe("matriz capability × provider é exaustiva", () => {

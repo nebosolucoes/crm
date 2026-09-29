@@ -30,11 +30,30 @@ import { capabilitiesOf } from "./capabilities";
 import { WINDOW_MS, windowRemainingMs } from "@/lib/agent-engine/guardrails/messaging-window";
 import type { ChannelProvider } from "./types";
 
+/**
+ * Este envio de PESSOA precisa da tag de atendimento humano? Só quando a
+ * janela comum fechou e o prazo estendido ainda corre (spec 21 §5). A IA
+ * nunca passa por aqui: o guardrail dela veta fora das 24h.
+ */
+export function precisaDaTagDeAtendimentoHumano(
+  provider: string | null | undefined,
+  plataforma: string | null | undefined,
+  lastInboundAt: string | null,
+  agora: Date,
+): boolean {
+  return estadoDaJanela(provider, lastInboundAt, agora, plataforma).tipo === "so_humano";
+}
+
 export type EstadoDaJanela =
   /** Canal sem restrição de janela: não há relógio a mostrar. */
   | { tipo: "sem_restricao" }
   /** Dá para escrever livremente; `restanteMs` é quanto falta para fechar. */
   | { tipo: "aberta"; restanteMs: number }
+  /**
+   * Instagram/Messenger: a janela de 24h fechou, mas uma PESSOA ainda pode
+   * responder até `restanteMs` (tag `HUMAN_AGENT`, 7 dias). A IA não.
+   */
+  | { tipo: "so_humano"; restanteMs: number }
   /**
    * Fechada: só modelo aprovado sai daqui.
    *
@@ -57,10 +76,12 @@ export function estadoDaJanela(
   provider: string | null | undefined,
   lastInboundAt: string | null,
   agora: Date,
+  /** A rede da conversa (`conversations.channel`). Ausente = WhatsApp. */
+  plataforma?: string | null,
 ): EstadoDaJanela {
   if (!provider) return { tipo: "sem_restricao" };
 
-  const caps = capabilitiesOf(provider as ChannelProvider);
+  const caps = capabilitiesOf(provider as ChannelProvider, plataforma);
   // `freeformOutsideWindow: true` = o canal aceita texto livre a qualquer hora.
   // Mostrar um relógio nele seria inventar uma urgência que não existe.
   if (caps.freeformOutsideWindow) return { tipo: "sem_restricao" };
@@ -70,6 +91,13 @@ export function estadoDaJanela(
   const ultimo = new Date(lastInboundAt);
   const restanteMs = windowRemainingMs(agora, ultimo);
   if (restanteMs > 0) return { tipo: "aberta", restanteMs };
+
+  if (caps.humanAgentWindowHours) {
+    const prazoHumanoMs = caps.humanAgentWindowHours * 60 * 60 * 1000;
+    const restanteHumanoMs = ultimo.getTime() + prazoHumanoMs - agora.getTime();
+    if (restanteHumanoMs > 0) return { tipo: "so_humano", restanteMs: restanteHumanoMs };
+    return { tipo: "fechada", fechadaHaMs: Math.max(0, -restanteHumanoMs) };
+  }
 
   // Quanto passou DEPOIS do vencimento, não desde a mensagem: os dois números
   // diferem em exatamente 24h, e o que o operador pergunta é "passei muito?".

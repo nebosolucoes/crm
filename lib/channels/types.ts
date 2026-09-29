@@ -54,6 +54,16 @@ export interface ChannelCapabilities {
   groups: "full" | "limited" | "none";
   /** Mensagem entregue gera custo → decisões de envio precisam considerar orçamento. */
   costPerMessage: boolean;
+  /**
+   * Por quantas horas depois da última mensagem do cliente um HUMANO ainda
+   * pode responder com texto livre, além da janela comum de 24h. `null` = não
+   * existe esse prazo estendido.
+   *
+   * Instagram e Messenger: 168h (7 dias) com a tag `HUMAN_AGENT` da Meta — só
+   * para resposta de pessoa, nunca da IA (spec 21 §5). É o que deixa o
+   * composer liberado entre 24h e 7 dias e o que faz o envio levar a tag.
+   */
+  humanAgentWindowHours: number | null;
 }
 
 /**
@@ -72,6 +82,12 @@ export interface RecipientInput {
   phoneNumber: string | null | undefined;
   /** `contacts.wa_identity` (migration 0027): 'phone:+E164' | 'lid:<digits>' | null. */
   waIdentity: string | null | undefined;
+  /**
+   * A thread do provider, quando ele endereça por thread (Instagram/Messenger
+   * pelo intermediário). É o destinatário que resta quando o contato não tem
+   * telefone nem identidade de WhatsApp — e numa DM social ele nunca tem.
+   */
+  providerConversationId?: string | null;
   /**
    * `contacts.wa_lid` (0122). Separado de `waIdentity` porque esta é GERADA com
    * o telefone na frente: contato @lid que ganha número deixa de casar em
@@ -156,6 +172,13 @@ export interface OutboundEnvelope extends ChannelTenantScope {
    * `undefined` = envio solto, que é o caso comum.
    */
   replyToExternalId?: string | null;
+  /**
+   * Resposta de PESSOA depois da janela de 24h, ainda dentro do prazo
+   * estendido do canal (`humanAgentWindowHours`). Quem decide é o handler, por
+   * `precisaDaTagDeAtendimentoHumano`; o adapter só traduz para o campo da
+   * plataforma. Spec 21 §5.
+   */
+  humanAgentTag?: boolean;
 }
 
 /**

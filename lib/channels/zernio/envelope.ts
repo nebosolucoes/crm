@@ -31,6 +31,10 @@ const texto = z.string().nullish();
 
 /** Quem está do outro lado. A ordem de precedência das âncoras vive em `webhook.ts`. */
 const zernioSenderSchema = z.looseObject({
+  /** Instagram/Messenger: IGSID/PSID. Numa mensagem de SAÍDA, o id da conta. */
+  id: texto,
+  username: texto,
+  picture: texto,
   phoneNumber: texto,
   businessScopedUserId: texto,
   whatsappUsername: texto,
@@ -49,6 +53,8 @@ const zernioMessageSchema = z.looseObject({
   content: texto,
   body: texto,
   sentAt: texto,
+  /** Quem mandou a mensagem de saída: `api` (nós), `human` (o app), null (desconhecido). */
+  sentVia: texto,
   sender: zernioSenderSchema.nullish(),
   /**
    * Ver a REGRA no cabeçalho: quem lê já aceita qualquer forma.
@@ -66,7 +72,9 @@ export const zernioEnvelopeSchema = z.looseObject({
   /** Detalhe do aviso de número, quando a plataforma o manda solto. */
   reason: texto,
   account: z.looseObject({ id: texto, accountId: texto }).nullish(),
-  conversation: z.looseObject({ participantId: texto, participantName: texto }).nullish(),
+  conversation: z
+    .looseObject({ id: texto, participantId: texto, participantName: texto, participantUsername: texto })
+    .nullish(),
   template: z.looseObject({ name: texto, status: texto, reason: texto }).nullish(),
   number: z.looseObject({ reason: texto }).nullish(),
   /**

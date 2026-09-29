@@ -26,8 +26,10 @@ import { recusaPorLimite } from "@/lib/entitlements/exigir-na-rota";
 
 export const dynamic = "force-dynamic";
 
+// `platform` (0280, spec 21): a rede da sessão — WhatsApp, Instagram ou
+// Messenger. É o que o seletor do inbox usa para dizer por qual rede o canal fala.
 export const CHANNEL_COLUMNS =
-  "id, provider, waha_session_name, display_name, phone_number, status, status_reason, last_health_check_at, last_status_change_at, daily_message_limit, is_warmup_complete, created_at";
+  "id, provider, platform, waha_session_name, display_name, phone_number, status, status_reason, last_health_check_at, last_status_change_at, daily_message_limit, is_warmup_complete, created_at";
 
 export async function GET(): Promise<Response> {
   const requestId = randomUUID();
