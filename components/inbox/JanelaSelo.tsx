@@ -9,6 +9,7 @@ import {
   formatarRestante,
   LIMIAR_URGENTE_MS,
 } from "@/lib/channels/janela";
+import { fonteDeTemplates } from "@/lib/channels/templates-fonte";
 import { cn } from "@/lib/utils";
 
 /**
@@ -37,9 +38,12 @@ import { cn } from "@/lib/utils";
  */
 export function JanelaSelo({
   provider,
+  plataforma,
   lastInboundAt,
 }: {
   provider: string | null | undefined;
+  /** A rede da conversa (spec 21). Ausente = WhatsApp. */
+  plataforma?: string | null;
   lastInboundAt: string | null;
 }) {
   const t = useT();
@@ -51,8 +55,25 @@ export function JanelaSelo({
     return () => clearInterval(t);
   }, []);
 
-  const estado = estadoDaJanela(provider, lastInboundAt, agora);
+  const estado = estadoDaJanela(provider, lastInboundAt, agora, plataforma);
   if (estado.tipo === "sem_restricao") return null;
+
+  // Instagram/Messenger depois de 24h: a IA parou, mas uma pessoa ainda pode
+  // responder. O selo diz as duas coisas, porque é exatamente a decisão de quem
+  // atende agora: "se eu não responder, ninguém responde".
+  if (estado.tipo === "so_humano") {
+    return (
+      <Badge
+        variant="outline"
+        className="h-4 border-amber-400 px-1.5 text-[10px] text-amber-700 dark:border-amber-700 dark:text-amber-300"
+        title={t(
+          "A janela de 24h fechou: a IA não responde mais nesta conversa. Uma pessoa da equipe ainda pode responder até o prazo acabar.",
+        )}
+      >
+        {t("Só humano")} · {formatarRestante(estado.restanteMs)}
+      </Badge>
+    );
+  }
 
   if (estado.tipo === "fechada") {
     // "Fechada há 3d" responde o que o operador realmente pergunta — "passei
@@ -62,15 +83,22 @@ export function JanelaSelo({
       estado.fechadaHaMs === null
         ? t("O cliente nunca escreveu")
         : `${t("Janela fechada há")} ${formatarDecorrido(estado.fechadaHaMs)}`;
+    // Rede social não tem modelo aprovado: fechada é fechada até a pessoa
+    // escrever de novo. Dizer "só modelo" ali apontaria uma porta que não há.
+    const semModelo = fonteDeTemplates(provider, plataforma) === null;
     return (
       <Badge
         variant="outline"
         className="h-4 border-amber-400 px-1.5 text-[10px] text-amber-700 dark:border-amber-700 dark:text-amber-300"
-        title={t(
-          "Passaram 24h desde a última mensagem do cliente. Só um modelo aprovado sai daqui — texto livre é recusado pela plataforma.",
-        )}
+        title={
+          semModelo
+            ? t("Passou o prazo para responder nesta rede. Só dá para escrever de novo quando o cliente mandar mensagem.")
+            : t(
+                "Passaram 24h desde a última mensagem do cliente. Só um modelo aprovado sai daqui — texto livre é recusado pela plataforma.",
+              )
+        }
       >
-        {quanto} · {t("só modelo")}
+        {quanto} · {semModelo ? t("aguarde o cliente") : t("só modelo")}
       </Badge>
     );
   }

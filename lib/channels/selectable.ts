@@ -23,6 +23,7 @@ import { nomeDoCanal } from "@/lib/channels/estado";
 
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "./archived";
 import { PROVIDERS_DE_MENSAGEM } from "./capabilities";
+import { ehPlataformaSocial, plataformaDe, type Plataforma, ROTULO_DA_PLATAFORMA } from "./plataformas";
 
 /** Um canal oferecível como destino, já com o rótulo resolvido para a tela. */
 export interface SelectableChannel {
@@ -30,9 +31,11 @@ export interface SelectableChannel {
   display_name: string;
   status: string;
   phone_number: string | null;
+  /** A rede (spec 21). O seletor precisa dizer se é o WhatsApp ou o Instagram. */
+  platform: Plataforma;
 }
 
-const COLUNAS = "id, display_name, status, phone_number, waha_session_name";
+const COLUNAS = "id, display_name, status, phone_number, waha_session_name, platform";
 
 interface LinhaCanal {
   id: string;
@@ -40,6 +43,7 @@ interface LinhaCanal {
   status: string;
   phone_number: string | null;
   waha_session_name: string | null;
+  platform?: string | null;
 }
 
 /**
@@ -81,8 +85,13 @@ export async function listSelectableChannels(
     // identificador que NÓS geramos para o transporte, exposto como se fosse o
     // nome do número da pessoa. Um canal sem apelido e sem telefone é um canal
     // sem nome, e dizer isso é melhor do que inventar um.
-    display_name: nomeDoCanal(c),
+    // Instagram/Messenger levam a rede na frente: "@loja" sozinho no seletor
+    // não diz se é a conta do Instagram ou a página do Facebook.
+    display_name: ehPlataformaSocial(c.platform)
+      ? `${ROTULO_DA_PLATAFORMA[c.platform]} · ${nomeDoCanal(c)}`
+      : nomeDoCanal(c),
     status: c.status,
     phone_number: c.phone_number ?? null,
+    platform: plataformaDe(c.platform),
   }));
 }

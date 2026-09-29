@@ -49,6 +49,7 @@
  * aparece neste arquivo.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { plataformaDe, ROTULO_DA_PLATAFORMA } from "@/lib/channels/plataformas";
 
 import { logger } from "@/lib/logger";
 
@@ -92,6 +93,8 @@ export interface DadosDoNascimento {
   conversationId: string;
   /** nome do contato, para o título do card. */
   nomeDoContato: string | null;
+  /** A rede da conversa (spec 21). Ausente = WhatsApp. */
+  plataforma?: string | null;
 }
 
 /**
@@ -270,7 +273,7 @@ export async function garantirLeadDaConversa(
         ? doPayload
         : // "Sem nome" serve para uma linha de lista; um card de kanban precisa
           // dizer de onde veio, senão o quadro vira uma coluna de anônimos iguais.
-          "Novo contato pelo WhatsApp";
+          `Novo contato pelo ${ROTULO_DA_PLATAFORMA[plataformaDe(dados.plataforma)]}`;
 
   // De onde veio: o contato já carrega a atribuição de anúncio (gravada no
   // primeiro toque, por `fn_estampar_atribuicao_de_anuncio` — ver
@@ -298,7 +301,7 @@ export async function garantirLeadDaConversa(
     p_pipeline: destino.pipelineId,
     p_stage: destino.stageId,
     p_title: titulo,
-    p_source: rotuloDeAnuncio ? contato!.source : "whatsapp",
+    p_source: rotuloDeAnuncio ? contato!.source : plataformaDe(dados.plataforma),
     p_source_metadata: rotuloDeAnuncio ? (contato!.source_metadata ?? {}) : {},
     // O ponto ao lado do título só acende se a organização cadastrar este
     // rótulo em `crm_pipelines.settings.canonical_tags` (Configurações do

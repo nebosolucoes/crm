@@ -27,6 +27,11 @@ export interface ContactSummary {
    * atendimento aparece. Opcional: conversas em cache de antes do campo existir.
    */
   force_human?: boolean | null;
+  /**
+   * Quem a pessoa é no Instagram/Messenger (spec 21). É o que a tela mostra no
+   * lugar do telefone, que numa DM social não existe. Opcional: cache antigo.
+   */
+  contact_platform_identities?: { platform: string; username: string | null }[] | null;
 }
 
 /**
@@ -46,6 +51,8 @@ export interface ChannelSummary {
    * que a doutrina proíbe, e ele mora atrás do seam.
    */
   provider: string | null;
+  /** A rede do canal (spec 21). Vai junto de `provider` para `estadoDaJanela`. */
+  platform?: string | null;
 }
 
 export type ConversationWithContact = Conversation & {

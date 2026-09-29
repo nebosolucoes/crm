@@ -38,7 +38,16 @@ export async function decidirElegibilidadeDaConversa(
        cv.assignee_kind             as assignee_kind,
        cv.bot_silenced_until        as bot_silenced_until,
        ct.ai_authorized_at          as ai_authorized_at,
-       ct.phone_number              as phone_number
+       -- Sem telefone (DM de Instagram/Messenger, spec 21), o @usuario da
+       -- identidade social é o que se compara com a lista de teste.
+       coalesce(
+         ct.phone_number,
+         (select '@' || lower(i.username)
+            from contact_platform_identities i
+           where i.contact_id = ct.id and i.organization_id = ct.organization_id and i.username is not null
+           order by i.updated_at desc
+           limit 1)
+       )                            as phone_number
      from conversations cv
      join contacts ct
        on ct.id = cv.contact_id and ct.organization_id = cv.organization_id

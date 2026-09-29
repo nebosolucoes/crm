@@ -91,8 +91,8 @@ const SELECT_COLS = `
   bot_silenced_until, last_handoff_at,
   sector_id, handover_from_user_id,
   comando_da_conversa,
-  contacts:contact_id (id, display_name, name, phone_number, is_anonymized, tags, is_blocked, avatar_storage_path, force_human),
-  channel_sessions:channel_session_id (phone_number, display_name, provider)
+  contacts:contact_id (id, display_name, name, phone_number, is_anonymized, tags, is_blocked, avatar_storage_path, force_human, contact_platform_identities (platform, username)),
+  channel_sessions:channel_session_id (phone_number, display_name, provider, platform)
 `;
 
 interface CursorPayload {

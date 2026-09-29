@@ -14,6 +14,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "@/lib/channels/archived";
 import { PROVIDERS_DE_MENSAGEM } from "@/lib/channels/capabilities";
+import { PLATAFORMA_WHATSAPP } from "@/lib/channels/plataformas";
 
 
 /** Sessão viva da org: WORKING primeiro; senão qualquer uma não arquivada. */
@@ -29,6 +30,10 @@ export async function sessaoProntaParaEnvio(
     // Voz não manda texto: escolher a linha de chamada aqui faria a automação
     // "enviar" por um canal sem transporte de mensagem (spec 18).
     q = q.in("provider", [...PROVIDERS_DE_MENSAGEM]);
+    // Quem chega aqui é um contato por TELEFONE: DM de Instagram/Messenger não
+    // se abre a frio (a Meta exige que a pessoa escreva primeiro), então uma
+    // sessão social nunca serve para iniciar conversa (spec 21 §6).
+    q = q.eq("platform", PLATAFORMA_WHATSAPP);
     if (soWorking) q = q.eq("status", "WORKING");
     if (ignorarArquivadas) q = q.is(ARCHIVED_AT, null);
     return q.order("created_at", { ascending: true }).limit(1);

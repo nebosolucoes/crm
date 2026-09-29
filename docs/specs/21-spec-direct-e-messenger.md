@@ -1,7 +1,10 @@
 # Spec 21 — Instagram Direct e Facebook Messenger (via Zernio)
 
-> Plano de desenvolvimento. Estado (2026-09-29): **desenho fechado, fase 1 em execução** na branch
-> `feat/canais-meta-zernio`, a partir da `nebo-custom` — destino **só o fork Nebo**.
+> Estado (2026-09-29): **fases 1–6 implementadas** na branch `feat/canais-meta-zernio`, a partir da
+> `nebo-custom` — destino **só o fork Nebo**. Provado: `pnpm test:db` (invariantes novos em
+> `tests/invariants/canais-sociais.test.ts`), unit em `tests/unit/canais-sociais.test.ts`, webhook HMAC
+> real contra o servidor local e `tests/e2e/canais-sociais.spec.ts` (3/3). **Falta medir com conta real**
+> (§9) antes de ligar em produção.
 > Decisões fechadas com o dono em 29/09 (§1). Lei que este plano obedece: `CLAUDE.md`,
 > `docs/doctrine/restricao-de-canal.md` (feature pergunta capacidade, nunca identidade),
 > `docs/specs/20-spec-setores-de-atendimento.md` (roteamento por setor, que este canal herda).
@@ -202,6 +205,21 @@ Entra: `attachmentUrl`+`attachmentType` (um anexo), `messagingType: MESSAGE_TAG`
 | 6 | Inbox (§7) + prova em tela + `.changes/` | e2e com webhook assinado de verdade |
 
 ## 9. O que NÃO está medido (a confirmar com conta real)
+
+Primeiro teste em produção, na ordem: conectar um Instagram profissional pela aba; mandar uma DM de
+outra conta; responder pela inbox; conferir no banco que o eco `message.sent` casou com a linha do envio
+(se não casar, o `ecoDoNossoEnvioSocial` segura por texto, mas vale confirmar); deixar passar 24h e
+responder com a tag. Depois o mesmo com uma página do Messenger.
+
+Pendências conhecidas, fora da primeira entrega:
+
+- **Mídia expirada:** o link do CDN da Meta vence. O worker baixa logo na entrada; se ele atrasar, falta
+  re-emitir o link por `GET /v1/inbox/conversations/{cid}/messages/{mid}/attachments/{i}`.
+- **Áudio gravado no composer** sai convertido para ogg/opus (regra do WhatsApp); o Instagram pode recusar.
+- **Documento no Instagram:** a DM não aceita arquivo; hoje o envio falha com o erro do provedor.
+- **Messenger sem @:** a pessoa pode não ter `username`; aí o modo de teste da IA não tem como casá-la, e o
+  caminho é abrir o canal ao público.
+- **Automação de primeiro contato** segue só WhatsApp (a Meta não deixa abrir DM a frio).
 
 - Nome exato dos campos de `conversation` e `account` no webhook de inbox (a doc não publica o
   schema; o parser aceita `account.id`/`account.accountId`, como já faz).

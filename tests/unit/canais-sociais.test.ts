@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type * as Credenciais from "@/lib/channels/zernio/credentials";
+
 /**
  * Instagram Direct e Messenger pelo intermediário (spec 21) — a lógica que dá
  * para provar sem banco nem rede.
@@ -25,6 +27,8 @@ import { parseZernioEdicao, parseZernioInbound } from "@/lib/channels/zernio/web
 import { waIdentityFrom } from "@/lib/channels/zernio/ingest";
 import { explicarErroDoCallback, plataformaDoProvedor, redeDoProvedor } from "@/lib/channels/zernio/social";
 import { channelLabel } from "@/hooks/channels/useChannelSessions";
+import { alcancavelPelaInternet } from "@/lib/channels/url-publica";
+import { aiAccessUpdateSchema, identidadeDeTeste, numeroPodeTestar } from "@/lib/ai/elegibilidade/pre-go-live";
 
 const ZERNIO = CHANNEL_PROVIDER_ZERNIO;
 
@@ -234,7 +238,7 @@ describe("envio pelo intermediário", () => {
   it("a chave NÃO vai para o CDN da Meta — e vai para o provedor", async () => {
     vi.doMock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({}) }));
     vi.doMock("@/lib/channels/zernio/credentials", async (orig) => ({
-      ...(await orig<typeof import("@/lib/channels/zernio/credentials")>()),
+      ...(await orig<typeof Credenciais>()),
       resolveZernioCreds: async () => ({ accountId: "acc", apiKey: "CHAVE", baseUrl: "https://zernio.com/api", source: "session" }),
     }));
     vi.doMock("@/lib/automation/outbound-ip", () => ({ assertDestinoResolvidoSeguro: async () => undefined }));
@@ -255,7 +259,7 @@ describe("envio pelo intermediário", () => {
   it("a tag HUMAN_AGENT só vai no corpo quando o envelope pede", async () => {
     vi.doMock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({}) }));
     vi.doMock("@/lib/channels/zernio/credentials", async (orig) => ({
-      ...(await orig<typeof import("@/lib/channels/zernio/credentials")>()),
+      ...(await orig<typeof Credenciais>()),
       resolveZernioCreds: async () => ({ accountId: "acc", apiKey: "CHAVE", baseUrl: "https://zernio.com/api", source: "session" }),
     }));
     const corpos: Record<string, unknown>[] = [];
@@ -270,6 +274,52 @@ describe("envio pelo intermediário", () => {
     expect(corpos[0]).toMatchObject({ messagingType: "MESSAGE_TAG", messageTag: "HUMAN_AGENT" });
     expect(corpos[1]).not.toHaveProperty("messageTag");
     vi.unstubAllGlobals();
+  });
+});
+
+describe("modo de teste da IA com @usuario", () => {
+  it("a lista aceita @ do perfil, minúsculo, ao lado de telefone", () => {
+    const r = aiAccessUpdateSchema.parse({ mode: "pre_go_live", test_phone_numbers: ["@Ana.Souza", "+5511999998888"] });
+    expect(r.test_phone_numbers).toEqual(["@ana.souza", "+5511999998888"]);
+  });
+
+  it("recusa @ malformado", () => {
+    expect(aiAccessUpdateSchema.safeParse({ mode: "pre_go_live", test_phone_numbers: ["@com espaço"] }).success).toBe(false);
+  });
+
+  it("o contato social casa pelo @, sem casar telefone nem outro @", () => {
+    const lista = ["@ana.souza", "+5511999998888"];
+    expect(numeroPodeTestar(identidadeDeTeste(null, [{ username: "Ana.Souza" }]), lista)).toBe(true);
+    expect(numeroPodeTestar(identidadeDeTeste(null, [{ username: "outra" }]), lista)).toBe(false);
+    expect(numeroPodeTestar(identidadeDeTeste(null, []), lista)).toBe(false);
+  });
+
+  it("com telefone, continua valendo o telefone (controle)", () => {
+    expect(identidadeDeTeste("+5511999998888", [{ username: "ana.souza" }])).toBe("+5511999998888");
+    expect(numeroPodeTestar("+5511999998888", ["+5511999998888"])).toBe(true);
+  });
+});
+
+describe("o webhook só é registrado num endereço que a internet alcança", () => {
+  it("recusa rede local, loopback e nome de máquina — o caso medido em 29/09", () => {
+    for (const url of [
+      "http://192.168.4.158:3001",
+      "http://localhost:3001",
+      "http://127.0.0.1:3000",
+      "http://10.0.0.5",
+      "http://172.20.1.1",
+      "http://meu-pc:3001",
+      "http://crm.local",
+      "http://[::1]:3000",
+    ]) {
+      expect(alcancavelPelaInternet(url), url).toBe(false);
+    }
+  });
+
+  it("aceita domínio e IP públicos (controle)", () => {
+    expect(alcancavelPelaInternet("https://crm.nebo.com.br")).toBe(true);
+    expect(alcancavelPelaInternet("http://143.95.160.129")).toBe(true);
+    expect(alcancavelPelaInternet("https://abc.trycloudflare.com")).toBe(true);
   });
 });
 

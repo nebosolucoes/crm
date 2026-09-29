@@ -328,7 +328,9 @@ export function parseZernioInbound(payload: unknown): ZernioInboundMessage | nul
             id: str(remetente?.id),
             name: str(remetente?.name) ?? str(remetente?.displayName),
             username: str(remetente?.username),
-            picture: str(remetente?.picture),
+            // Medido no payload real (29/09): a foto vem em
+            // `conversation.participantPicture`, não no `sender`.
+            picture: str(remetente?.picture) ?? str(conversa?.participantPicture),
           })
       : saida
         ? resolveZernioIdentity(participanteDaConversa(conversa))

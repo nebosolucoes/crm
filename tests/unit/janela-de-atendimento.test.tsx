@@ -143,7 +143,7 @@ describe("os elos que somem sem barulho", () => {
     // A coluna fora do `select` não chega, e o cast do embed faz isso NÃO ser
     // erro de tipo: ficaria `undefined` e todo canal viraria "sem restrição".
     const fonte = readFileSync("app/api/v1/conversations/_handler.ts", "utf8");
-    expect(fonte).toMatch(/channel_sessions:channel_session_id \(phone_number, display_name, provider\)/);
+    expect(fonte).toMatch(/channel_sessions:channel_session_id \(phone_number, display_name, provider(, platform)?\)/);
   });
 
   it("o composer é BLOQUEADO quando a janela fechou", () => {

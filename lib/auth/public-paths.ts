@@ -37,6 +37,10 @@ export const PUBLIC_PATHS: RegExp[] = [
   // qualquer sub-path futuro nascer público de carona.
   /^\/api\/v1\/agenda\/google\/callback$/,
   /^\/api\/v1\/integrations\/nuvemshop\/callback$/,
+  // Instagram/Messenger (spec 21): a volta do OAuth vem do Facebook. A
+  // identidade sai do `state` assinado + cookie de vínculo SameSite=Lax, e o
+  // papel é reconferido no banco DENTRO da rota.
+  /^\/api\/v1\/channels\/social\/callback$/,
   /^\/api\/internal\//,
   /^\/api\/mcp(\/.*)?$/,
   // GET /api/v1/contacts aceita SESSÃO ou Bearer `dsk_...` (api_tokens) — a

@@ -47,12 +47,13 @@ describe("leitura do evento (Zernio)", () => {
     expect(parseZernioEdicao(null)).toBeNull();
   });
 
-  it("edição de outra plataforma é ignorada", () => {
-    // A mesma conta serve Instagram e Facebook; não há linha nossa para corrigir.
+  it("edição de rede que o CRM não atende é ignorada", () => {
+    // A mesma conta serve outras redes (Telegram, X…); não há linha nossa para
+    // corrigir. Instagram e Messenger entram desde a spec 21.
     expect(
       parseZernioEdicao({
         event: "message.edited",
-        message: { platform: "instagram", platformMessageId: "x" },
+        message: { platform: "telegram", platformMessageId: "x" },
       }),
     ).toBeNull();
   });

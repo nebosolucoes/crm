@@ -23,6 +23,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { ApiError } from "@/lib/api/types";
 import { decidirPreGoLiveDoCanalViaSupabase } from "@/lib/ai/elegibilidade/consulta-pre-go-live";
+import { identidadeDeTesteDoContato } from "@/lib/ai/elegibilidade/pre-go-live";
 import type { Actor, HandlerCtx } from "@/lib/api/handlers/types";
 import { audit } from "@/lib/audit";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -626,7 +627,8 @@ export async function sendMessageHandler(
   const acessoAtual = ctx.actor.type === "user" ? null : await decidirPreGoLiveDoCanalViaSupabase(supabase, {
     organizationId: ctx.organization_id,
     channelSessionId: c.channel_session_id,
-    contactPhoneNumber: c.contacts?.phone_number ?? "",
+    // Instagram/Messenger (spec 21): sem telefone, o @usuario vale como identidade de teste.
+    contactPhoneNumber: (await identidadeDeTesteDoContato(supabase, ctx.organization_id, c.contact_id, c.contacts?.phone_number)) ?? "",
   }).catch(() => ({ permite: false, motivo: "pre_go_live_indisponivel" }));
   if (acessoAtual && !acessoAtual.permite) {
     const { data: updated, error } = await supabase.from("messages").update({

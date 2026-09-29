@@ -245,8 +245,11 @@ describe("o que a ingestão RECUSA", () => {
     expect(ops.some((o) => o.tabela === "messages")).toBe(false);
   };
 
-  it("outra plataforma na mesma conta", () =>
-    recusa(evento({ platform: "instagram" }), "evento_sem_interesse"));
+  // Spec 21: Instagram passou a ser lido pelo parser; quem recusa agora é a
+  // conferência da rede DA SESSÃO (esta é de WhatsApp).
+  it("outra rede na mesma conta — DM de Instagram numa sessão de WhatsApp", () =>
+    recusa(evento({ platform: "instagram" }), "rede_de_outra_sessao"));
+  it("rede que o CRM não atende", () => recusa(evento({ platform: "telegram" }), "evento_sem_interesse"));
 
   it("sem identidade utilizável — criar contato anônimo faria a próxima mensagem virar um segundo contato", () =>
     recusa(evento({ sender: { whatsappUsername: "@x" } }), "sem_identidade_utilizavel"));

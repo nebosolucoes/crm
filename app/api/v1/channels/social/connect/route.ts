@@ -16,7 +16,7 @@ import { fail, ok } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { PLATAFORMAS_SOCIAIS } from "@/lib/channels/plataformas";
 import { CAMINHO_DO_CALLBACK_SOCIAL, iniciarConexaoSocial } from "@/lib/channels/social";
-import { urlPublicaDaInstalacao } from "@/lib/channels/url-publica";
+import { alcancavelPelaInternet, urlPublicaDaInstalacao } from "@/lib/channels/url-publica";
 import { recusaPorLimite } from "@/lib/entitlements/exigir-na-rota";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { authenticatedSessionId, requireSupportWrite } from "@/lib/impersonate/support";
@@ -40,6 +40,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const lido = corpoSchema.safeParse(await req.json().catch(() => null));
   if (!lido.success) return fail("invalid_request", t("Escolha Instagram ou Messenger."), 422, { requestId });
+
+  // O provedor entrega as mensagens pela INTERNET. Com o CRM num endereço que
+  // ela não alcança, a conexão pareceria feita e nenhuma DM chegaria nunca —
+  // recusar aqui, antes da Meta, é dizer o porquê enquanto dá para agir.
+  const base = urlPublicaDaInstalacao(req);
+  if (!alcancavelPelaInternet(base)) {
+    return fail(
+      "invalid_request",
+      `${t("Este CRM está num endereço que a internet não alcança")} (${new URL(base).host}). ${t("O Instagram e o Messenger entregam as mensagens pela internet: conecte pelo endereço público da instalação (um domínio com https).")}`,
+      422,
+      { requestId },
+    );
+  }
 
   const admin = createAdminClient();
   // Limite do plano ANTES de mandar o operador para a Meta: descobrir o teto

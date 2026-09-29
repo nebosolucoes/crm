@@ -153,9 +153,13 @@ export function CanalSocialClient() {
             </p>
           </div>
           {temChave ? (
-            <Badge variant="secondary">{t("Chave cadastrada")}</Badge>
+            <Badge variant="secondary" className="shrink-0 whitespace-nowrap">
+              {t("Chave cadastrada")}
+            </Badge>
           ) : (
-            <Badge variant="outline">{t("Sem chave")}</Badge>
+            <Badge variant="outline" className="shrink-0 whitespace-nowrap">
+              {t("Sem chave")}
+            </Badge>
           )}
         </div>
 

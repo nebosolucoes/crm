@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
+import { ehPlataformaSocial } from "@/lib/channels/plataformas";
+import { IconeDaPlataforma } from "@/components/channels/IconeDaPlataforma";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -128,6 +130,10 @@ export function ConversationListItem({
   const c = conversation.contacts ?? null;
   const displayName = rotuloDoContato(c, t);
   const phoneFallback = c?.phone_number ? phoneForDisplay(c.phone_number) : "??";
+  // Instagram/Messenger (spec 21): a conversa leva o selo da rede ao lado do
+  // nome. Só nas redes sociais — no WhatsApp, que é a maioria, o selo em toda
+  // linha seria ruído.
+  const redeSocial = ehPlataformaSocial(conversation.channel) ? conversation.channel : null;
   const tags = c?.tags ?? [];
   const visibleTags = tags.slice(0, 2);
   const overflow = tags.length - visibleTags.length;
@@ -256,6 +262,9 @@ export function ConversationListItem({
               c?.is_anonymized && "font-normal italic text-text-muted",
             )}
           >
+            {redeSocial && (
+              <IconeDaPlataforma plataforma={redeSocial} className="mr-1 inline size-3.5 align-[-2px]" />
+            )}
             {displayName}
           </span>
           <span
@@ -307,7 +316,11 @@ export function ConversationListItem({
                 className="h-4 gap-1 px-1.5 text-[10px] font-normal text-text-muted"
                 title={`${t("Entrou por")} ${rotuloCanal}`}
               >
-                <Phone size={9} weight="regular" aria-hidden />
+                {redeSocial ? (
+                  <IconeDaPlataforma plataforma={redeSocial} titulo={false} className="size-2.5" />
+                ) : (
+                  <Phone size={9} weight="regular" aria-hidden />
+                )}
                 {rotuloCanal}
               </Badge>
             )}

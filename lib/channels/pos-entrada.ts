@@ -103,6 +103,12 @@ export interface EntradaDeMensagem {
    * lendo o `event_log` meses depois, se saiba por onde a mensagem entrou.
    */
   origem: string;
+  /**
+   * A rede por onde a mensagem entrou (spec 21). Só batiza o card e a origem
+   * do lead ("Novo contato pelo Instagram"); nenhum passo muda de regra por
+   * ela. Ausente = WhatsApp.
+   */
+  plataforma?: string | null;
 }
 
 /**
@@ -254,6 +260,7 @@ async function abrirDemanda(admin: Admin, entrada: EntradaDeMensagem): Promise<v
       contactId: entrada.contactId,
       conversationId: entrada.conversationId,
       nomeDoContato: entrada.nomeDoContato,
+      plataforma: entrada.plataforma ?? null,
     });
 
     // Os DOIS desfechos viram log. Sem a linha do "não criou", o silêncio de

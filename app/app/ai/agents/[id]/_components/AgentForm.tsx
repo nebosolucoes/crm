@@ -856,7 +856,7 @@ export function AgentForm(props: Props) {
               </div>
             )}
             <div className="space-y-1">
-              <Label htmlFor="channel_session_id">{t("Número conectado")}</Label>
+              <Label htmlFor="channel_session_id">{t("Canal conectado")}</Label>
               <Select
                 value={form.channel_session_id || undefined}
                 onValueChange={(v) => patch({ channel_session_id: v })}

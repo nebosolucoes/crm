@@ -60,18 +60,21 @@ function textoDoModelo(modelo: ModeloAprovado): string {
 export function JanelaFechadaAviso({
   conversationId,
   provider,
+  plataforma,
   motivo,
 }: {
   conversationId: string;
   /** Decide de ONDE vêm as definições. A tela não interpreta este valor. */
   provider: string | null;
+  /** A rede da conversa (spec 21) — Instagram/Messenger não têm definições. */
+  plataforma?: string | null;
   motivo: string;
 }) {
   const t = useT();
   const send = useSendMessage();
   const [escolhido, setEscolhido] = useState("");
 
-  const fonte = fonteDeTemplates(provider);
+  const fonte = fonteDeTemplates(provider, plataforma);
   const { data } = useQuery({
     // A chave inclui a fonte: sem isso, trocar de conversa entre canais serviria
     // a lista em cache do canal anterior, e o operador mandaria um modelo que

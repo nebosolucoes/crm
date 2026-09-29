@@ -614,6 +614,7 @@ jobs:
         autonomia-assistida.spec.ts
         roteamento-por-canal.spec.ts
         setores.spec.ts
+        canais-sociais.spec.ts
         central-avisos-destino.spec.ts
         agenda-presenca-recuperacao.spec.ts
         agenda-google-sync.spec.ts

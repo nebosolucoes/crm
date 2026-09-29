@@ -1,5 +1,6 @@
 import { listSelectableChannels, type SelectableChannel } from "@/lib/channels/selectable";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { PLATAFORMA_WHATSAPP } from "@/lib/channels/plataformas";
 import { capacidadesPadraoDoOnboarding } from "./capacidades-padrao";
 import { escolherModeloDoProvedor } from "./escolher-modelo";
 import { chaveDePlataforma } from "@/lib/ai/runtime/agent";
@@ -96,7 +97,12 @@ export async function publishFirstVersion(
   } catch (err) {
     return { published: false, reason: "failed", message: mensagemDoErro(err) };
   }
-  const canal = selection ? canais.find((c) => c.id === selection.channelId) : canais[0];
+  // Sem escolha explícita, o primeiro agente vai para o primeiro canal de
+  // WHATSAPP — o que o onboarding conectou. Uma conta de Instagram conectada
+  // antes não deve herdar o agente de estreia por acaso de ordem (spec 21).
+  const canal = selection
+    ? canais.find((c) => c.id === selection.channelId)
+    : (canais.find((c) => c.platform === PLATAFORMA_WHATSAPP) ?? canais[0]);
   if (!canal) return { published: false, reason: "no_channel" };
 
   // Erro de leitura aqui NÃO pode virar "assume anthropic": publicar sem saber

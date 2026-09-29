@@ -278,6 +278,7 @@ async function efeitosDaEntrada(
     nomeDoContato: msg.identity.displayName,
     requestId: input.requestId,
     origem: "zernio_webhook",
+    plataforma: msg.plataforma,
   });
 }
 

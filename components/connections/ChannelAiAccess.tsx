@@ -82,7 +82,7 @@ function AccessForm({ channelId, initial, onClose }: { channelId: string; initia
       mode, test_phone_numbers: numbers.split("\n").map(n => n.trim()).filter(Boolean),
     });
     if (!parsed.success) {
-      setError(t("Use um telefone com DDI por linha, por exemplo +5511999998888."));
+      setError(t("Use um telefone com DDI (+5511999998888) ou o @ do perfil (@minhaloja) por linha."));
       return;
     }
     setBusy(true);
@@ -112,13 +112,13 @@ function AccessForm({ channelId, initial, onClose }: { channelId: string; initia
         </p>
       </div>
       <div className="flex flex-col gap-2">
-        <Label htmlFor={id}>{t("Números autorizados para teste")}</Label>
+        <Label htmlFor={id}>{t("Contatos autorizados para teste")}</Label>
         <Textarea id={id} rows={6} value={numbers} disabled={busy}
           onChange={e => { setNumbers(e.target.value); setError(null); }}
           aria-invalid={Boolean(error)} aria-describedby={`${id}-help`}
           placeholder="+5511999998888" />
         <p id={`${id}-help`} className="text-sm text-muted-foreground">
-          {t("Um telefone com DDI por linha. Lista vazia no modo de teste bloqueia todas as respostas automáticas.")}
+          {t("Um por linha: telefone com DDI no WhatsApp, @ do perfil no Instagram e no Messenger. Lista vazia no modo de teste bloqueia todas as respostas automáticas.")}
         </p>
       </div>
       <p className="text-sm text-muted-foreground">

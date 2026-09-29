@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { JanelaSelo } from "@/components/inbox/JanelaSelo";
+import { IconeDaPlataforma } from "@/components/channels/IconeDaPlataforma";
+import { ehPlataformaSocial, ROTULO_DA_PLATAFORMA } from "@/lib/channels/plataformas";
 import { Phone, ArrowRight } from "@/lib/ui/icons";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useClaimConversation } from "@/hooks/inbox/useClaimConversation";
@@ -73,6 +75,11 @@ export function ConversationHeader({ conversation }: Props) {
   const c = conversation.contacts ?? null;
   const displayName = rotuloDoContato(c, t);
   const phone = c?.phone_number ? phoneForDisplay(c.phone_number) : null;
+  // Sem telefone numa DM social (spec 21): o @ do perfil é o que identifica a
+  // pessoa para quem atende, e a rede diz onde procurá-la.
+  const redeSocial = ehPlataformaSocial(conversation.channel) ? conversation.channel : null;
+  const usuarioSocial =
+    c?.contact_platform_identities?.find((i) => i.platform === conversation.channel && i.username)?.username ?? null;
   const status = conversation.status;
   const isMineAssigned = conversation.assigned_to_user_id === user.id;
   const isOpen = status === "open" || conversation.assigned_to_user_id == null;
@@ -149,6 +156,7 @@ export function ConversationHeader({ conversation }: Props) {
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background px-4 py-3">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
+          {redeSocial && <IconeDaPlataforma plataforma={redeSocial} />}
           <h2 className="truncate text-sm font-semibold">{displayName}</h2>
           <Badge variant="outline" className="h-4 px-1.5 text-[10px]">
             {t(STATUS_LABEL[status] ?? status)}
@@ -158,6 +166,7 @@ export function ConversationHeader({ conversation }: Props) {
               `failed` com um código de cinco dígitos. */}
           <JanelaSelo
             provider={conversation.channel_sessions?.provider ?? null}
+            plataforma={conversation.channel}
             lastInboundAt={conversation.last_inbound_at}
           />
           {/* Sem esta marca, a conversa em que o robô está calado tem exatamente
@@ -197,6 +206,12 @@ export function ConversationHeader({ conversation }: Props) {
         {phone && (
           <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
             <Phone size={11} weight="regular" aria-hidden /> {phone}
+          </p>
+        )}
+        {!phone && redeSocial && (
+          <p className="mt-0.5 text-xs text-muted-foreground" data-testid="identidade-social">
+            {ROTULO_DA_PLATAFORMA[redeSocial]}
+            {usuarioSocial ? ` · @${usuarioSocial}` : ""}
           </p>
         )}
       </div>

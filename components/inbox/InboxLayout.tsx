@@ -4,6 +4,8 @@ import { useT } from "@/hooks/i18n/useT";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { estadoDaJanela, formatarDecorrido } from "@/lib/channels/janela";
+import { ehPlataformaSocial } from "@/lib/channels/plataformas";
+import { fonteDeTemplates } from "@/lib/channels/templates-fonte";
 import { JanelaFechadaAviso } from "@/components/inbox/JanelaFechadaAviso";
 import { useClaimConversation } from "@/hooks/inbox/useClaimConversation";
 import { useCloseConversation } from "@/hooks/inbox/useCloseConversation";
@@ -327,12 +329,20 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
     selectedConversation?.channel_sessions?.provider ?? null,
     selectedConversation?.last_inbound_at ?? null,
     agoraJanela,
+    selectedConversation?.channel ?? null,
   );
+  // Instagram/Messenger (spec 21): não há modelo aprovado. Fechada ali quer
+  // dizer "passou o prazo de 7 dias" e a única saída é o cliente escrever.
+  const redeSemModelo =
+    fonteDeTemplates(selectedConversation?.channel_sessions?.provider ?? null, selectedConversation?.channel ?? null) ===
+      null && ehPlataformaSocial(selectedConversation?.channel);
   const motivoDaJanela =
     janela.tipo === "fechada"
-      ? janela.fechadaHaMs === null
-        ? t("O cliente ainda não escreveu — a janela de 24h nunca abriu. Só um modelo aprovado sai daqui.")
-        : `${t("A janela de 24h fechou há")} ${formatarDecorrido(janela.fechadaHaMs)}. ${t("Só um modelo aprovado sai daqui — texto livre é recusado pela plataforma.")}`
+      ? redeSemModelo
+        ? t("Passou o prazo para responder nesta rede (7 dias desde a última mensagem do cliente). Só dá para escrever de novo quando ele mandar mensagem.")
+        : janela.fechadaHaMs === null
+          ? t("O cliente ainda não escreveu — a janela de 24h nunca abriu. Só um modelo aprovado sai daqui.")
+          : `${t("A janela de 24h fechou há")} ${formatarDecorrido(janela.fechadaHaMs)}. ${t("Só um modelo aprovado sai daqui — texto livre é recusado pela plataforma.")}`
       : null;
 
   const blockedReason = selectedConversation?.contacts?.is_blocked
@@ -508,6 +518,7 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
               <JanelaFechadaAviso
                 conversationId={selectedConversation.id}
                 provider={selectedConversation.channel_sessions?.provider ?? null}
+                plataforma={selectedConversation.channel}
                 motivo={motivoDaJanela}
               />
             )}

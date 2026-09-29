@@ -501,6 +501,10 @@ $$;
 revoke all on function public.fn_lgpd_cascade_redact_contact(uuid,uuid,uuid) from public,anon,authenticated;
 grant execute on function public.fn_lgpd_cascade_redact_contact(uuid,uuid,uuid) to service_role;
 
+-- A inbox embute `contact_platform_identities` em `contacts`: o PostgREST
+-- precisa reler o schema para enxergar a relação nova.
+notify pgrst, 'reload schema';
+
 -- ---- travas do modo somente leitura do suporte nas tabelas novas ----
 -- Mesma razão da 0278: na CADEIA ninguém replanta as travas depois da 0274, e
 -- `contact_platform_identities`/`channel_provider_keys` nasceriam sem elas. No
