@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { JanelaSelo } from "@/components/inbox/JanelaSelo";
 import { IconeDaPlataforma } from "@/components/channels/IconeDaPlataforma";
-import { ehPlataformaSocial, ROTULO_DA_PLATAFORMA } from "@/lib/channels/plataformas";
+import { ehPlataformaSocial, plataformaDe, ROTULO_DA_PLATAFORMA } from "@/lib/channels/plataformas";
 import { Phone, ArrowRight } from "@/lib/ui/icons";
 import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useClaimConversation } from "@/hooks/inbox/useClaimConversation";
@@ -78,6 +78,8 @@ export function ConversationHeader({ conversation }: Props) {
   // Sem telefone numa DM social (spec 21): o @ do perfil é o que identifica a
   // pessoa para quem atende, e a rede diz onde procurá-la.
   const redeSocial = ehPlataformaSocial(conversation.channel) ? conversation.channel : null;
+  // O selo da rede aparece em toda conversa, WhatsApp inclusive (pedido do dono, 29/09).
+  const rede = plataformaDe(conversation.channel);
   const usuarioSocial =
     c?.contact_platform_identities?.find((i) => i.platform === conversation.channel && i.username)?.username ?? null;
   const status = conversation.status;
@@ -156,7 +158,7 @@ export function ConversationHeader({ conversation }: Props) {
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background px-4 py-3">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          {redeSocial && <IconeDaPlataforma plataforma={redeSocial} />}
+          <IconeDaPlataforma plataforma={rede} />
           <h2 className="truncate text-sm font-semibold">{displayName}</h2>
           <Badge variant="outline" className="h-4 px-1.5 text-[10px]">
             {t(STATUS_LABEL[status] ?? status)}

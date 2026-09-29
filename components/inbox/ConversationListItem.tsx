@@ -5,7 +5,7 @@ import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
 import type { Locale } from "date-fns";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import { useT } from "@/hooks/i18n/useT";
-import { Phone, Robot } from "@/lib/ui/icons";
+import { Robot } from "@/lib/ui/icons";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { OwnerBadge } from "@/components/kanban/OwnerBadge";
@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
-import { ehPlataformaSocial } from "@/lib/channels/plataformas";
+import { plataformaDe } from "@/lib/channels/plataformas";
 import { IconeDaPlataforma } from "@/components/channels/IconeDaPlataforma";
 
 interface Props {
@@ -130,10 +130,10 @@ export function ConversationListItem({
   const c = conversation.contacts ?? null;
   const displayName = rotuloDoContato(c, t);
   const phoneFallback = c?.phone_number ? phoneForDisplay(c.phone_number) : "??";
-  // Instagram/Messenger (spec 21): a conversa leva o selo da rede ao lado do
-  // nome. Só nas redes sociais — no WhatsApp, que é a maioria, o selo em toda
-  // linha seria ruído.
-  const redeSocial = ehPlataformaSocial(conversation.channel) ? conversation.channel : null;
+  // Toda conversa leva o selo da rede ao lado do nome — WhatsApp, Instagram ou
+  // Messenger (spec 21; pedido do dono, 29/09: "o ícone do WhatsApp igual tem
+  // no Instagram"). Conversa sem `channel` (cache antigo) é WhatsApp.
+  const rede = plataformaDe(conversation.channel);
   const tags = c?.tags ?? [];
   const visibleTags = tags.slice(0, 2);
   const overflow = tags.length - visibleTags.length;
@@ -262,9 +262,7 @@ export function ConversationListItem({
               c?.is_anonymized && "font-normal italic text-text-muted",
             )}
           >
-            {redeSocial && (
-              <IconeDaPlataforma plataforma={redeSocial} className="mr-1 inline size-3.5 align-[-2px]" />
-            )}
+            <IconeDaPlataforma plataforma={rede} className="mr-1 inline size-3.5 align-[-2px]" />
             {displayName}
           </span>
           <span
@@ -316,11 +314,7 @@ export function ConversationListItem({
                 className="h-4 gap-1 px-1.5 text-[10px] font-normal text-text-muted"
                 title={`${t("Entrou por")} ${rotuloCanal}`}
               >
-                {redeSocial ? (
-                  <IconeDaPlataforma plataforma={redeSocial} titulo={false} className="size-2.5" />
-                ) : (
-                  <Phone size={9} weight="regular" aria-hidden />
-                )}
+                <IconeDaPlataforma plataforma={rede} titulo={false} className="size-2.5" />
                 {rotuloCanal}
               </Badge>
             )}

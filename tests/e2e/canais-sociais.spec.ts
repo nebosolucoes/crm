@@ -122,7 +122,10 @@ test.describe("Instagram Direct e Messenger — a tela", () => {
 
     const linha = page.locator("[data-conversation-id]", { hasText: NOME_ABERTA });
     await expect(linha).toBeVisible({ timeout: 30_000 });
-    await expect(linha.locator('svg[data-plataforma="instagram"]')).toBeVisible();
+    await expect(linha.locator('svg[data-plataforma="instagram"]').first()).toBeVisible();
+    // E a conversa de WhatsApp leva o selo do WhatsApp (pedido do dono, 29/09):
+    // toda linha diz a rede, não só as sociais.
+    await expect(page.locator('[data-conversation-id] svg[data-plataforma="whatsapp"]').first()).toBeVisible();
 
     await linha.click();
     await expect(page.getByTestId("identidade-social")).toHaveText("Instagram · @iara.e2e");
