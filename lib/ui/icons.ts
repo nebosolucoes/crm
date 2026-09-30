@@ -156,4 +156,13 @@ export {
   ArrowLeft,
   DotsThreeVertical,
   Broadcast,
+  // prévia realista das redes sociais (Publicações): os ícones da interface
+  // que a pessoa vai reconhecer no Feed, nos Stories e nos Reels
+  Heart,
+  BookmarkSimple,
+  ShareFat,
+  ThumbsUp,
+  ChatCircleDots,
+  SpeakerSimpleHigh,
+  SmileyWink,
 } from "@phosphor-icons/react/dist/ssr";

@@ -192,6 +192,19 @@ test("Agendar: 2 arquivos, WhatsApp com 2 grupos, Instagram Feed + Stories, 2 da
   await expect(page.getByTestId("rede-instagram")).toContainText("Reels precisa de um vídeo");
   await page.getByTestId("destino-instagram-reel").click();
 
+  // A prévia: um aparelho por destino, setas trocam de rede; a conta e as
+  // marcas de cada formato aparecem (o @ no Feed, as barras no Story).
+  await expect(page.getByTestId("previa-rotulo")).toContainText("Instagram · Feed");
+  await expect(page.getByTestId("previa-instagram-feed")).toContainText("nebo.demo");
+  await page.getByTestId("previa-proximo").click();
+  await expect(page.getByTestId("previa-rotulo")).toContainText("Instagram · Stories");
+  await expect(page.getByTestId("previa-instagram-story")).toBeVisible();
+  await page.getByTestId("previa-proximo").click();
+  await expect(page.getByTestId("previa-rotulo")).toContainText("WhatsApp · Grupos");
+  await expect(page.getByTestId("previa-whatsapp-group_message")).toContainText("Clientes VIP");
+  await page.getByTestId("previa-anterior").click();
+  await expect(page.getByTestId("previa-rotulo")).toContainText("Instagram · Stories");
+
   await page.getByRole("button", { name: "Amanhã, mesmo horário" }).click();
   await expect(page.getByTestId("horario-2")).toBeVisible();
 

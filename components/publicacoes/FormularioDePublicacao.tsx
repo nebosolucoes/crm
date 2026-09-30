@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { PreviaDoCelular, type AnexoDaPrevia } from "@/components/disparo/PreviaDoCelular";
 import type { GrupoSelecionavel } from "@/components/disparo/SeletorDeGrupos";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { Button } from "@/components/ui/button";
@@ -21,11 +20,12 @@ import { validarDestino } from "@/lib/publicacoes/regras-por-destino";
 import type { CriarPublicacao, DestinoDaPublicacao, MidiaDaPublicacao, RecorrenciaDaPublicacao } from "@/lib/publicacoes/schema";
 import type { PublicacaoLida } from "@/lib/publicacoes/servico";
 import { horaLocal, paredeParaInstante, proximaHoraCheia } from "@/lib/publicacoes/tempo-da-tela";
-import { cn } from "@/lib/utils";
 
 import { DropzoneDeMidia, type AnexoLocal } from "./DropzoneDeMidia";
 import { SeletorDeDestinos, chaveDoDestino } from "./SeletorDeDestinos";
 import { SeletorDeHorarios } from "./SeletorDeHorarios";
+import type { MidiaDaPrevia } from "./previa/Aparelho";
+import { PreviaDosDestinos } from "./previa/PreviaDosDestinos";
 import { ROTULO_DA_REDE, ROTULO_DO_FORMATO } from "./rotulos";
 
 /**
@@ -205,9 +205,8 @@ function Formulario({ fuso, editarId, inicial }: { fuso: string; editarId: strin
   }
 
   const grupoNome = useMemo(() => new Map((grupos ?? []).map((g) => [g.id, g.name])), [grupos]);
-  const destinoWa = destinos.find((d) => d.network === "whatsapp");
-  const nomesDosGrupos = (destinoWa?.group_ids ?? []).map((id) => grupoNome.get(id) ?? "").filter(Boolean);
-  const anexosDaPrevia: AnexoDaPrevia[] = anexos.map((a) => ({ id: a.id, kind: a.kind, url: a.url, nome: a.nome, mime: a.mime, sizeBytes: a.sizeBytes }));
+  const nomesDosGrupos = (ids: string[]) => ids.map((id) => grupoNome.get(id) ?? "").filter(Boolean);
+  const midiasDaPrevia: MidiaDaPrevia[] = anexos.map((a) => ({ id: a.id, kind: a.kind, url: a.url, nome: a.nome }));
   const primeira = datas[0] ?? null;
   const dataLegenda = primeira ? new Intl.DateTimeFormat(tag, { day: "2-digit", month: "short", timeZone: fuso }).format(new Date(primeira)) : "";
   const resumoDosDestinos = destinos.map((d) => `${ROTULO_DA_REDE[d.network]} · ${d.network === "whatsapp" ? `${d.group_ids?.length ?? 0} ${t("grupos")}` : t(ROTULO_DO_FORMATO[d.format])}`);
@@ -274,11 +273,15 @@ function Formulario({ fuso, editarId, inicial }: { fuso: string; editarId: strin
             </li>
           </ul>
         </div>
-        {destinoWa ? (
-          <PreviaDoCelular grupos={nomesDosGrupos} mensagem={legenda} anexos={anexosDaPrevia} horario={primeira ? horaLocal(primeira, fuso) : "--:--"} dataLegenda={dataLegenda} className={cn("mx-auto")} />
-        ) : (
-          <div className="rounded-xl border border-dashed p-4 text-center text-xs text-muted-foreground">{t("Marque o WhatsApp para ver a prévia da mensagem no celular.")}</div>
-        )}
+        <PreviaDosDestinos
+          destinos={destinos}
+          contas={contas ?? []}
+          nomesDosGrupos={nomesDosGrupos}
+          midias={midiasDaPrevia}
+          legenda={legenda}
+          hora={primeira ? horaLocal(primeira, fuso) : "--:--"}
+          dataLegenda={dataLegenda}
+        />
       </aside>
     </div>
   );

@@ -9838,6 +9838,32 @@ export const DICIONARIO: Traducoes = {
   "Abra o Histórico de Publicações: o destino que falhou mostra o motivo e permite reenviar quando fizer sentido.": { es: "Abre el Historial de Publicaciones: el destino que falló muestra el motivo y permite reenviar cuando tenga sentido." },
   "Uma publicação não saiu em um dos destinos": { es: "Una publicación no salió en uno de los destinos" },
 
+  // ── Publicações: prévia realista por destino (Feed, Stories, Reels) ──
+  "(sem legenda)": { es: "(sin texto)" },
+  "Anexe um vídeo vertical para ver o Reel.": { es: "Adjunta un video vertical para ver el Reel." },
+  "Anexe uma foto ou um vídeo: cada arquivo vira um Story.": { es: "Adjunta una foto o un video: cada archivo se convierte en un Story." },
+  "Comentar": { es: "Comentar" },
+  "Compartilhar": { es: "Compartir" },
+  "Curtido por": { es: "Le gusta a" },
+  "Curtir": { es: "Me gusta" },
+  "Destino anterior": { es: "Destino anterior" },
+  "Foto anterior": { es: "Foto anterior" },
+  "Marque um destino para ver a prévia como ela vai aparecer.": { es: "Marca un destino para ver la vista previa tal como va a aparecer." },
+  "Prévia do Reel": { es: "Vista previa del Reel" },
+  "Prévia do Story": { es: "Vista previa del Story" },
+  "Prévia do post no Feed": { es: "Vista previa del post en el Feed" },
+  "Prévia por destino": { es: "Vista previa por destino" },
+  "Próxima foto": { es: "Foto siguiente" },
+  "Próximo Story": { es: "Story siguiente" },
+  "Próximo destino": { es: "Destino siguiente" },
+  "Responder…": { es: "Responder…" },
+  "Seguir": { es: "Seguir" },
+  "Sua Página": { es: "Tu Página" },
+  "Story anterior": { es: "Story anterior" },
+  "Você e outras pessoas": { es: "Tú y otras personas" },
+  "outras pessoas": { es: "otras personas" },
+  "Áudio original": { es: "Audio original" },
+
 };
 
 /**
