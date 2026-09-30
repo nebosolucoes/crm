@@ -26,7 +26,7 @@ export function Aparelho({
 }) {
   const escuro = tema === "escuro";
   return (
-    <div className={cn("mx-auto w-[300px] select-none", className)} role="img" aria-label={rotulo} data-testid="aparelho-de-previa">
+    <div className={cn("mx-auto w-[300px] select-none 2xl:w-[340px]", className)} role="img" aria-label={rotulo} data-testid="aparelho-de-previa">
       <div className="rounded-[2.6rem] border-[8px] border-[#1c1c1e] bg-[#1c1c1e] shadow-[0_24px_48px_-20px_rgba(0,0,0,0.6)]">
         <div className={cn("relative aspect-[9/19.5] overflow-hidden rounded-[2.1rem]", escuro ? "bg-black text-white" : "bg-white text-[#0f1419]")}>
           {/* Barra de status */}

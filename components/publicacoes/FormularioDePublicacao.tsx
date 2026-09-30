@@ -234,7 +234,7 @@ function Formulario({ fuso, editarId, inicial }: { fuso: string; editarId: strin
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="grid gap-6 xl:grid-cols-[minmax(300px,0.9fr)_minmax(340px,1.1fr)_344px] lg:grid-cols-[minmax(280px,1fr)_minmax(320px,1fr)]" data-testid="formulario-em-colunas">
+      <div className="grid gap-6 lg:grid-cols-[minmax(280px,1fr)_minmax(320px,1fr)] xl:grid-cols-[minmax(320px,1fr)_minmax(380px,1.25fr)_minmax(360px,0.95fr)] xl:gap-8" data-testid="formulario-em-colunas">
         {/* 1ª coluna: onde e quando */}
         <section className="flex min-w-0 flex-col gap-4" aria-labelledby="passo-destinos">
           <h2 id="passo-destinos" className="flex items-center gap-2 text-base font-semibold">
@@ -291,7 +291,7 @@ function Formulario({ fuso, editarId, inicial }: { fuso: string; editarId: strin
         </section>
 
         {/* 3ª coluna: como vai aparecer */}
-        <aside className="flex min-w-0 flex-col gap-4 lg:col-span-2 xl:col-span-1 xl:sticky xl:top-4 xl:self-start" aria-labelledby="passo-previa">
+        <aside className="flex min-w-0 flex-col gap-4 lg:col-span-2 xl:col-span-1 xl:sticky xl:top-2 xl:self-start" aria-labelledby="passo-previa">
           <h2 id="passo-previa" className="flex items-center gap-2 text-base font-semibold">
             <Passo n={3} />
             {t("Como vai aparecer")}
