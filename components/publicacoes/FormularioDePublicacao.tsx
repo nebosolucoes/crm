@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { useT } from "@/hooks/i18n/useT";
 import { subirMidia, urlAssinadaDaMidia, useContasPublicaveis, useMutacoesDePublicacao, usePublicacao } from "@/hooks/publicacoes/usePublicacoes";
@@ -212,78 +213,113 @@ function Formulario({ fuso, editarId, inicial }: { fuso: string; editarId: strin
   const resumoDosDestinos = destinos.map((d) => `${ROTULO_DA_REDE[d.network]} · ${d.network === "whatsapp" ? `${d.group_ids?.length ?? 0} ${t("grupos")}` : t(ROTULO_DO_FORMATO[d.format])}`);
   const ocupado = salvando !== null;
 
+  // O que falta para agendar — a lista que desativa o botão e vira o tooltip.
+  const pendencias: string[] = [];
+  if (destinos.length === 0) pendencias.push(t("Marque pelo menos um destino."));
+  if (datas.length === 0) pendencias.push(t("Escolha pelo menos uma data e hora."));
+  if (!legenda.trim() && anexos.length === 0) pendencias.push(t("Escreva uma legenda ou anexe um arquivo."));
+  for (const d of destinos) {
+    const v = veredito[chaveDoDestino(d)];
+    for (const e of v?.erros ?? []) {
+      pendencias.push(`${ROTULO_DA_REDE[d.network]} · ${t(ROTULO_DO_FORMATO[d.format])}: ${t(e.mensagem)}`);
+    }
+  }
+  const podeAgendar = pendencias.length === 0;
+
+  const botaoAgendar = (
+    <Button type="button" onClick={() => void salvar("scheduled")} disabled={ocupado || !podeAgendar} aria-disabled={!podeAgendar} data-testid="agendar-publicacao">
+      {salvando === "scheduled" ? t("Agendando…") : editarId ? t("Salvar alterações") : t("Agendar publicação")}
+    </Button>
+  );
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="flex flex-col gap-8">
-        <section className="flex flex-col gap-4" aria-labelledby="passo-conteudo">
-          <h2 id="passo-conteudo" className="flex items-center gap-2 text-base font-semibold">
+    <TooltipProvider delayDuration={150}>
+      <div className="grid gap-6 xl:grid-cols-[minmax(300px,0.9fr)_minmax(340px,1.1fr)_344px] lg:grid-cols-[minmax(280px,1fr)_minmax(320px,1fr)]" data-testid="formulario-em-colunas">
+        {/* 1ª coluna: onde e quando */}
+        <section className="flex min-w-0 flex-col gap-4" aria-labelledby="passo-destinos">
+          <h2 id="passo-destinos" className="flex items-center gap-2 text-base font-semibold">
             <Passo n={1} />
+            {t("Onde e quando")}
+          </h2>
+          {carregandoContas ? <Skeleton className="h-40 w-full" /> : <SeletorDeDestinos contas={contas ?? []} grupos={grupos ?? []} destinos={destinos} onChange={setDestinos} veredito={veredito} disabled={ocupado} layout="coluna" />}
+          <h3 className="pt-2 text-sm font-semibold">{t("Datas e horários")}</h3>
+          <SeletorDeHorarios datas={datas} onChange={setDatas} recorrencia={recorrencia} onRecorrencia={setRecorrencia} fuso={fuso} disabled={ocupado} />
+        </section>
+
+        {/* 2ª coluna: o conteúdo */}
+        <section className="flex min-w-0 flex-col gap-4" aria-labelledby="passo-conteudo">
+          <h2 id="passo-conteudo" className="flex items-center gap-2 text-base font-semibold">
+            <Passo n={2} />
             {t("Conteúdo")}
           </h2>
+          <DropzoneDeMidia anexos={anexos} onChange={setAnexos} disabled={ocupado} />
+          <div className="grid gap-2">
+            <Label htmlFor="pub-legenda">{t("Legenda")}</Label>
+            <Textarea id="pub-legenda" value={legenda} onChange={(e) => setLegenda(e.target.value)} placeholder={t("O texto que sai no post e na mensagem. No WhatsApp, *negrito* e _itálico_ funcionam.")} rows={7} maxLength={4000} disabled={ocupado} data-testid="pub-legenda" />
+            <span className="text-right text-[11px] text-muted-foreground">{legenda.length}/4000</span>
+          </div>
           <div className="grid gap-2">
             <Label htmlFor="pub-titulo">{t("Título (só para você achar depois)")}</Label>
             <Input id="pub-titulo" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder={t("Ex.: Oferta Coca-Cola")} maxLength={160} disabled={ocupado} data-testid="pub-titulo" />
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="pub-legenda">{t("Legenda")}</Label>
-            <Textarea id="pub-legenda" value={legenda} onChange={(e) => setLegenda(e.target.value)} placeholder={t("O texto que sai no post e na mensagem. No WhatsApp, *negrito* e _itálico_ funcionam.")} rows={5} maxLength={4000} disabled={ocupado} data-testid="pub-legenda" />
-            <span className="text-right text-[11px] text-muted-foreground">{legenda.length}/4000</span>
+
+          <div className="mt-auto flex flex-wrap items-center gap-2 border-t pt-4">
+            {podeAgendar ? (
+              botaoAgendar
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0} className="inline-flex" data-testid="agendar-bloqueado">
+                    {botaoAgendar}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs" data-testid="tooltip-pendencias">
+                  <p className="font-medium">{t("Falta para agendar:")}</p>
+                  <ul className="mt-1 list-disc pl-4">
+                    {pendencias.map((m) => (
+                      <li key={m}>{m}</li>
+                    ))}
+                  </ul>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            <Button type="button" variant="outline" onClick={() => void salvar("draft")} disabled={ocupado} data-testid="salvar-rascunho">
+              {salvando === "draft" ? t("Salvando…") : t("Salvar como rascunho")}
+            </Button>
+            {editarId ? <span className="text-xs text-muted-foreground">{t("Salvar altera todas as datas pendentes desta publicação.")}</span> : null}
           </div>
-          <DropzoneDeMidia anexos={anexos} onChange={setAnexos} disabled={ocupado} />
         </section>
 
-        <section className="flex flex-col gap-4" aria-labelledby="passo-destinos">
-          <h2 id="passo-destinos" className="flex items-center gap-2 text-base font-semibold">
-            <Passo n={2} />
-            {t("Onde publicar")}
-          </h2>
-          {carregandoContas ? <Skeleton className="h-40 w-full" /> : <SeletorDeDestinos contas={contas ?? []} grupos={grupos ?? []} destinos={destinos} onChange={setDestinos} veredito={veredito} disabled={ocupado} />}
-        </section>
-
-        <section className="flex flex-col gap-4" aria-labelledby="passo-quando">
-          <h2 id="passo-quando" className="flex items-center gap-2 text-base font-semibold">
+        {/* 3ª coluna: como vai aparecer */}
+        <aside className="flex min-w-0 flex-col gap-4 lg:col-span-2 xl:col-span-1 xl:sticky xl:top-4 xl:self-start" aria-labelledby="passo-previa">
+          <h2 id="passo-previa" className="flex items-center gap-2 text-base font-semibold">
             <Passo n={3} />
-            {t("Quando")}
+            {t("Como vai aparecer")}
           </h2>
-          <SeletorDeHorarios datas={datas} onChange={setDatas} recorrencia={recorrencia} onRecorrencia={setRecorrencia} fuso={fuso} disabled={ocupado} />
-        </section>
-
-        <div className="flex flex-wrap items-center gap-2 border-t pt-4">
-          <Button type="button" onClick={() => void salvar("scheduled")} disabled={ocupado} data-testid="agendar-publicacao">
-            {salvando === "scheduled" ? t("Agendando…") : editarId ? t("Salvar alterações") : t("Agendar publicação")}
-          </Button>
-          <Button type="button" variant="outline" onClick={() => void salvar("draft")} disabled={ocupado} data-testid="salvar-rascunho">
-            {salvando === "draft" ? t("Salvando…") : t("Salvar como rascunho")}
-          </Button>
-          {editarId ? <span className="text-xs text-muted-foreground">{t("Salvar altera todas as datas pendentes desta publicação.")}</span> : null}
-        </div>
+          <PreviaDosDestinos
+            destinos={destinos}
+            contas={contas ?? []}
+            nomesDosGrupos={nomesDosGrupos}
+            midias={midiasDaPrevia}
+            legenda={legenda}
+            hora={primeira ? horaLocal(primeira, fuso) : "--:--"}
+            dataLegenda={dataLegenda}
+          />
+          <div className="rounded-xl border bg-card p-3 text-sm">
+            <ul className="flex flex-col gap-1">
+              <li>
+                {anexos.length} {anexos.length === 1 ? t("arquivo") : t("arquivos")}
+              </li>
+              {resumoDosDestinos.length > 0 ? resumoDosDestinos.map((r) => <li key={r}>{r}</li>) : <li className="text-muted-foreground">{t("Nenhum destino ainda")}</li>}
+              <li>
+                {datas.length} {datas.length === 1 ? t("data") : t("datas")}
+                {recorrencia.kind !== "none" ? ` · ${t("com repetição")}` : ""}
+              </li>
+            </ul>
+          </div>
+        </aside>
       </div>
-
-      <aside className="flex flex-col gap-4 lg:sticky lg:top-4 lg:self-start">
-        <div className="rounded-xl border bg-card p-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("Resumo")}</h3>
-          <ul className="mt-2 flex flex-col gap-1 text-sm">
-            <li>
-              {anexos.length} {anexos.length === 1 ? t("arquivo") : t("arquivos")}
-            </li>
-            {resumoDosDestinos.length > 0 ? resumoDosDestinos.map((r) => <li key={r}>{r}</li>) : <li className="text-muted-foreground">{t("Nenhum destino ainda")}</li>}
-            <li>
-              {datas.length} {datas.length === 1 ? t("data") : t("datas")}
-              {recorrencia.kind !== "none" ? ` · ${t("com repetição")}` : ""}
-            </li>
-          </ul>
-        </div>
-        <PreviaDosDestinos
-          destinos={destinos}
-          contas={contas ?? []}
-          nomesDosGrupos={nomesDosGrupos}
-          midias={midiasDaPrevia}
-          legenda={legenda}
-          hora={primeira ? horaLocal(primeira, fuso) : "--:--"}
-          dataLegenda={dataLegenda}
-        />
-      </aside>
-    </div>
+    </TooltipProvider>
   );
 }
 

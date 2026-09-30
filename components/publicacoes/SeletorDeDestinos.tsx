@@ -31,6 +31,7 @@ export function SeletorDeDestinos({
   onChange,
   veredito,
   disabled,
+  layout = "linha",
 }: {
   contas: ContaPublicavel[];
   grupos: GrupoSelecionavel[];
@@ -39,6 +40,8 @@ export function SeletorDeDestinos({
   /** Por chave de destino: erros e avisos das regras por formato. */
   veredito: Record<ChaveDoDestino, { erros: ProblemaDoDestino[]; avisos: ProblemaDoDestino[] }>;
   disabled?: boolean;
+  /** `coluna` empilha os cards (o Agendar em três colunas); `linha` os põe lado a lado. */
+  layout?: "linha" | "coluna";
 }) {
   const t = useT();
   const porRede = useMemo(() => {
@@ -71,7 +74,7 @@ export function SeletorDeDestinos({
   }
 
   return (
-    <div className="grid gap-3 md:grid-cols-3">
+    <div className={cn("grid gap-3", layout === "linha" && "md:grid-cols-3")}>
       {REDES_DA_PUBLICACAO.map((rede) => {
         const lista = porRede.get(rede) ?? [];
         const contaId = contaDaRede(rede);
@@ -108,13 +111,13 @@ export function SeletorDeDestinos({
                     <SelectContent>
                       {lista.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
-                          {c.username ? `@${c.username}` : (c.display_name ?? c.id.slice(0, 8))}
+                          {rede === "facebook" ? (c.display_name ?? (c.username ? `@${c.username}` : c.id.slice(0, 8))) : c.username ? `@${c.username}` : (c.display_name ?? c.id.slice(0, 8))}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 ) : (
-                  <p className="truncate text-xs text-muted-foreground">{conta?.username ? `@${conta.username}` : conta?.display_name}</p>
+                  <p className="truncate text-xs text-muted-foreground">{rede === "facebook" ? (conta?.display_name ?? (conta?.username ? `@${conta.username}` : "")) : conta?.username ? `@${conta.username}` : conta?.display_name}</p>
                 )}
 
                 <div className="flex flex-col gap-1.5">

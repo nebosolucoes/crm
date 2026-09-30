@@ -9866,6 +9866,12 @@ export const DICIONARIO: Traducoes = {
 
   "Ver todos os comentários": { es: "Ver todos los comentarios" },
 
+  // ── Agendar em três colunas ──
+  "Onde e quando": { es: "Dónde y cuándo" },
+  "Datas e horários": { es: "Fechas y horarios" },
+  "Marque pelo menos um destino.": { es: "Marca al menos un destino." },
+  "Falta para agendar:": { es: "Falta para programar:" },
+
 };
 
 /**
