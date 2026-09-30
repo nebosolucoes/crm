@@ -2569,6 +2569,8 @@ gates de cron/scheduler já existentes. A spec e2e mocka as rotas de escrita (o 
 a cadeia da tela e o contrato que ela manda); o envio real por WAHA com vários arquivos ainda
 não foi provado com número pareado.
 
+- **[P1] Cada data escolhe suas redes (0284, 30/09/2026).** Agendar em 4 passos (1 Redes com ícones, 2 Conteúdo, 3 Data e horário com os ícones das redes por linha, 4 Prévia). Coberto em `publicacoes-visual.spec.ts` ("Agendar"): apagar os Stories na 2ª data manda `occurrences[1].targets` sem `instagram/story`; apagar todas as redes de uma data trava o Agendar com o motivo no tooltip. Prévia: Feed no quadro da mídia (aviso quando a rede corta), Stories/Reels inteiros com faixas — `proporcao.test.ts`.
+
 ## J31 — Publicações: um conteúdo, vários destinos, várias datas `[P1]`
 
 Spec: `docs/specs/23-spec-publicacoes.md`. Sucessor de J28 (migration 0283): as tabelas do Disparo foram copiadas para o modelo novo e as telas de `/app/disparo/*` redirecionam para `/app/publicacoes/*`. Prova pela tela: `tests/e2e/publicacoes-visual.spec.ts` (API mockada, como o spec anterior) e a rodada local contra o servidor de desenvolvimento descrita na spec.

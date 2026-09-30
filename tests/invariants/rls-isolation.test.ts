@@ -181,6 +181,10 @@ beforeAll(() => {
           insert into public.publication_executions (organization_id, publication_id, occurrence_id, target_id, group_id)
             values (v_org, v_pub, v_occ, v_target, v_group);
         end if;
+        -- 0284: a data escolhe seus destinos — a linha diz "esta ocorrência só sai neste destino".
+        insert into public.publication_occurrence_targets (organization_id, occurrence_id, target_id)
+          values (v_org, v_occ, v_target)
+          on conflict do nothing;
 
         select id into v_contact from public.contacts
           where organization_id = v_org and display_name = 'RLS Invariant Contact';
@@ -424,6 +428,8 @@ export const TABLES = [
   "publication_target_groups",
   "publication_occurrences",
   "publication_executions",
+  // migration 0284 — cada data escolhe seus destinos.
+  "publication_occurrence_targets",
   // migration 0207 — as credenciais de IA da organização. A 0150 apagou a policy
   // de leitura por organização sem que nada acusasse, e a 0207 a restaurou; esta
   // linha é o que passa a acusar se ela sumir de novo (issue #545). A leitura é

@@ -16,6 +16,7 @@ Vocabulário fixo, usado em todo o código e na tela:
 | **Mídia** | `publication_media` | os arquivos, em ordem (`position numeric`), com dicas de dimensão/duração |
 | **Destino** | `publication_targets` (+ `publication_target_groups`) | (rede, formato, conexão); WhatsApp liga grupos por FK tripla org+sessão+grupo |
 | **Ocorrência** | `publication_occurrences` | cada data/hora; `source manual|recurrence`; status é o **rollup** das execuções |
+| **Destinos da ocorrência** | `publication_occurrence_targets` (0284) | o SUBCONJUNTO de destinos que sai naquela data. **Sem linha = todos** (é o que a recorrência gera e o que o legado tem). A tela manda `occurrences[{scheduled_at, targets: chaves|null}]`; o worker filtra a expansão por aqui |
 | **Execução** | `publication_executions` | uma por ocorrência × destino (× grupo no WhatsApp; × arquivo em Stories), por tentativa; a única linha com id externo |
 
 Máquina de estados (a verdade está embaixo):
@@ -67,6 +68,9 @@ Regra de fronteira (`lint:channels`): **nada fora de `lib/channels/` nomeia prov
 - **Recurso do plano**: `broadcast` (rótulo "Publicações"). Não há recurso separado para redes sociais nesta versão.
 - **Legado**: a 0283 copia `scheduled_group_messages`/`_runs` para o modelo novo (`legacy_scheduled_message_id`, `legacy_run_id`, `where not exists`); `paused` vira `draft`; as tabelas antigas ficam uma release sem escrita e saem numa migration posterior (0284). `scheduled_whatsapp_groups` continua sendo o cache de grupos.
 
+- **Cada data escolhe seus destinos (0284).** O uso real pede "Feed e Facebook às 19:30, Stories só amanhã ao meio-dia, WhatsApp nos dois". Join table (org, ocorrência, destino) com FKs compostas, e não `uuid[]` na ocorrência: a FK garante que o destino é desta organização e cascateia quando ele some. Semântica **sem linha = todos**, para nada mudar em quem já agendou, na recorrência e no legado. A tela guarda o que está DESLIGADO por data (`excluidos`) e manda o complemento: assim uma rede marcada depois nasce acesa em todas as datas. Uma data com todas as redes apagadas não agenda (`Esta data está sem nenhuma rede.`, na tela e no zod).
+- **A prévia enquadra como a rede.** Feed: o quadro segue a proporção da mídia dentro do limite (Instagram 4:5–1.91:1; Facebook até 1:2), a primeira foto dita o carrossel, e fora disso a prévia AVISA que a rede corta (`components/publicacoes/previa/proporcao.ts`). Stories e Reels: `object-contain` no 9:16 — faixas pretas, nunca zoom. Antes, Stories dava zoom e o Feed cortava tudo em 1:1, e a pessoa não via o que ia sair.
+
 ## 5. Limites que valem hoje
 
 - Vídeo até **50 MB** (limite do bucket `whatsapp-media`, `MAX_MEDIA_BYTES`); duração e proporção são dicas do navegador — a recusa definitiva é do provedor e aparece no Histórico.
@@ -94,6 +98,9 @@ Prova com recursos reais (doutrina de QA): banco fresco do `baseline.sql` + `boo
 - `pnpm test:e2e` completo no CI (a spec entra em `SPECS_PARTE_*` no lugar da antiga).
 
 ## 8. Manutenção — onde mexer para…
+
+- **…mudar como uma data escolhe redes:** `lib/publicacoes/schema.ts` (`ocorrenciaDaPublicacaoSchema`, `conferirOcorrencias`), `lib/publicacoes/servico.ts` (`horariosDaEntrada`, `gravarDestinosDasOcorrencias`, `destinosDasOcorrencias`), `lib/publicacoes/worker/expandir.ts` (o filtro), `components/publicacoes/SeletorDeHorarios.tsx` (`HorarioDaTela`, `destinosDaLinha`). Testes: `lib/publicacoes/schema.test.ts`, `expandir.test.ts` ("0284"), e2e `publicacoes-visual.spec.ts` (toggles `horario-N-destino-<rede>-<formato>`).
+- **…mudar o enquadramento da prévia:** `components/publicacoes/previa/proporcao.ts` (+ teste) e o `ajuste` de `MidiaVisual` em `Aparelho.tsx`.
 
 | Quero… | Mexo em |
 |---|---|

@@ -85,6 +85,9 @@ export interface MidiaDaPrevia {
   kind: "image" | "video" | "audio" | "document";
   url: string | null;
   nome: string;
+  /** Dimensões lidas no navegador (ou da mídia salva) — é o que deixa a prévia enquadrar como a rede. */
+  width?: number | null;
+  height?: number | null;
 }
 
 /**
@@ -98,14 +101,23 @@ export function nomeDaConta(conta: ContaDaPrevia, padrao: string, rede: "instagr
   return arroba ?? nome ?? padrao;
 }
 
-/** Uma mídia visual (foto/vídeo) para a área principal. */
-export function MidiaVisual({ midia, className, poster = false }: { midia: MidiaDaPrevia | null; className?: string; poster?: boolean }) {
+/**
+ * Uma mídia visual (foto/vídeo) para a área principal.
+ *
+ * `ajuste` diz como a rede enquadra: `cobrir` preenche o quadro cortando o
+ * que sobra (o Feed, quando a proporção está fora do limite); `conter`
+ * mostra a mídia inteira com faixas pretas (Stories e Reels, que nunca dão
+ * zoom no que não é 9:16). O padrão é cobrir porque o quadro do Feed já vem
+ * na proporção da mídia (`proporcaoDoFeed`) — cobrir ali não corta nada.
+ */
+export function MidiaVisual({ midia, className, poster = false, ajuste = "cobrir" }: { midia: MidiaDaPrevia | null; className?: string; poster?: boolean; ajuste?: "cobrir" | "conter" }) {
   if (!midia || !midia.url || (midia.kind !== "image" && midia.kind !== "video")) {
     return <div className={cn("flex items-center justify-center bg-[#262626] text-[11px] text-white/60", className)}>{midia ? midia.nome : ""}</div>;
   }
+  const encaixe = ajuste === "conter" ? "object-contain" : "object-cover";
   if (midia.kind === "video") {
-    return <video src={midia.url} muted playsInline loop autoPlay={!poster} preload="metadata" className={cn("object-cover", className)} />;
+    return <video src={midia.url} muted playsInline loop autoPlay={!poster} preload="metadata" className={cn(encaixe, className)} />;
   }
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={midia.url} alt="" className={cn("object-cover", className)} />;
+  return <img src={midia.url} alt="" className={cn(encaixe, className)} />;
 }

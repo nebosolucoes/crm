@@ -16,6 +16,8 @@ interface Cenario {
   medias?: Array<Record<string, unknown>>;
   grupos?: Array<Record<string, unknown>>;
   retries?: Array<Record<string, unknown>>;
+  /** Linhas de `publication_occurrence_targets` da ocorrência (0284). */
+  destinosDaOcorrencia?: Array<Record<string, unknown>>;
 }
 
 function responder(c: Cenario) {
@@ -27,6 +29,7 @@ function responder(c: Cenario) {
     if (tabela === "publication_targets") return { data: c.targets ?? [], error: null };
     if (tabela === "publication_media") return { data: c.medias ?? [], error: null };
     if (tabela === "publication_target_groups") return { data: c.grupos ?? [], error: null };
+    if (tabela === "publication_occurrence_targets") return { data: c.destinosDaOcorrencia ?? [], error: null };
     if (tabela === "publication_executions" && n[0] === "select") return { data: c.retries ?? [], error: null };
     if (tabela === "publication_executions") return { data: null, error: null };
     if (tabela === "agent_inbox_items" && n[0] === "select") return { count: 0, error: null };
@@ -63,6 +66,51 @@ describe("expandir — ocorrência vencida vira execuções", () => {
     const claim = cadeias(chamadas, "publication_occurrences", "update")[0]!;
     expect(argDe(claim.ops, "update")).toMatchObject({ status: "processing" });
     expect(claim.ops.some((o) => o.m === "eq" && o.args[0] === "status" && o.args[1] === "pending")).toBe(true);
+  });
+
+  it("0284: a ocorrência que escolheu destinos só expande ESSES — o resto da publicação não sai nesta data", async () => {
+    const { admin, chamadas } = fakeAdmin(
+      responder({
+        ocorrencia: OCC,
+        targets: [
+          { id: "t-wa", network: "whatsapp", format: "group_message", channel_session_id: "s1", metadata: {} },
+          { id: "t-st", network: "instagram", format: "story", channel_session_id: "s2", metadata: {} },
+          { id: "t-fd", network: "facebook", format: "feed", channel_session_id: "s3", metadata: {} },
+        ],
+        medias: [{ id: "m1", position: 1 }],
+        grupos: [{ target_id: "t-wa", group_id: "g1" }],
+        destinosDaOcorrencia: [{ target_id: "t-fd" }],
+      }),
+      (fn) => (fn === "fn_org_has_feature" ? { data: true, error: null } : { data: null, error: null }),
+    );
+    const r = await expandirOcorrenciasVencidas(admin as never, AGORA, "req");
+    expect(r).toMatchObject({ expanded: 1, executions: 1, skipped: 0 });
+    const insert = cadeias(chamadas, "publication_executions", "insert")[0]!;
+    const linhas = argDe(insert.ops, "insert") as Array<Record<string, unknown>>;
+    expect(linhas.map((l) => l.target_id)).toEqual(["t-fd"]);
+    // A consulta é pela ocorrência e pela organização — nunca solta.
+    const escolha = cadeias(chamadas, "publication_occurrence_targets", "select")[0]!;
+    expect(escolha.ops.some((o) => o.m === "eq" && o.args[0] === "occurrence_id" && o.args[1] === "occ1")).toBe(true);
+    expect(escolha.ops.some((o) => o.m === "eq" && o.args[0] === "organization_id" && o.args[1] === ORG)).toBe(true);
+  });
+
+  it("0284: sem linha em publication_occurrence_targets, TODOS os destinos saem (recorrência e legado)", async () => {
+    const { admin, chamadas } = fakeAdmin(
+      responder({
+        ocorrencia: OCC,
+        targets: [
+          { id: "t-st", network: "instagram", format: "story", channel_session_id: "s2", metadata: {} },
+          { id: "t-fd", network: "facebook", format: "feed", channel_session_id: "s3", metadata: {} },
+        ],
+        medias: [{ id: "m1", position: 1 }],
+        destinosDaOcorrencia: [],
+      }),
+      (fn) => (fn === "fn_org_has_feature" ? { data: true, error: null } : { data: null, error: null }),
+    );
+    const r = await expandirOcorrenciasVencidas(admin as never, AGORA, "req");
+    expect(r).toMatchObject({ expanded: 1, executions: 2, skipped: 0 });
+    const linhas = argDe(cadeias(chamadas, "publication_executions", "insert")[0]!.ops, "insert") as Array<Record<string, unknown>>;
+    expect(linhas.map((l) => l.target_id).sort()).toEqual(["t-fd", "t-st"]);
   });
 
   it("janela perdida (> 30 min): pula com missed_window, avisa e NÃO cria execução", async () => {

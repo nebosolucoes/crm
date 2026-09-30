@@ -7,6 +7,7 @@ import { BookmarkSimple, ChatCircle, DotsThree, Globe, Heart, PaperPlaneTilt, Sh
 import { cn } from "@/lib/utils";
 
 import { Aparelho, AvatarDaConta, MidiaVisual, nomeDaConta, type ContaDaPrevia, type MidiaDaPrevia } from "./Aparelho";
+import { carrosselCorta, feedCorta, proporcaoDoFeed } from "./proporcao";
 
 interface Props {
   rede: "instagram" | "facebook";
@@ -23,6 +24,10 @@ interface Props {
  * e os pontos), coração/comentário/enviar/salvar, curtidas e a legenda
  * começando pelo @. No Facebook, o nome da Página, a hora com o globo, o
  * texto ACIMA da mídia, a grade de fotos e a barra Curtir/Comentar/Compartilhar.
+ *
+ * O quadro da mídia segue a proporção da foto dentro do limite da rede
+ * (`proporcaoDoFeed`): 4:5 a 1.91:1 no Instagram, e a primeira foto dita a
+ * do carrossel, como lá. Fora do limite a rede corta — e a prévia avisa.
  */
 export function PreviaDoFeed({ rede, conta, midias, legenda, hora, quando }: Props) {
   const t = useT();
@@ -31,6 +36,10 @@ export function PreviaDoFeed({ rede, conta, midias, legenda, hora, quando }: Pro
   const [i, setI] = useState(0);
   const atual = visuais[Math.min(i, Math.max(0, visuais.length - 1))] ?? null;
   const rotulo = `${t("Prévia do post no Feed")} · ${rede === "instagram" ? "Instagram" : "Facebook"}`;
+  const primeira = visuais[0] ?? null;
+  const proporcao = proporcaoDoFeed(rede, primeira?.width, primeira?.height);
+  const foraDoLimite = visuais.some((m) => feedCorta(rede, m.width, m.height));
+  const corta = foraDoLimite || carrosselCorta(rede, visuais);
 
   if (rede === "instagram") {
     return (
@@ -52,8 +61,13 @@ export function PreviaDoFeed({ rede, conta, midias, legenda, hora, quando }: Pro
             <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{nome}</span>
             <DotsThree size={20} weight="bold" aria-hidden />
           </div>
-          <div className="relative aspect-square w-full shrink-0 bg-[#111]">
+          <div className="relative w-full shrink-0 bg-[#111]" style={{ aspectRatio: proporcao }} data-testid="quadro-do-feed">
             <MidiaVisual midia={atual} className="h-full w-full" poster />
+            {corta ? (
+              <span className="absolute bottom-2 left-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] text-white" data-testid="aviso-de-corte">
+                {foraDoLimite ? t("A rede vai cortar: fora de 4:5 a 1.91:1") : t("Carrossel: a rede corta todas no quadro da primeira foto")}
+              </span>
+            ) : null}
             {visuais.length > 1 ? (
               <>
                 <span className="absolute top-2 right-2 rounded-full bg-black/70 px-2 py-0.5 text-[11px] font-medium text-white">
@@ -117,7 +131,7 @@ export function PreviaDoFeed({ rede, conta, midias, legenda, hora, quando }: Pro
           </div>
           {legenda.trim() ? <p className="px-3 pt-2 pb-2 text-[14px] leading-[19px] whitespace-pre-wrap">{legenda}</p> : <div className="h-2" />}
           {grade.length === 1 ? (
-            <div className="relative aspect-square w-full bg-[#111]">
+            <div className="relative w-full bg-[#111]" style={{ aspectRatio: proporcao }} data-testid="quadro-do-feed">
               <MidiaVisual midia={grade[0]!} className="h-full w-full" poster />
             </div>
           ) : grade.length > 1 ? (

@@ -205,18 +205,43 @@ test("Agendar: 2 arquivos, WhatsApp com 2 grupos, Instagram Feed + Stories, 2 da
   await page.getByTestId("previa-anterior").click();
   await expect(page.getByTestId("previa-rotulo")).toContainText("Instagram · Stories");
 
+  // Cada data mostra os ícones das redes marcadas; a 2ª data sai só no Feed
+  // e nos grupos — os Stories dela são apagados com um clique no ícone.
   await page.getByRole("button", { name: "Amanhã, mesmo horário" }).click();
   await expect(page.getByTestId("horario-2")).toBeVisible();
+  await expect(page.getByTestId("horario-1-destino-instagram-story")).toHaveAttribute("aria-checked", "true");
+  await page.getByTestId("horario-2-destino-instagram-story").click();
+  await expect(page.getByTestId("horario-2-destino-instagram-story")).toHaveAttribute("aria-checked", "false");
+  // Apagar TODAS as redes de uma data trava o Agendar e explica no tooltip.
+  await page.getByTestId("horario-2-destino-instagram-feed").click();
+  await page.getByTestId("horario-2-destino-whatsapp-group_message").click();
+  await expect(page.getByTestId("agendar-publicacao")).toBeDisabled();
+  await page.getByTestId("agendar-bloqueado").hover();
+  await expect(page.getByTestId("tooltip-pendencias").first()).toContainText("sem nenhuma rede");
+  await page.getByTestId("horario-2-destino-instagram-feed").click();
+  await page.getByTestId("horario-2-destino-whatsapp-group_message").click();
+  await expect(page.getByTestId("agendar-publicacao")).toBeEnabled();
 
   await page.getByTestId("agendar-publicacao").click();
   await expect.poll(() => capturar.criadas.length).toBe(1);
-  const corpo = capturar.criadas[0] as { status: string; media: unknown[]; targets: Array<{ network: string; format: string; group_ids?: string[] }>; scheduled_at: string[]; timezone: string };
+  const corpo = capturar.criadas[0] as {
+    status: string;
+    media: unknown[];
+    targets: Array<{ network: string; format: string; group_ids?: string[] }>;
+    scheduled_at: string[];
+    occurrences: Array<{ scheduled_at: string; targets: string[] | null }>;
+    timezone: string;
+  };
   expect(corpo.status).toBe("scheduled");
   expect(corpo.media).toHaveLength(2);
   expect(corpo.scheduled_at).toHaveLength(2);
   expect(corpo.timezone).toBe("America/Sao_Paulo");
   expect(corpo.targets.map((t) => `${t.network}/${t.format}`).sort()).toEqual(["instagram/feed", "instagram/story", "whatsapp/group_message"]);
   expect(corpo.targets.find((t) => t.network === "whatsapp")?.group_ids).toEqual([GRUPO_1, GRUPO_2]);
+  // 1ª data: todos (null). 2ª data: só Feed e grupos — os Stories ficaram de fora.
+  expect(corpo.occurrences).toHaveLength(2);
+  expect(corpo.occurrences[0]!.targets).toBeNull();
+  expect(corpo.occurrences[1]!.targets?.map((k) => k.split("/").slice(0, 2).join("/")).sort()).toEqual(["instagram/feed", "whatsapp/group_message"]);
   await expect(page).toHaveURL(/\/app\/publicacoes\/lista/);
 });
 

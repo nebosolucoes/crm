@@ -16,7 +16,8 @@ interface Props {
 /**
  * Reels: vídeo em tela cheia 9:16, os botões à direita (coração, comentário,
  * enviar, mais), e embaixo o @ com "Seguir", a legenda e a faixa do áudio.
- * No Facebook, a mesma coreografia com o polegar no lugar do coração.
+ * No Facebook, a mesma coreografia com o polegar no lugar do coração. O
+ * vídeo aparece inteiro: um horizontal ganha faixas, como na rede.
  */
 export function PreviaDoReel({ rede, conta, midias, legenda, hora }: Props) {
   const t = useT();
@@ -29,7 +30,7 @@ export function PreviaDoReel({ rede, conta, midias, legenda, hora }: Props) {
     <Aparelho hora={hora} tema="escuro" rotulo={rotulo}>
       <div className="relative flex h-full flex-col bg-black text-white">
         <div className="absolute inset-0">
-          <MidiaVisual midia={video} className="h-full w-full" />
+          <MidiaVisual midia={video} className="h-full w-full" ajuste="conter" />
           <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/75 to-transparent" aria-hidden />
         </div>
         <div className="relative z-10 flex items-center justify-between px-4 pt-2 text-[16px] font-semibold drop-shadow">

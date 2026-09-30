@@ -9872,6 +9872,22 @@ export const DICIONARIO: Traducoes = {
   "Marque pelo menos um destino.": { es: "Marca al menos un destino." },
   "Falta para agendar:": { es: "Falta para programar:" },
 
+  // ── Publicações: cada data escolhe suas redes; prévia enquadra como a rede ──
+  "Redes": { es: "Redes" },
+  "Data e horário": { es: "Fecha y hora" },
+  "Prévia": { es: "Vista previa" },
+  "Redes desta data": { es: "Redes de esta fecha" },
+  "Marque as redes no passo 1": { es: "Marca las redes en el paso 1" },
+  "não sai nesta data": { es: "no sale en esta fecha" },
+  "Esta data está sem nenhuma rede.": { es: "Esta fecha no tiene ninguna red." },
+  "Incluir mais dias e horários": { es: "Incluir más días y horarios" },
+  "As datas geradas pela repetição saem em todas as redes marcadas.": { es: "Las fechas generadas por la repetición salen en todas las redes marcadas." },
+  "Em cada data, apague o ícone da rede que não deve sair nela.": { es: "En cada fecha, apaga el icono de la red que no debe salir en ella." },
+  "A rede vai cortar: fora de 4:5 a 1.91:1": { es: "La red va a recortar: fuera de 4:5 a 1.91:1" },
+  "Carrossel: a rede corta todas no quadro da primeira foto": { es: "Carrusel: la red recorta todas al cuadro de la primera foto" },
+  "Este destino não está na publicação.": { es: "Este destino no está en la publicación." },
+  "Uma das datas aponta para um destino que a publicação não tem.": { es: "Una de las fechas apunta a un destino que la publicación no tiene." },
+
 };
 
 /**

@@ -4,7 +4,9 @@
  * Uma ocorrência `pending` cujo horário chegou passa a `processing` (com
  * guarda no status — dois ticks não expandem a mesma) e ganha UMA execução
  * por unidade de efeito: por destino; por GRUPO num destino de WhatsApp; por
- * ARQUIVO num destino de Stories. Antes disso, três portas:
+ * ARQUIVO num destino de Stories. Os destinos são os da publicação, ou só os
+ * que a ocorrência escolheu em `publication_occurrence_targets` (0284) quando
+ * há linhas lá. Antes disso, três portas:
  *
  *  - janela perdida (`politica.ts`): venceu há mais que a tolerância → `skipped`
  *    com `missed_window` e aviso. É o que impede a rajada depois de uma VPS parada;
@@ -142,8 +144,17 @@ export async function expandirOcorrenciasVencidas(
       .eq("organization_id", occ.organization_id)
       .eq("publication_id", occ.publication_id);
     if (erroTargets) throw new Error(`publicacoes_targets_failed: ${erroTargets.message}`);
+    // 0284: a ocorrência pode ter escolhido um subconjunto dos destinos. Sem linha = todos.
+    const { data: escolhidos, error: erroEscolha } = await admin
+      .from("publication_occurrence_targets")
+      .select("target_id")
+      .eq("organization_id", occ.organization_id)
+      .eq("occurrence_id", occ.id);
+    if (erroEscolha) throw new Error(`publicacoes_occurrence_targets_failed: ${erroEscolha.message}`);
+    const somenteEstes = new Set(((escolhidos ?? []) as Array<{ target_id: string }>).map((e) => e.target_id));
     const vivos = ((targets ?? []) as Array<{ id: string; network: string; format: string; channel_session_id: string; metadata: Record<string, unknown> | null }>)
-      .filter((t) => typeof t.metadata?.removed_at !== "string");
+      .filter((t) => typeof t.metadata?.removed_at !== "string")
+      .filter((t) => somenteEstes.size === 0 || somenteEstes.has(t.id));
     if (vivos.length === 0) {
       await pular(admin, occ, "no_targets", agora);
       resultado.skipped += 1;

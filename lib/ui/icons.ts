@@ -165,4 +165,10 @@ export {
   ChatCircleDots,
   SpeakerSimpleHigh,
   SmileyWink,
+  // logos das redes e glifos de formato (seletor compacto de destinos)
+  InstagramLogo,
+  FacebookLogo,
+  WhatsappLogo,
+  FilmStrip,
+  Circle,
 } from "@phosphor-icons/react/dist/ssr";

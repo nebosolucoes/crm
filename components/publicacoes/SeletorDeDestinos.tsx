@@ -5,24 +5,35 @@ import { useMemo } from "react";
 
 import { SeletorDeGrupos, type GrupoSelecionavel } from "@/components/disparo/SeletorDeGrupos";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT } from "@/hooks/i18n/useT";
-import { FORMATOS_POR_REDE, REDES_DA_PUBLICACAO, type DestinoDaPublicacao, type FormatoDaPublicacao, type RedeDaPublicacao } from "@/lib/publicacoes/schema";
+import { FORMATOS_POR_REDE, REDES_DA_PUBLICACAO, chaveDeDestino, type DestinoDaPublicacao, type FormatoDaPublicacao, type RedeDaPublicacao } from "@/lib/publicacoes/schema";
 import type { ProblemaDoDestino } from "@/lib/publicacoes/regras-por-destino";
 import type { ContaPublicavel } from "@/lib/publicacoes/servico";
-import { Check, Warning } from "@/lib/ui/icons";
+import { Warning } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
-import { PONTO_DA_REDE, ROTULO_DA_REDE, ROTULO_DO_FORMATO } from "./rotulos";
+import { IconeDoDestino } from "./IconeDoDestino";
+import { ROTULO_DA_REDE, ROTULO_DO_FORMATO } from "./rotulos";
 
 export type ChaveDoDestino = string;
-export const chaveDoDestino = (d: { network: string; format: string; channel_session_id: string }): ChaveDoDestino => `${d.network}/${d.format}/${d.channel_session_id}`;
+export const chaveDoDestino = chaveDeDestino;
+
+/** Como a rede chama a conta: o @ no Instagram, o nome da Página no Facebook, o nome da conexão no WhatsApp. */
+export function nomeDaContaPublicavel(rede: RedeDaPublicacao, c: ContaPublicavel | null | undefined): string {
+  if (!c) return "";
+  if (rede === "facebook") return c.display_name ?? (c.username ? `@${c.username}` : c.id.slice(0, 8));
+  if (rede === "whatsapp") return c.display_name ?? c.id.slice(0, 8);
+  return c.username ? `@${c.username}` : (c.display_name ?? c.id.slice(0, 8));
+}
 
 /**
- * ONDE publicar: um card por rede, só com as contas conectadas. Rede sem
- * conta aparece desabilitada com o caminho para Conexões; rede com duas
- * contas mostra um seletor. Os formatos são caixas de marcar; marcar o
- * WhatsApp abre a escolha de conta e de grupos. As regras por formato chegam
- * de fora (`veredito`), já calculadas contra o conteúdo atual.
+ * ONDE publicar, em uma linha: um ícone por destino (rede + formato), como
+ * as ferramentas de agendamento fazem — marcar é acender o ícone. Rede sem
+ * conta fica apagada com o caminho para Conexões no tooltip. Embaixo, só
+ * para as redes marcadas: a conta (seletor quando há mais de uma), os
+ * grupos do WhatsApp e os problemas das regras por formato (`veredito`),
+ * já calculados contra o conteúdo atual.
  */
 export function SeletorDeDestinos({
   contas,
@@ -31,7 +42,6 @@ export function SeletorDeDestinos({
   onChange,
   veredito,
   disabled,
-  layout = "linha",
 }: {
   contas: ContaPublicavel[];
   grupos: GrupoSelecionavel[];
@@ -40,8 +50,6 @@ export function SeletorDeDestinos({
   /** Por chave de destino: erros e avisos das regras por formato. */
   veredito: Record<ChaveDoDestino, { erros: ProblemaDoDestino[]; avisos: ProblemaDoDestino[] }>;
   disabled?: boolean;
-  /** `coluna` empilha os cards (o Agendar em três colunas); `linha` os põe lado a lado. */
-  layout?: "linha" | "coluna";
 }) {
   const t = useT();
   const porRede = useMemo(() => {
@@ -74,18 +82,82 @@ export function SeletorDeDestinos({
   }
 
   return (
-    <div className={cn("grid gap-3", layout === "linha" && "md:grid-cols-3")}>
+    <div className="flex flex-col gap-3">
+      {/* A linha de ícones: um por destino possível. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2" role="group" aria-label={t("Onde publicar")} data-testid="linha-de-destinos">
+        {REDES_DA_PUBLICACAO.map((rede) => {
+          const lista = porRede.get(rede) ?? [];
+          const contaId = contaDaRede(rede);
+          const semConta = lista.length === 0;
+          return (
+            <div key={rede} className="flex items-center gap-1.5">
+              {FORMATOS_POR_REDE[rede].map((format) => {
+                const ligado = destinos.some((d) => d.network === rede && d.format === format);
+                const chave = contaId ? chaveDoDestino({ network: rede, format, channel_session_id: contaId }) : "";
+                const comErro = ligado && (veredito[chave]?.erros.length ?? 0) > 0;
+                const rotulo = `${ROTULO_DA_REDE[rede]} · ${rede === "whatsapp" ? t("Grupos") : t(ROTULO_DO_FORMATO[format])}`;
+                return (
+                  <Tooltip key={format}>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        role="checkbox"
+                        aria-checked={ligado}
+                        aria-label={rotulo}
+                        data-testid={`destino-${rede}-${format}`}
+                        disabled={disabled || semConta}
+                        onClick={() => alternar(rede, format)}
+                        className={cn(
+                          "rounded-full p-0.5 outline-hidden ring-offset-2 ring-offset-card transition-all focus-visible:ring-2 focus-visible:ring-accent",
+                          ligado ? "ring-2 ring-accent" : "opacity-55 hover:opacity-90",
+                          semConta && "cursor-not-allowed opacity-30 hover:opacity-30",
+                          comErro && "ring-error-fg",
+                        )}
+                      >
+                        <IconeDoDestino rede={rede} formato={format} ligado={ligado} tamanho={38} />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      {semConta ? `${rotulo} — ${t("Nenhuma conta conectada.")}` : rotulo}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+      {REDES_DA_PUBLICACAO.every((r) => (porRede.get(r) ?? []).length === 0) ? (
+        <p className="text-xs text-muted-foreground">
+          {t("Nenhuma conta conectada.")}{" "}
+          <Link href="/app/connections" className="text-accent underline-offset-2 hover:underline">
+            {t("Conectar em Conexões")}
+          </Link>
+        </p>
+      ) : null}
+
+      {/* Por rede marcada: a conta, os grupos e o que as regras acusaram. */}
       {REDES_DA_PUBLICACAO.map((rede) => {
+        const marcados = destinos.filter((d) => d.network === rede);
+        if (marcados.length === 0) return null;
         const lista = porRede.get(rede) ?? [];
         const contaId = contaDaRede(rede);
         const conta = lista.find((c) => c.id === contaId) ?? null;
-        const semConta = lista.length === 0;
-        const marcados = destinos.filter((d) => d.network === rede);
+        // A mesma frase repetida por arquivo (dois arquivos fora do 9:16) aparece uma vez só.
+        const unicos = <T extends { mensagem: string }>(lista: T[]) => lista.filter((x, i) => lista.findIndex((y) => y.mensagem === x.mensagem) === i);
+        const problemas = marcados
+          .map((d) => {
+            const v = veredito[chaveDoDestino(d)];
+            return { d, v: v ? { erros: unicos(v.erros), avisos: unicos(v.avisos) } : undefined };
+          })
+          .filter((x) => x.v && (x.v.erros.length > 0 || x.v.avisos.length > 0));
         return (
-          <section key={rede} data-testid={`rede-${rede}`} className={cn("flex flex-col gap-3 rounded-xl border p-3", semConta && "opacity-70", marcados.length > 0 && "border-accent/60")}>
+          <section key={rede} data-testid={`rede-${rede}`} className="flex flex-col gap-2 rounded-xl border p-3">
             <header className="flex items-center gap-2">
-              <span className={cn("h-2.5 w-2.5 rounded-full", PONTO_DA_REDE[rede])} aria-hidden />
               <span className="text-sm font-semibold">{ROTULO_DA_REDE[rede]}</span>
+              <span className="text-xs text-muted-foreground">
+                {marcados.map((d) => (rede === "whatsapp" ? t("Grupos") : t(ROTULO_DO_FORMATO[d.format]))).join(" · ")}
+              </span>
               {conta && !conta.disponivel ? (
                 <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-warning-fg" title={t("A conexão não está ativa")}>
                   <Warning size={12} aria-hidden />
@@ -93,98 +165,54 @@ export function SeletorDeDestinos({
                 </span>
               ) : null}
             </header>
-
-            {semConta ? (
-              <p className="text-xs text-muted-foreground">
-                {t("Nenhuma conta conectada.")}{" "}
-                <Link href="/app/connections" className="text-accent underline-offset-2 hover:underline">
-                  {t("Conectar em Conexões")}
-                </Link>
-              </p>
+            {lista.length > 1 ? (
+              <Select value={contaId ?? undefined} onValueChange={(v) => trocarConta(rede, v)} disabled={disabled}>
+                <SelectTrigger className="h-9 text-xs" aria-label={`${t("Conta")} ${ROTULO_DA_REDE[rede]}`}>
+                  <SelectValue placeholder={t("Escolha a conta")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {lista.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {nomeDaContaPublicavel(rede, c)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             ) : (
-              <>
-                {lista.length > 1 ? (
-                  <Select value={contaId ?? undefined} onValueChange={(v) => trocarConta(rede, v)} disabled={disabled}>
-                    <SelectTrigger className="h-9 text-xs" aria-label={`${t("Conta")} ${ROTULO_DA_REDE[rede]}`}>
-                      <SelectValue placeholder={t("Escolha a conta")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {lista.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {rede === "facebook" ? (c.display_name ?? (c.username ? `@${c.username}` : c.id.slice(0, 8))) : c.username ? `@${c.username}` : (c.display_name ?? c.id.slice(0, 8))}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <p className="truncate text-xs text-muted-foreground">{rede === "facebook" ? (conta?.display_name ?? (conta?.username ? `@${conta.username}` : "")) : conta?.username ? `@${conta.username}` : conta?.display_name}</p>
-                )}
-
-                <div className="flex flex-col gap-1.5">
-                  {FORMATOS_POR_REDE[rede].map((format) => {
-                    const chave = contaId ? chaveDoDestino({ network: rede, format, channel_session_id: contaId }) : "";
-                    const ligado = marcados.some((d) => d.format === format);
-                    const v = veredito[chave];
-                    return (
-                      <div key={format} className="flex flex-col gap-1">
-                        <button
-                          type="button"
-                          role="checkbox"
-                          aria-checked={ligado}
-                          data-testid={`destino-${rede}-${format}`}
-                          disabled={disabled || !contaId}
-                          onClick={() => alternar(rede, format)}
-                          className={cn("flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-sm transition-colors", ligado ? "border-accent bg-accent-soft/50" : "border-border hover:bg-muted/40")}
-                        >
-                          <span className={cn("flex h-4 w-4 items-center justify-center rounded-sm border", ligado ? "border-accent bg-accent text-white" : "border-border")} aria-hidden>
-                            {ligado ? <Check size={12} weight="bold" /> : null}
-                          </span>
-                          <span>{rede === "whatsapp" ? t("Mensagem nos grupos") : t(ROTULO_DO_FORMATO[format])}</span>
-                          {ligado && v && v.erros.length > 0 ? <Warning size={14} className="ml-auto text-error-fg" aria-label={t("Este destino tem problemas")} /> : null}
-                        </button>
-                        {ligado && v ? (
-                          <ul className="ml-1 flex flex-col gap-0.5">
-                            {v.erros.map((e, i) => (
-                              <li key={`e-${i}`} className="text-[11px] text-error-fg">
-                                {t(e.mensagem)}
-                              </li>
-                            ))}
-                            {v.avisos.map((a, i) => (
-                              <li key={`a-${i}`} className="text-[11px] text-muted-foreground">
-                                {t(a.mensagem)}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {rede === "whatsapp" && marcados.length > 0 && contaId ? (
-                  <div className="flex flex-col gap-1.5">
-                    <span className="text-xs font-medium">
-                      {(marcados[0]!.group_ids ?? []).length} {(marcados[0]!.group_ids ?? []).length === 1 ? t("grupo selecionado") : t("grupos selecionados")}
-                    </span>
-                    <SeletorDeGrupos
-                      grupos={grupos.filter((g) => g.channel_session_id === contaId)}
-                      nomeDaConexao={() => conta?.display_name ?? ""}
-                      selecionados={marcados[0]!.group_ids ?? []}
-                      onChange={(ids) => trocarGrupos(contaId, ids)}
-                      disabled={disabled}
-                    />
-                    {grupos.filter((g) => g.channel_session_id === contaId).length === 0 ? (
-                      <p className="text-[11px] text-muted-foreground">
-                        {t("Nenhum grupo salvo nesta conexão.")}{" "}
-                        <Link href="/app/publicacoes/grupos" className="text-accent hover:underline">
-                          {t("Buscar grupos")}
-                        </Link>
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-              </>
+              <p className="truncate text-xs text-muted-foreground">{nomeDaContaPublicavel(rede, conta)}</p>
             )}
+            {problemas.length > 0 ? (
+              <ul className="flex flex-col gap-0.5">
+                {problemas.flatMap(({ d, v }) => [
+                  ...v!.erros.map((e, i) => (
+                    <li key={`${d.format}-e-${i}`} className="text-[11px] text-error-fg">
+                      {t(ROTULO_DO_FORMATO[d.format])}: {t(e.mensagem)}
+                    </li>
+                  )),
+                  ...v!.avisos.map((a, i) => (
+                    <li key={`${d.format}-a-${i}`} className="text-[11px] text-muted-foreground">
+                      {t(ROTULO_DO_FORMATO[d.format])}: {t(a.mensagem)}
+                    </li>
+                  )),
+                ])}
+              </ul>
+            ) : null}
+            {rede === "whatsapp" && contaId ? (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium">
+                  {(marcados[0]!.group_ids ?? []).length} {(marcados[0]!.group_ids ?? []).length === 1 ? t("grupo selecionado") : t("grupos selecionados")}
+                </span>
+                <SeletorDeGrupos grupos={grupos.filter((g) => g.channel_session_id === contaId)} nomeDaConexao={() => conta?.display_name ?? ""} selecionados={marcados[0]!.group_ids ?? []} onChange={(ids) => trocarGrupos(contaId, ids)} disabled={disabled} />
+                {grupos.filter((g) => g.channel_session_id === contaId).length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    {t("Nenhum grupo salvo nesta conexão.")}{" "}
+                    <Link href="/app/publicacoes/grupos" className="text-accent hover:underline">
+                      {t("Buscar grupos")}
+                    </Link>
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </section>
         );
       })}

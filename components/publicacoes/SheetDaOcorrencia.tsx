@@ -126,6 +126,8 @@ export function SheetDaOcorrencia({
               <section className="flex flex-col gap-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("Destinos")}</h3>
                 {pub.targets
+                  // Só os destinos DESTA data (0284): sem escolha, todos os da publicação.
+                  .filter((d) => !o.target_ids || o.target_ids.includes(d.id) || data.executions.some((e) => e.target_id === d.id))
                   .filter((d) => !d.removido || data.executions.some((e) => e.target_id === d.id))
                   .map((d) => (
                     <BlocoDoDestino key={d.id} destino={d} execucoes={data.executions.filter((e) => e.target_id === d.id)} media={pub.media} podeEditar={podeEditar} pendente={pendente} onReenviar={reenviarExecucao} reenviando={reenviar.isPending} />

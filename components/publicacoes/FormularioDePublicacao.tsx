@@ -24,17 +24,17 @@ import { horaLocal, paredeParaInstante, proximaHoraCheia } from "@/lib/publicaco
 
 import { DropzoneDeMidia, type AnexoLocal } from "./DropzoneDeMidia";
 import { SeletorDeDestinos, chaveDoDestino } from "./SeletorDeDestinos";
-import { SeletorDeHorarios } from "./SeletorDeHorarios";
+import { SeletorDeHorarios, destinosDaLinha, type HorarioDaTela } from "./SeletorDeHorarios";
 import type { MidiaDaPrevia } from "./previa/Aparelho";
 import { PreviaDosDestinos } from "./previa/PreviaDosDestinos";
 import { ROTULO_DA_REDE, ROTULO_DO_FORMATO } from "./rotulos";
 
 /**
- * O fluxo único de criar/editar: Conteúdo → Destinos → Quando → Agendar.
- *
- * A pessoa pensa "tenho uma oferta": escolhe os arquivos, escreve a legenda,
- * marca onde sai, escolhe grupos, datas e recorrência, e clica em Agendar.
- * O que a API faz com isso (ocorrências, execuções, provedores) não aparece.
+ * O fluxo único de criar/editar, na ordem em que a pessoa pensa:
+ * 1. Redes (onde sai) → 2. Conteúdo (o quê) → 3. Data e horário (quando, e
+ * quais redes em cada data) → 4. Prévia (como vai aparecer). Um clique em
+ * Agendar. O que a API faz com isso (ocorrências, execuções, provedores)
+ * não aparece.
  *
  * Duas camadas: o carregador (`FormularioDePublicacao`) busca a publicação a
  * editar e as URLs das mídias; o formulário (`Formulario`) nasce já com o
@@ -45,7 +45,7 @@ export interface EstadoInicial {
   legenda: string;
   anexos: AnexoLocal[];
   destinos: DestinoDaPublicacao[];
-  datas: string[];
+  horarios: HorarioDaTela[];
   recorrencia: RecorrenciaDaPublicacao;
 }
 
@@ -81,7 +81,7 @@ async function estadoInicial(existente: PublicacaoLida | null, fuso: string, dia
     return proximaHoraCheia(agora, fuso);
   };
   if (!existente) {
-    return { titulo: "", legenda: "", anexos: [], destinos: [], datas: [primeiraData()], recorrencia: { kind: "none", config: {}, repeat_until: null, max_occurrences: null } };
+    return { titulo: "", legenda: "", anexos: [], destinos: [], horarios: [{ iso: primeiraData(), excluidos: [] }], recorrencia: { kind: "none", config: {}, repeat_until: null, max_occurrences: null } };
   }
   const anexos = await Promise.all(
     existente.media.map(async (m): Promise<AnexoLocal> => ({
@@ -99,15 +99,21 @@ async function estadoInicial(existente: PublicacaoLida | null, fuso: string, dia
       enviando: false,
     })),
   );
-  const pendentes = existente.occurrences.filter((o) => o.status === "pending" && o.source === "manual").map((o) => o.scheduled_at);
+  const vivos = existente.targets.filter((d) => !d.removido);
+  const chavePorId = new Map(vivos.map((d) => [d.id, chaveDoDestino(d)]));
+  // Cada data pendente traz os destinos que escolheu (0284); sem escolha, todos.
+  const horarios: HorarioDaTela[] = existente.occurrences
+    .filter((o) => o.status === "pending" && o.source === "manual")
+    .map((o) => {
+      const escolhidos = o.target_ids ? new Set(o.target_ids) : null;
+      return { iso: o.scheduled_at, excluidos: escolhidos ? vivos.filter((d) => !escolhidos.has(d.id)).map((d) => chavePorId.get(d.id)!) : [] };
+    });
   return {
     titulo: existente.title ?? "",
     legenda: existente.body ?? "",
     anexos,
-    destinos: existente.targets
-      .filter((d) => !d.removido)
-      .map((d) => ({ id: d.id, network: d.network, format: d.format, channel_session_id: d.channel_session_id, group_ids: d.group_ids, settings: d.settings as DestinoDaPublicacao["settings"] })),
-    datas: pendentes.length > 0 ? pendentes : [primeiraData()],
+    destinos: vivos.map((d) => ({ id: d.id, network: d.network, format: d.format, channel_session_id: d.channel_session_id, group_ids: d.group_ids, settings: d.settings as DestinoDaPublicacao["settings"] })),
+    horarios: horarios.length > 0 ? horarios : [{ iso: primeiraData(), excluidos: [] }],
     recorrencia: {
       kind: existente.recurrence.kind,
       config: existente.recurrence.config as RecorrenciaDaPublicacao["config"],
@@ -134,7 +140,7 @@ function Formulario({ fuso, editarId, inicial }: { fuso: string; editarId: strin
   const [legenda, setLegenda] = useState(inicial.legenda);
   const [anexos, setAnexos] = useState<AnexoLocal[]>(inicial.anexos);
   const [destinos, setDestinos] = useState<DestinoDaPublicacao[]>(inicial.destinos);
-  const [datas, setDatas] = useState<string[]>(inicial.datas);
+  const [horarios, setHorarios] = useState<HorarioDaTela[]>(inicial.horarios);
   const [recorrencia, setRecorrencia] = useState<RecorrenciaDaPublicacao>(inicial.recorrencia);
   const [salvando, setSalvando] = useState<null | "draft" | "scheduled">(null);
 
@@ -149,6 +155,13 @@ function Formulario({ fuso, editarId, inicial }: { fuso: string; editarId: strin
     return saida;
   }, [anexos, destinos, legenda]);
   const temErro = Object.values(veredito).some((v) => v.erros.length > 0);
+
+  /** Desmarcar uma rede no passo 1 a tira também das datas que a tinham desligado. */
+  function mudarDestinos(proximos: DestinoDaPublicacao[]) {
+    const chaves = new Set(proximos.map(chaveDoDestino));
+    setDestinos(proximos);
+    setHorarios((atual) => atual.map((h) => ({ ...h, excluidos: h.excluidos.filter((k) => chaves.has(k)) })));
+  }
 
   async function subirPendentes(): Promise<MidiaDaPublicacao[]> {
     const saida: MidiaDaPublicacao[] = [];
@@ -172,7 +185,7 @@ function Formulario({ fuso, editarId, inicial }: { fuso: string; editarId: strin
         toast.error(t("Escolha pelo menos um destino."));
         return;
       }
-      if (datas.length === 0) {
+      if (horarios.length === 0) {
         toast.error(t("Escolha pelo menos uma data e hora."));
         return;
       }
@@ -191,7 +204,8 @@ function Formulario({ fuso, editarId, inicial }: { fuso: string; editarId: strin
         timezone: fuso,
         media,
         targets: destinos,
-        scheduled_at: datas,
+        scheduled_at: horarios.map((h) => h.iso),
+        occurrences: horarios.map((h) => ({ scheduled_at: h.iso, targets: destinosDaLinha(h, destinos) })),
         recurrence: recorrencia,
       };
       if (editarId) await editar.mutateAsync({ id: editarId, entrada: corpo });
@@ -207,8 +221,8 @@ function Formulario({ fuso, editarId, inicial }: { fuso: string; editarId: strin
 
   const grupoNome = useMemo(() => new Map((grupos ?? []).map((g) => [g.id, g.name])), [grupos]);
   const nomesDosGrupos = (ids: string[]) => ids.map((id) => grupoNome.get(id) ?? "").filter(Boolean);
-  const midiasDaPrevia: MidiaDaPrevia[] = anexos.map((a) => ({ id: a.id, kind: a.kind, url: a.url, nome: a.nome }));
-  const primeira = datas[0] ?? null;
+  const midiasDaPrevia: MidiaDaPrevia[] = anexos.map((a) => ({ id: a.id, kind: a.kind, url: a.url, nome: a.nome, width: a.width, height: a.height }));
+  const primeira = horarios[0]?.iso ?? null;
   const dataLegenda = primeira ? new Intl.DateTimeFormat(tag, { day: "2-digit", month: "short", timeZone: fuso }).format(new Date(primeira)) : "";
   const resumoDosDestinos = destinos.map((d) => `${ROTULO_DA_REDE[d.network]} · ${d.network === "whatsapp" ? `${d.group_ids?.length ?? 0} ${t("grupos")}` : t(ROTULO_DO_FORMATO[d.format])}`);
   const ocupado = salvando !== null;
@@ -216,13 +230,16 @@ function Formulario({ fuso, editarId, inicial }: { fuso: string; editarId: strin
   // O que falta para agendar — a lista que desativa o botão e vira o tooltip.
   const pendencias: string[] = [];
   if (destinos.length === 0) pendencias.push(t("Marque pelo menos um destino."));
-  if (datas.length === 0) pendencias.push(t("Escolha pelo menos uma data e hora."));
+  if (horarios.length === 0) pendencias.push(t("Escolha pelo menos uma data e hora."));
   if (!legenda.trim() && anexos.length === 0) pendencias.push(t("Escreva uma legenda ou anexe um arquivo."));
   for (const d of destinos) {
     const v = veredito[chaveDoDestino(d)];
     for (const e of v?.erros ?? []) {
       pendencias.push(`${ROTULO_DA_REDE[d.network]} · ${t(ROTULO_DO_FORMATO[d.format])}: ${t(e.mensagem)}`);
     }
+  }
+  for (const [i, h] of horarios.entries()) {
+    if (destinos.length > 0 && destinosDaLinha(h, destinos)?.length === 0) pendencias.push(`${i + 1}ª ${t("data")}: ${t("Esta data está sem nenhuma rede.")}`);
   }
   const podeAgendar = pendencias.length === 0;
 
@@ -234,17 +251,26 @@ function Formulario({ fuso, editarId, inicial }: { fuso: string; editarId: strin
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="grid gap-6 lg:grid-cols-[minmax(280px,1fr)_minmax(320px,1fr)] xl:grid-cols-[minmax(320px,1fr)_minmax(380px,1.25fr)_minmax(360px,0.95fr)] xl:gap-8" data-testid="formulario-em-colunas">
-        {/* 1ª coluna: onde e quando */}
-        <section className="flex min-w-0 flex-col gap-4" aria-labelledby="passo-destinos">
-          <h2 id="passo-destinos" className="flex items-center gap-2 text-base font-semibold">
-            <Passo n={1} />
-            {t("Onde e quando")}
-          </h2>
-          {carregandoContas ? <Skeleton className="h-40 w-full" /> : <SeletorDeDestinos contas={contas ?? []} grupos={grupos ?? []} destinos={destinos} onChange={setDestinos} veredito={veredito} disabled={ocupado} layout="coluna" />}
-          <h3 className="pt-2 text-sm font-semibold">{t("Datas e horários")}</h3>
-          <SeletorDeHorarios datas={datas} onChange={setDatas} recorrencia={recorrencia} onRecorrencia={setRecorrencia} fuso={fuso} disabled={ocupado} />
-        </section>
+      <div className="grid gap-6 lg:grid-cols-[minmax(280px,1fr)_minmax(320px,1fr)] xl:grid-cols-[minmax(340px,1fr)_minmax(380px,1.2fr)_minmax(360px,0.95fr)] xl:gap-8" data-testid="formulario-em-colunas">
+        {/* 1ª coluna: as redes e, embaixo, as datas — cada data com as redes que saem nela */}
+        <div className="flex min-w-0 flex-col gap-6">
+          <section className="flex min-w-0 flex-col gap-3" aria-labelledby="passo-destinos">
+            <h2 id="passo-destinos" className="flex items-center gap-2 text-base font-semibold">
+              <Passo n={1} />
+              {t("Redes")}
+            </h2>
+            {carregandoContas ? <Skeleton className="h-12 w-full" /> : <SeletorDeDestinos contas={contas ?? []} grupos={grupos ?? []} destinos={destinos} onChange={mudarDestinos} veredito={veredito} disabled={ocupado} />}
+          </section>
+
+          <section className="flex min-w-0 flex-col gap-3" aria-labelledby="passo-horarios">
+            <h2 id="passo-horarios" className="flex items-center gap-2 text-base font-semibold">
+              <Passo n={3} />
+              {t("Data e horário")}
+            </h2>
+            <p className="-mt-1 text-xs text-muted-foreground">{t("Em cada data, apague o ícone da rede que não deve sair nela.")}</p>
+            <SeletorDeHorarios horarios={horarios} onChange={setHorarios} destinos={destinos} recorrencia={recorrencia} onRecorrencia={setRecorrencia} fuso={fuso} disabled={ocupado} />
+          </section>
+        </div>
 
         {/* 2ª coluna: o conteúdo */}
         <section className="flex min-w-0 flex-col gap-4" aria-labelledby="passo-conteudo">
@@ -293,8 +319,8 @@ function Formulario({ fuso, editarId, inicial }: { fuso: string; editarId: strin
         {/* 3ª coluna: como vai aparecer */}
         <aside className="flex min-w-0 flex-col gap-4 lg:col-span-2 xl:col-span-1 xl:sticky xl:top-2 xl:self-start" aria-labelledby="passo-previa">
           <h2 id="passo-previa" className="flex items-center gap-2 text-base font-semibold">
-            <Passo n={3} />
-            {t("Como vai aparecer")}
+            <Passo n={4} />
+            {t("Prévia")}
           </h2>
           <PreviaDosDestinos
             destinos={destinos}
@@ -312,7 +338,7 @@ function Formulario({ fuso, editarId, inicial }: { fuso: string; editarId: strin
               </li>
               {resumoDosDestinos.length > 0 ? resumoDosDestinos.map((r) => <li key={r}>{r}</li>) : <li className="text-muted-foreground">{t("Nenhum destino ainda")}</li>}
               <li>
-                {datas.length} {datas.length === 1 ? t("data") : t("datas")}
+                {horarios.length} {horarios.length === 1 ? t("data") : t("datas")}
                 {recorrencia.kind !== "none" ? ` · ${t("com repetição")}` : ""}
               </li>
             </ul>

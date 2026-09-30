@@ -31,17 +31,19 @@ import { FUSO_PADRAO, fusoValido } from "@/lib/tempo/fusos";
 import { HORIZONTE_DE_RECORRENCIA_DIAS, TETO_DE_OCORRENCIAS_PENDENTES } from "./politica";
 import { proximasOcorrencias } from "./recorrencia";
 import { validarDestino, type ProblemaDoDestino } from "./regras-por-destino";
-import type {
-  AlterarPublicacao,
-  CriarPublicacao,
-  DestinoDaPublicacao,
-  FormatoDaPublicacao,
-  MidiaDaPublicacao,
-  RedeDaPublicacao,
-  StatusDaExecucao,
-  StatusDaOcorrencia,
-  StatusDaPublicacao,
-  TipoDeRecorrencia,
+import {
+  chaveDeDestino,
+  type AlterarPublicacao,
+  type CriarPublicacao,
+  type DestinoDaPublicacao,
+  type FormatoDaPublicacao,
+  type MidiaDaPublicacao,
+  type OcorrenciaDaPublicacao,
+  type RedeDaPublicacao,
+  type StatusDaExecucao,
+  type StatusDaOcorrencia,
+  type StatusDaPublicacao,
+  type TipoDeRecorrencia,
 } from "./schema";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -185,6 +187,11 @@ export interface OcorrenciaLida {
   skipped_reason: string | null;
   processed_at: string | null;
   finished_at: string | null;
+  /**
+   * Os destinos que saem NESTA data (migration 0284): ids de `publication_targets`.
+   * `null` = todos os destinos da publicação; ausente = não foi carregado.
+   */
+  target_ids?: string[] | null;
 }
 
 export interface PublicacaoLida {
@@ -258,6 +265,11 @@ export async function carregarPublicacao(
   for (const r of [media, targets, grupos, occ]) {
     if (r.error) throw new Error(`publicacoes_read_failed: ${r.error.message}`);
   }
+  const destinosPorOcorrencia = await destinosDasOcorrencias(
+    admin,
+    orgId,
+    ((occ.data ?? []) as Array<{ id: string }>).map((o) => o.id),
+  );
 
   const gruposPorTarget = new Map<string, DestinoLido["groups"]>();
   for (const g of (grupos.data ?? []) as unknown as Array<{
@@ -331,8 +343,81 @@ export async function carregarPublicacao(
       skipped_reason: (o.skipped_reason as string | null) ?? null,
       processed_at: (o.processed_at as string | null) ?? null,
       finished_at: (o.finished_at as string | null) ?? null,
+      target_ids: destinosPorOcorrencia.get(o.id as string) ?? null,
     })),
   };
+}
+
+/** `publication_occurrence_targets` das ocorrências pedidas: id → ids de destino. Sem linha = todos (fica fora do mapa). */
+async function destinosDasOcorrencias(admin: AdminClient, orgId: string, occurrenceIds: string[]): Promise<Map<string, string[]>> {
+  const mapa = new Map<string, string[]>();
+  if (occurrenceIds.length === 0) return mapa;
+  const { data, error } = await admin
+    .from("publication_occurrence_targets")
+    .select("occurrence_id, target_id")
+    .eq("organization_id", orgId)
+    .in("occurrence_id", occurrenceIds);
+  if (error) throw new Error(`publicacoes_read_failed: ${error.message}`);
+  for (const r of (data ?? []) as Array<{ occurrence_id: string; target_id: string }>) {
+    const lista = mapa.get(r.occurrence_id) ?? [];
+    lista.push(r.target_id);
+    mapa.set(r.occurrence_id, lista);
+  }
+  return mapa;
+}
+
+/**
+ * As datas com os destinos de cada uma, na forma que o serviço grava.
+ * `occurrences` manda; sem ela, `scheduled_at` = todos os destinos em cada data.
+ * A mesma data repetida funde as listas (e `null` engole tudo).
+ */
+export function horariosDaEntrada(entrada: { scheduled_at?: string[]; occurrences?: OcorrenciaDaPublicacao[] }): Map<string, string[] | null> {
+  const mapa = new Map<string, string[] | null>();
+  const linhas: OcorrenciaDaPublicacao[] = entrada.occurrences ?? (entrada.scheduled_at ?? []).map((d) => ({ scheduled_at: d, targets: null }));
+  for (const o of linhas) {
+    const iso = new Date(o.scheduled_at).toISOString();
+    const atual = mapa.get(iso);
+    if (!mapa.has(iso)) mapa.set(iso, o.targets ? [...new Set(o.targets)] : null);
+    else if (atual !== null && o.targets !== null) mapa.set(iso, [...new Set([...(atual ?? []), ...o.targets])]);
+    else mapa.set(iso, null);
+  }
+  return mapa;
+}
+
+/**
+ * Grava em `publication_occurrence_targets` o subconjunto de cada ocorrência
+ * (apaga o que havia e insere o pedido). Chave que não bate com destino vivo é
+ * erro — a data não pode apontar para uma rede que a publicação não tem.
+ */
+async function gravarDestinosDasOcorrencias(
+  admin: AdminClient,
+  orgId: string,
+  ocorrencias: Array<{ id: string; scheduled_at: string }>,
+  horarios: Map<string, string[] | null>,
+  idPorChave: Map<string, string>,
+): Promise<void> {
+  if (ocorrencias.length === 0) return;
+  const { error: erroLimpa } = await admin
+    .from("publication_occurrence_targets")
+    .delete()
+    .eq("organization_id", orgId)
+    .in("occurrence_id", ocorrencias.map((o) => o.id));
+  if (erroLimpa) throw new Error(`publicacoes_occurrence_targets_failed: ${erroLimpa.message}`);
+  const linhas: Array<{ organization_id: string; occurrence_id: string; target_id: string }> = [];
+  for (const o of ocorrencias) {
+    const chaves = horarios.get(new Date(o.scheduled_at).toISOString());
+    if (!chaves) continue;
+    // Tudo marcado = sem linha (o mesmo que "todos"), para a leitura não distinguir.
+    if (chaves.length >= idPorChave.size && [...idPorChave.keys()].every((k) => chaves.includes(k))) continue;
+    for (const k of chaves) {
+      const targetId = idPorChave.get(k);
+      if (!targetId) throw new ErroDePublicacao("validation_failed", "Uma das datas aponta para um destino que a publicação não tem.", 422, { target: k });
+      linhas.push({ organization_id: orgId, occurrence_id: o.id, target_id: targetId });
+    }
+  }
+  if (linhas.length === 0) return;
+  const { error } = await admin.from("publication_occurrence_targets").insert(linhas);
+  if (error) throw new Error(`publicacoes_occurrence_targets_insert_failed: ${error.message}`);
 }
 
 // ─── Validação da intenção ──────────────────────────────────────────────────
@@ -506,7 +591,8 @@ export async function criarPublicacao(
   conferirMidia(ctx.orgId, entrada.media);
   const destinos = await conferirDestinos(admin, ctx.orgId, entrada.targets);
   if (entrada.status === "scheduled") conferirRegras(entrada.body, entrada.media, destinos);
-  const datas = entrada.status === "scheduled" ? instantesValidos(entrada.scheduled_at, agora) : [...new Set(entrada.scheduled_at)].sort();
+  const horarios = horariosDaEntrada(entrada);
+  const datas = entrada.status === "scheduled" ? instantesValidos([...horarios.keys()], agora) : [...horarios.keys()].sort();
   const timezone = entrada.timezone && fusoValido(entrada.timezone) ? entrada.timezone : await fusoDaOrganizacao(admin, ctx.orgId);
 
   const { data: criada, error } = await admin
@@ -531,12 +617,14 @@ export async function criarPublicacao(
   const id = criada.id as string;
 
   await gravarMidias(admin, ctx.orgId, id, entrada.media);
-  await gravarDestinos(admin, ctx.orgId, id, destinos, []);
+  const idPorChave = await gravarDestinos(admin, ctx.orgId, id, destinos, []);
   if (datas.length > 0) {
-    const { error: erroOcc } = await admin.from("publication_occurrences").insert(
-      datas.map((d) => ({ organization_id: ctx.orgId, publication_id: id, scheduled_at: d, source: "manual", status: "pending" })),
-    );
+    const { data: criadas, error: erroOcc } = await admin
+      .from("publication_occurrences")
+      .insert(datas.map((d) => ({ organization_id: ctx.orgId, publication_id: id, scheduled_at: d, source: "manual", status: "pending" })))
+      .select("id, scheduled_at");
     if (erroOcc) throw new Error(`publicacoes_occurrences_insert_failed: ${erroOcc.message}`);
+    await gravarDestinosDasOcorrencias(admin, ctx.orgId, (criadas ?? []) as Array<{ id: string; scheduled_at: string }>, horarios, idPorChave);
   }
   await materializarRecorrencia(
     admin,
@@ -613,6 +701,8 @@ async function gravarMidias(admin: AdminClient, orgId: string, publicationId: st
 /**
  * Destinos: os novos entram; os que saíram somem se ninguém executou neles,
  * ou ficam marcados `metadata.removed_at` (histórico) e fora da expansão.
+ * Devolve o id de cada destino vivo por chave `rede/formato/conta` — é o que
+ * liga as datas aos seus destinos.
  */
 async function gravarDestinos(
   admin: AdminClient,
@@ -620,10 +710,11 @@ async function gravarDestinos(
   publicationId: string,
   destinos: DestinoConferido[],
   atuais: DestinoLido[],
-): Promise<void> {
-  const chave = (d: { network: string; format: string; channel_session_id: string }) => `${d.network}/${d.format}/${d.channel_session_id}`;
+): Promise<Map<string, string>> {
+  const chave = chaveDeDestino;
   const desejados = new Map(destinos.map((d) => [chave(d), d]));
   const existentes = new Map(atuais.map((t) => [chave(t), t]));
+  const idPorChave = new Map<string, string>();
 
   for (const [k, t] of existentes) {
     if (desejados.has(k)) continue;
@@ -672,6 +763,7 @@ async function gravarDestinos(
       if (error || !data) throw new Error(`publicacoes_target_insert_failed: ${error?.message}`);
       targetId = data.id as string;
     }
+    idPorChave.set(k, targetId);
     if (d.network === "whatsapp") {
       const { error: erroLimpa } = await admin
         .from("publication_target_groups")
@@ -692,6 +784,7 @@ async function gravarDestinos(
       }
     }
   }
+  return idPorChave;
 }
 
 // ─── Editar ─────────────────────────────────────────────────────────────────
@@ -758,16 +851,21 @@ export async function alterarPublicacao(
   if (error) throw new Error(`publicacoes_update_failed: ${error.message}`);
 
   if (entrada.media) await gravarMidias(admin, ctx.orgId, id, media);
-  if (entrada.targets) await gravarDestinos(admin, ctx.orgId, id, destinos, atual.targets);
+  // Sem `targets` no corpo os destinos são os atuais, e é preciso o id por chave do mesmo jeito.
+  const idPorChave = entrada.targets
+    ? await gravarDestinos(admin, ctx.orgId, id, destinos, atual.targets)
+    : new Map(atual.targets.filter((t) => !t.removido).map((t) => [chaveDeDestino(t), t.id]));
 
   // Ocorrências pendentes: a lista manual nova substitui a antiga; a
   // recorrência pendente é regerada quando a regra ou as datas mudam.
-  const mudouAgenda = entrada.scheduled_at !== undefined || entrada.recurrence !== undefined || entrada.timezone !== undefined;
+  const trouxeDatas = entrada.occurrences !== undefined || entrada.scheduled_at !== undefined;
+  const mudouAgenda = trouxeDatas || entrada.recurrence !== undefined || entrada.timezone !== undefined;
   if (mudouAgenda) {
+    const horarios = trouxeDatas ? horariosDaEntrada(entrada) : null;
     const manuaisDesejadas = new Set(
       statusNovo === "scheduled"
-        ? instantesValidos(entrada.scheduled_at ?? atual.occurrences.filter((o) => o.source === "manual" && o.status === "pending").map((o) => o.scheduled_at), agora)
-        : (entrada.scheduled_at ?? []).map((d) => new Date(d).toISOString()),
+        ? instantesValidos(horarios ? [...horarios.keys()] : atual.occurrences.filter((o) => o.source === "manual" && o.status === "pending").map((o) => o.scheduled_at), agora)
+        : [...(horarios?.keys() ?? [])],
     );
     const pendentes = atual.occurrences.filter((o) => o.status === "pending");
     const remover = pendentes.filter((o) => o.source === "recurrence" || !manuaisDesejadas.has(new Date(o.scheduled_at).toISOString()));
@@ -779,13 +877,22 @@ export async function alterarPublicacao(
         .in("id", remover.map((o) => o.id));
       if (erroDel) throw new Error(`publicacoes_occurrences_delete_failed: ${erroDel.message}`);
     }
-    const jaExistem = new Set(atual.occurrences.filter((o) => !remover.includes(o)).map((o) => new Date(o.scheduled_at).toISOString()));
+    const mantidas = atual.occurrences.filter((o) => !remover.includes(o));
+    const jaExistem = new Set(mantidas.map((o) => new Date(o.scheduled_at).toISOString()));
     const inserir = [...manuaisDesejadas].filter((d) => !jaExistem.has(d));
+    let criadas: Array<{ id: string; scheduled_at: string }> = [];
     if (inserir.length > 0) {
-      const { error: erroIns } = await admin.from("publication_occurrences").insert(
-        inserir.map((d) => ({ organization_id: ctx.orgId, publication_id: id, scheduled_at: d, source: "manual", status: "pending" })),
-      );
+      const { data, error: erroIns } = await admin
+        .from("publication_occurrences")
+        .insert(inserir.map((d) => ({ organization_id: ctx.orgId, publication_id: id, scheduled_at: d, source: "manual", status: "pending" })))
+        .select("id, scheduled_at");
       if (erroIns) throw new Error(`publicacoes_occurrences_insert_failed: ${erroIns.message}`);
+      criadas = (data ?? []) as Array<{ id: string; scheduled_at: string }>;
+    }
+    if (horarios) {
+      // As pendentes manuais que ficaram e as novas recebem o subconjunto pedido.
+      const pendentesManuais = mantidas.filter((o) => o.status === "pending" && o.source === "manual" && manuaisDesejadas.has(new Date(o.scheduled_at).toISOString()));
+      await gravarDestinosDasOcorrencias(admin, ctx.orgId, [...pendentesManuais, ...criadas], horarios, idPorChave);
     }
   }
   if (statusNovo === "scheduled") {
@@ -1078,6 +1185,7 @@ async function montarResumos(
   for (const r of [pubs, medias, targets, grupos, execs]) {
     if (r.error) throw new Error(`publicacoes_list_failed: ${r.error.message}`);
   }
+  const destinosPorOcorrencia = await destinosDasOcorrencias(admin, orgId, occIds);
   const pubPorId = new Map(((pubs.data ?? []) as unknown as Array<Record<string, unknown>>).map((p) => [p.id as string, p]));
   const thumbPorPub = new Map<string, { storage_path: string; kind: string; mime: string }>();
   const contagemDeMidia = new Map<string, number>();
@@ -1130,7 +1238,13 @@ async function montarResumos(
       recurrence_config: (p.recurrence_config as Record<string, unknown>) ?? {},
       thumb: thumbPorPub.get(o.publication_id) ?? null,
       media_count: contagemDeMidia.get(o.publication_id) ?? 0,
-      targets: (targetsPorPub.get(o.publication_id) ?? []).filter((t) => !t.removido || o.status !== "pending"),
+      target_ids: destinosPorOcorrencia.get(o.id) ?? null,
+      // Só os destinos DESTA data (0284): sem linha, todos.
+      targets: (targetsPorPub.get(o.publication_id) ?? []).filter((t) => {
+        const desta = destinosPorOcorrencia.get(o.id);
+        if (desta && !desta.includes(t.id)) return false;
+        return !t.removido || o.status !== "pending";
+      }),
       executions: execPorOcc.get(o.id) ?? { total: 0, sent: 0, failed: 0, pending: 0, sending: 0, skipped: 0, cancelled: 0 },
     });
   }

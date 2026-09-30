@@ -19,7 +19,9 @@ interface Props {
  * Stories: tela cheia 9:16, uma barra de progresso por arquivo (cada arquivo
  * é UM Story), avatar + @ + "agora" no topo, e a barra "Enviar mensagem" com
  * o coração e o avião embaixo. Tocar na metade esquerda/direita troca o Story,
- * como no aparelho. Não há legenda: a rede não mostra.
+ * como no aparelho. Não há legenda: a rede não mostra. A mídia aparece
+ * INTEIRA no 9:16 — o que não tem essa proporção ganha faixas pretas, como
+ * na rede, e nunca zoom.
  */
 export function PreviaDoStory({ rede, conta, midias, hora }: Props) {
   const t = useT();
@@ -34,7 +36,7 @@ export function PreviaDoStory({ rede, conta, midias, hora }: Props) {
     <Aparelho hora={hora} tema="escuro" rotulo={rotulo}>
       <div className="relative flex h-full flex-col bg-black text-white">
         <div className="absolute inset-0">
-          <MidiaVisual midia={atual} className="h-full w-full" />
+          <MidiaVisual midia={atual} className="h-full w-full" ajuste="conter" />
           <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/60 to-transparent" aria-hidden />
           <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/60 to-transparent" aria-hidden />
         </div>

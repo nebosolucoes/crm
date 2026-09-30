@@ -46,6 +46,15 @@ describe("Publicações — portas reais de navegação", () => {
     expect(form).toContain("<SeletorDeDestinos");
     expect(form).toContain("<SeletorDeHorarios");
     expect(form).toContain("<DropzoneDeMidia");
-    expect(form).toContain("<PreviaDoCelular");
+    // A prévia é um carrossel por destino; o celular do WhatsApp mora dentro dele.
+    expect(form).toContain("<PreviaDosDestinos");
+    const previa = readFileSync("components/publicacoes/previa/PreviaDosDestinos.tsx", "utf8");
+    expect(previa).toContain("<PreviaDoCelular");
+    expect(previa).toContain("<PreviaDoFeed");
+    expect(previa).toContain("<PreviaDoStory");
+    expect(previa).toContain("<PreviaDoReel");
+    // Cada data escolhe suas redes (0284): o formulário manda `occurrences` com os destinos por data.
+    expect(form).toContain("occurrences: horarios.map(");
+    expect(form).toContain("destinosDaLinha(h, destinos)");
   });
 });

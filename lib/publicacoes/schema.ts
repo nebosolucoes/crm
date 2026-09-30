@@ -185,10 +185,51 @@ export const recorrenciaDaPublicacaoSchema = z
   });
 export type RecorrenciaDaPublicacao = z.infer<typeof recorrenciaDaPublicacaoSchema>;
 
+/** A chave de um destino como a tela e a API a escrevem: `rede/formato/conta`. */
+export const chaveDeDestino = (d: { network: string; format: string; channel_session_id: string }): string =>
+  `${d.network}/${d.format}/${d.channel_session_id}`;
+
+/**
+ * Uma data com os destinos que saem nela. `targets` são chaves `rede/formato/conta`
+ * de destinos da MESMA publicação; `null` = todos (é o que a recorrência gera).
+ * Lista vazia não é "nenhum" — é erro: uma data sem rede não publica nada.
+ */
+export const ocorrenciaDaPublicacaoSchema = z.object({
+  scheduled_at: instante,
+  targets: z.array(z.string().trim().min(3).max(160)).max(MAXIMO_DE_DESTINOS_POR_PUBLICACAO).nullable().default(null),
+});
+export type OcorrenciaDaPublicacao = z.infer<typeof ocorrenciaDaPublicacaoSchema>;
+
+/** Confere as chaves de cada data contra os destinos declarados e acusa data sem rede. */
+function conferirOcorrencias(
+  ocorrencias: OcorrenciaDaPublicacao[] | undefined,
+  targets: Array<{ network: string; format: string; channel_session_id: string }> | undefined,
+  ctx: z.RefinementCtx,
+): void {
+  if (!ocorrencias) return;
+  const chaves = targets ? new Set(targets.map(chaveDeDestino)) : null;
+  for (const [i, o] of ocorrencias.entries()) {
+    if (o.targets === null) continue;
+    if (o.targets.length === 0) {
+      ctx.addIssue({ code: "custom", path: ["occurrences", i, "targets"], message: "Esta data está sem nenhuma rede." });
+      continue;
+    }
+    for (const [j, k] of o.targets.entries()) {
+      if (chaves && !chaves.has(k)) {
+        ctx.addIssue({ code: "custom", path: ["occurrences", i, "targets", j], message: "Este destino não está na publicação." });
+      }
+    }
+  }
+}
+
 /**
  * Criar. `scheduled_at` são os horários escolhidos à mão (sempre instantes com
  * offset — a tela converte a parede no fuso da publicação ANTES de mandar);
  * a recorrência, quando existe, gera as demais a partir do primeiro deles.
+ *
+ * `occurrences` é a forma completa: cada data com os destinos que saem nela.
+ * Quando vem, manda; `scheduled_at` fica por compatibilidade (todos os destinos
+ * em todas as datas) e para quem só tem datas.
  */
 export const criarPublicacaoSchema = z
   .object({
@@ -200,15 +241,17 @@ export const criarPublicacaoSchema = z
     media: z.array(midiaDaPublicacaoSchema).max(MAXIMO_DE_ARQUIVOS_POR_PUBLICACAO).default([]),
     targets: z.array(destinoDaPublicacaoSchema).max(MAXIMO_DE_DESTINOS_POR_PUBLICACAO).default([]),
     scheduled_at: z.array(instante).max(MAXIMO_DE_DATAS_POR_PUBLICACAO).default([]),
+    occurrences: z.array(ocorrenciaDaPublicacaoSchema).max(MAXIMO_DE_DATAS_POR_PUBLICACAO).optional(),
     recurrence: recorrenciaDaPublicacaoSchema.default({ kind: "none", config: {} }),
     metadata: z.record(z.string(), z.unknown()).optional(),
   })
   .superRefine((p, ctx) => {
+    const datas = p.occurrences ? p.occurrences.length : p.scheduled_at.length;
     if (p.status === "scheduled") {
       if (p.targets.length === 0) {
         ctx.addIssue({ code: "custom", path: ["targets"], message: "Escolha pelo menos um destino." });
       }
-      if (p.scheduled_at.length === 0) {
+      if (datas === 0) {
         ctx.addIssue({ code: "custom", path: ["scheduled_at"], message: "Escolha pelo menos uma data e hora." });
       }
       if (!p.body && p.media.length === 0) {
@@ -223,6 +266,7 @@ export const criarPublicacaoSchema = z
       }
       chaves.add(k);
     }
+    conferirOcorrencias(p.occurrences, p.targets, ctx);
   });
 export type CriarPublicacao = z.infer<typeof criarPublicacaoSchema>;
 
@@ -230,17 +274,21 @@ export type CriarPublicacao = z.infer<typeof criarPublicacaoSchema>;
  * Editar. Só o que veio muda. Trocar mídia, destinos ou recorrência regera as
  * ocorrências PENDENTES; as que já saíram ficam como estão (histórico).
  */
-export const alterarPublicacaoSchema = z.object({
-  title: z.string().trim().min(1).max(160).nullable().optional(),
-  body: z.string().trim().min(1).max(4000).nullable().optional(),
-  status: z.enum(["draft", "scheduled"]).optional(),
-  timezone: z.string().trim().min(1).max(80).optional(),
-  media: z.array(midiaDaPublicacaoSchema).max(MAXIMO_DE_ARQUIVOS_POR_PUBLICACAO).optional(),
-  targets: z.array(destinoDaPublicacaoSchema).max(MAXIMO_DE_DESTINOS_POR_PUBLICACAO).optional(),
-  scheduled_at: z.array(instante).max(MAXIMO_DE_DATAS_POR_PUBLICACAO).optional(),
-  recurrence: recorrenciaDaPublicacaoSchema.optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
-});
+export const alterarPublicacaoSchema = z
+  .object({
+    title: z.string().trim().min(1).max(160).nullable().optional(),
+    body: z.string().trim().min(1).max(4000).nullable().optional(),
+    status: z.enum(["draft", "scheduled"]).optional(),
+    timezone: z.string().trim().min(1).max(80).optional(),
+    media: z.array(midiaDaPublicacaoSchema).max(MAXIMO_DE_ARQUIVOS_POR_PUBLICACAO).optional(),
+    targets: z.array(destinoDaPublicacaoSchema).max(MAXIMO_DE_DESTINOS_POR_PUBLICACAO).optional(),
+    scheduled_at: z.array(instante).max(MAXIMO_DE_DATAS_POR_PUBLICACAO).optional(),
+    /** Como em criar: quando vem, substitui `scheduled_at`. Sem `targets` no corpo, as chaves são conferidas no serviço. */
+    occurrences: z.array(ocorrenciaDaPublicacaoSchema).max(MAXIMO_DE_DATAS_POR_PUBLICACAO).optional(),
+    recurrence: recorrenciaDaPublicacaoSchema.optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+  })
+  .superRefine((p, ctx) => conferirOcorrencias(p.occurrences, p.targets, ctx));
 export type AlterarPublicacao = z.infer<typeof alterarPublicacaoSchema>;
 
 export const cancelarPublicacaoSchema = z.object({

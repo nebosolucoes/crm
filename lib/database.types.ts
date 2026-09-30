@@ -7908,6 +7908,63 @@ export type Database = {
           },
         ]
       }
+      publication_occurrence_targets: {
+        Row: {
+          created_at: string
+          occurrence_id: string
+          organization_id: string
+          target_id: string
+        }
+        Insert: {
+          created_at?: string
+          occurrence_id: string
+          organization_id: string
+          target_id: string
+        }
+        Update: {
+          created_at?: string
+          occurrence_id?: string
+          organization_id?: string
+          target_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publication_occurrence_targets_occurrence_id_fkey"
+            columns: ["occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "publication_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "publication_occurrence_targets_occurrence_org_fkey"
+            columns: ["organization_id", "occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "publication_occurrences"
+            referencedColumns: ["organization_id", "id"]
+          },
+          {
+            foreignKeyName: "publication_occurrence_targets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "publication_occurrence_targets_target_id_fkey"
+            columns: ["target_id"]
+            isOneToOne: false
+            referencedRelation: "publication_targets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "publication_occurrence_targets_target_org_fkey"
+            columns: ["organization_id", "target_id"]
+            isOneToOne: false
+            referencedRelation: "publication_targets"
+            referencedColumns: ["organization_id", "id"]
+          },
+        ]
+      }
       publication_occurrences: {
         Row: {
           cancelled_at: string | null
