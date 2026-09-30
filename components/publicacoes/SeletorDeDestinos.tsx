@@ -35,8 +35,9 @@ export function nomeDaContaPublicavel(rede: RedeDaPublicacao, c: ContaPublicavel
  * no tooltip. Embaixo, só o que precisa de escolha: a conta, quando a rede
  * tem mais de uma, e o botão que abre a janela de grupos do WhatsApp (a lista
  * não fica aberta na tela). Os problemas das regras por formato (`veredito`)
- * não aparecem aqui: o ícone ganha um anel vermelho e o tooltip diz o motivo,
- * e o botão Agendar lista tudo no seu tooltip.
+ * não aparecem aqui: o tooltip do ícone diz o motivo (`data-erro`), e o
+ * botão Agendar lista tudo no seu tooltip. Sem anel em volta do ícone
+ * marcado — a cor contra o cinza já diz o que está ligado.
  */
 export function SeletorDeDestinos({
   contas,
@@ -120,12 +121,8 @@ export function SeletorDeDestinos({
                         data-testid={`destino-${rede}-${format}`}
                         disabled={disabled || semConta}
                         onClick={() => alternar(rede, format)}
-                        className={cn(
-                          "rounded-full p-0.5 outline-hidden ring-offset-2 ring-offset-card transition-all focus-visible:ring-2 focus-visible:ring-accent",
-                          ligado && "ring-2 ring-accent",
-                          semConta && "cursor-not-allowed",
-                          erro && "ring-error-fg",
-                        )}
+                        data-erro={erro ? "true" : undefined}
+                        className={cn("rounded-full p-0.5 outline-hidden ring-offset-2 ring-offset-card transition-all focus-visible:ring-2 focus-visible:ring-accent", semConta && "cursor-not-allowed")}
                       >
                         <ChannelIcon channel={rede} format={formatoParaChannelFormat(format)} state={semConta ? "disabled" : ligado ? "active" : "inactive"} size={30} decorative />
                       </button>
@@ -177,6 +174,19 @@ export function SeletorDeDestinos({
             </Button>
           ) : null}
         </div>
+      ) : null}
+      {whatsapp && nGrupos > 0 ? (
+        <ul className="-mt-1 flex flex-col gap-0.5 pl-1 text-xs text-muted-foreground" data-testid="grupos-escolhidos">
+          {(whatsapp.group_ids ?? []).map((id) => {
+            const g = gruposDaConta.find((x) => x.id === id);
+            return g ? (
+              <li key={id} className="flex items-center gap-1.5">
+                <span className="h-1 w-1 rounded-full bg-muted-foreground/60" aria-hidden />
+                {g.name}
+              </li>
+            ) : null;
+          })}
+        </ul>
       ) : null}
 
       {/* A janela de grupos: a lista só aparece quando a pessoa pede. */}

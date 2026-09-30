@@ -55,7 +55,7 @@ export function PreviaDoFeed({ rede, conta, midias, legenda, hora, quando }: Pro
             </span>
           </div>
           <div className="flex items-center gap-2 px-3 pb-2">
-            <span className="rounded-full bg-gradient-to-tr from-[#feda75] via-[#d62976] to-[#4f5bd5] p-[2px]">
+            <span className="inline-flex shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-[#feda75] via-[#d62976] to-[#4f5bd5] p-[2px]">
               <AvatarDaConta nome={nome} url={conta.avatarUrl} tamanho={30} className="ring-2 ring-white" />
             </span>
             <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{nome}</span>

@@ -106,8 +106,8 @@ export function SeletorDeHorarios({
               <Label htmlFor={`horario-${i}`} className="sr-only">
                 {i === 0 ? t("Primeira") : `${i + 1}ª`}
               </Label>
-              <Input id={`horario-${i}`} type="datetime-local" value={instanteParaParede(h.iso, fuso)} onChange={(e) => mudar(i, e.target.value)} disabled={disabled} className="h-9 w-[190px] text-xs" data-testid={`horario-${i + 1}`} />
-              <div className="flex items-center gap-1" role="group" aria-label={t("Redes desta data")}>
+              <Input id={`horario-${i}`} type="datetime-local" value={instanteParaParede(h.iso, fuso)} onChange={(e) => mudar(i, e.target.value)} disabled={disabled} className="h-9 w-[152px] px-2 text-xs" data-testid={`horario-${i + 1}`} />
+              <div className="flex items-center gap-0.5" role="group" aria-label={t("Redes desta data")}>
                 {destinos.length === 0 ? (
                   <span className="text-[11px] text-muted-foreground">{t("Marque as redes no passo 1")}</span>
                 ) : (
@@ -138,7 +138,7 @@ export function SeletorDeHorarios({
                 )}
               </div>
               {horarios.length > 1 ? (
-                <Button type="button" variant="ghost" size="icon" className="ml-auto h-8 w-8" aria-label={t("Remover este horário")} onClick={() => remover(i)} disabled={disabled}>
+                <Button type="button" variant="ghost" size="icon" className="ml-auto h-7 w-7" aria-label={t("Remover este horário")} onClick={() => remover(i)} disabled={disabled}>
                   <Trash size={14} aria-hidden />
                 </Button>
               ) : null}

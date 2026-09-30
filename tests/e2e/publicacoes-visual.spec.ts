@@ -189,12 +189,14 @@ test("Agendar: 2 arquivos, WhatsApp com 2 grupos, Instagram Feed + Stories, 2 da
   await page.getByTestId("concluir-grupos").click();
   await expect(page.getByTestId("dialogo-de-grupos")).toBeHidden();
   await expect(page.getByTestId("escolher-grupos")).toContainText("2 grupos");
+  await expect(page.getByTestId("grupos-escolhidos")).toContainText("Clientes VIP");
+  await expect(page.getByTestId("grupos-escolhidos")).toContainText("Ofertas da Semana");
   await page.getByTestId("destino-instagram-feed").click();
   await page.getByTestId("destino-instagram-story").click();
   // Reels com foto reprova na hora (regra por formato): o ícone ganha o anel
   // de erro e o botão Agendar explica no tooltip — sem lista de avisos na tela.
   await page.getByTestId("destino-instagram-reel").click();
-  await expect(page.getByTestId("destino-instagram-reel")).toHaveClass(/ring-error-fg/);
+  await expect(page.getByTestId("destino-instagram-reel")).toHaveAttribute("data-erro", "true");
   await expect(page.getByTestId("agendar-publicacao")).toBeDisabled();
   await page.getByTestId("agendar-bloqueado").hover();
   await expect(page.getByTestId("tooltip-pendencias").first()).toContainText("Reels precisa de um vídeo");
