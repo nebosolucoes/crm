@@ -148,13 +148,26 @@ test.describe("Instagram Direct e Messenger — a tela", () => {
     await page.screenshot({ path: ".superpowers/evidence/canais-sociais-02-so-humano.png" });
   });
 
-  test("Conexões tem a aba Redes sociais, com a conexão listada", async ({ page }) => {
+  test("Conexões é uma lista só, e 'Adicionar conexão' oferece todas as formas", async ({ page }) => {
     await loginComoAdmin(page, lerCreds());
-    await page.goto("/app/connections?aba=social");
+    await page.goto("/app/connections");
 
-    await expect(page.getByRole("heading", { name: /Instagram Direct e Messenger/ })).toBeVisible({ timeout: 30_000 });
-    const cartao = page.locator('[data-conexao-social="instagram"]', { hasText: "@loja.e2e" });
-    await expect(cartao).toBeVisible();
+    // A conexão de Instagram está na MESMA lista que os WhatsApp, com o tipo escrito.
+    const cartao = page.locator(`[data-conexao="${SESSAO}"]`);
+    await expect(cartao).toBeVisible({ timeout: 30_000 });
+    await expect(cartao.getByTestId("tipo-da-conexao")).toHaveText("Instagram");
+    await expect(cartao.locator('svg[data-plataforma="instagram"]').first()).toBeVisible();
+    await expect(cartao.getByRole("button", { name: /Desconectar/ })).toBeVisible();
+    // Sem abas por tipo de canal.
+    await expect(page.getByRole("tab", { name: "Números por QR" })).toHaveCount(0);
     await page.screenshot({ path: ".superpowers/evidence/canais-sociais-03-conexoes.png", fullPage: true });
+
+    await page.getByTestId("adicionar-conexao").click();
+    const popup = page.getByTestId("nova-conexao");
+    await expect(popup).toBeVisible();
+    for (const opcao of ["WhatsApp por QR code", "WhatsApp API oficial (Meta)", "Instagram Direct", "Facebook Messenger", "Chamada de voz"]) {
+      await expect(popup.getByRole("button", { name: opcao })).toBeVisible();
+    }
+    await page.screenshot({ path: ".superpowers/evidence/canais-sociais-04-adicionar-conexao.png" });
   });
 });

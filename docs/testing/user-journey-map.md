@@ -2596,8 +2596,10 @@ servidor local (3/3).
 
 | # | Caso | Prioridade | Prova |
 |---|---|---|---|
-| 30.1 | Admin abre Conexões › Redes sociais, vê o formulário da chave e as conexões já feitas | `[P0]` | e2e: aba + cartão da conexão |
-| 30.2 | Chave colada é validada contra o provedor (inclusive o inbox) antes de gravar | `[P0]` | `lib/channels/zernio/social.ts` (sem teste contra a API real — ver "não medido") |
+| 30.1 | Admin abre Conexões e vê TODAS as conexões numa lista só (QR, oficial, parceiro, Instagram, Messenger), cada uma com o tipo escrito; "Adicionar conexão" abre o popup com todas as formas | `[P0]` | e2e caso 3 (30/09, lista única) |
+| 30.2 | Sem `ZERNIO_API_KEY` no .env, Instagram/Messenger aparecem desligados no popup com o motivo; com ela, conectam pela conta da instalação | `[P0]` | medido com a chave real em 30/09; o caso sem chave só por leitura de código |
+| 30.10 | Plano com `max_instagram` = 1 recusa o segundo Instagram; "+1 extra" em Admin › Empresa › Plano libera | `[P1]` | `lib/entitlements/consumo.test.ts` (soma do extra); **tela não medida** |
+| 30.11 | Desconectar remove a conta e o profile na Zernio; falha do provedor não arquiva | `[P0]` | **não medido contra a API** (desconectar a conta real apagaria a do dono) |
 | 30.3 | "Conectar Instagram" leva à Meta e volta conectado, com o webhook registrado sozinho | `[P0]` | **não medido**: exige conta Zernio + Instagram profissional reais |
 | 30.4 | DM que chega pelo webhook assinado vira contato (sem telefone, com @), conversa `instagram` e lead "pela rede" | `[P0]` | medido em 29/09 com webhook HMAC real contra o :3001 (ingested / duplicate na reentrega / 401 com assinatura errada); `tests/unit/canais-sociais.test.ts` |
 | 30.5 | Evento de outra conta ou de outra rede na mesma URL é ignorado, não vira conversa | `[P0]` | medido em 29/09: `conta_de_outra_sessao`, `rede_de_outra_sessao` |

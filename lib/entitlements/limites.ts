@@ -39,8 +39,22 @@ export const CHAVES_DE_LIMITE = [
   "broadcast_monthly_sends",
   "max_contacts",
   "max_sectors",
+  // Por rede (spec 21 §10, decisão do dono 30/09). Somam-se ao `max_channels`,
+  // que segue sendo o teto TOTAL: a empresa respeita os dois.
+  "max_whatsapp",
+  "max_instagram",
+  "max_messenger",
 ] as const;
 export type ChaveDeLimite = (typeof CHAVES_DE_LIMITE)[number];
+
+/**
+ * As chaves que aceitam CONEXÕES EXTRAS por empresa (`organization_limit_extras`,
+ * migration 0281): o admin da instalação vende "+N" que SOMA ao plano. Espelha
+ * o CHECK da coluna `limit_key` — vigiado por
+ * `tests/invariants/vocabulario-banco-x-typescript.test.ts`.
+ */
+export const CHAVES_COM_EXTRA = ["max_channels", "max_whatsapp", "max_instagram", "max_messenger"] as const;
+export type ChaveComExtra = (typeof CHAVES_COM_EXTRA)[number];
 
 export interface LimiteMeta {
   chave: ChaveDeLimite;
@@ -105,6 +119,33 @@ export const LIMITES: Record<ChaveDeLimite, LimiteMeta> = {
     descricao: "Quantos setores ativos (financeiro, comercial…) a organização pode ter. 0 = plano sem setores.",
     unidade: "quantidade",
     // Barra em POST /sectors (spec 20 §2.3).
+    enforced: true,
+  },
+  max_whatsapp: {
+    chave: "max_whatsapp",
+    recurso: "channels",
+    rotulo: "Conexões de WhatsApp",
+    descricao: "Quantos números de WhatsApp (QR, API oficial ou parceiro) a organização pode manter conectados.",
+    unidade: "quantidade",
+    // Barra em POST /channel-sessions, /channels/official e /channels/partner.
+    enforced: true,
+  },
+  max_instagram: {
+    chave: "max_instagram",
+    recurso: "channels",
+    rotulo: "Contas de Instagram",
+    descricao: "Quantas contas de Instagram Direct a organização pode manter conectadas.",
+    unidade: "quantidade",
+    // Barra em POST /channels/social/connect e na volta do OAuth.
+    enforced: true,
+  },
+  max_messenger: {
+    chave: "max_messenger",
+    recurso: "channels",
+    rotulo: "Páginas do Messenger",
+    descricao: "Quantas páginas do Facebook (Messenger) a organização pode manter conectadas.",
+    unidade: "quantidade",
+    // Barra em POST /channels/social/connect e na volta do OAuth.
     enforced: true,
   },
 };

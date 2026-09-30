@@ -10,6 +10,7 @@ import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
 import { randomId } from "@/lib/random-id";
 import type { OverrideDaOrganizacao } from "@/lib/entitlements/admin/organizacoes";
+import type { ExtraCriar, ExtraDaOrganizacao } from "@/lib/entitlements/admin/extras";
 import type { Medicao } from "@/lib/entitlements/consumo";
 import type { PlanoDoCatalogo } from "@/lib/entitlements/admin/planos";
 import type { OverrideCriar, PlanoCriar, PlanoEditar } from "@/lib/entitlements/admin/schemas";
@@ -121,6 +122,48 @@ export function useRevogarOverride(tenantId: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: chaveDoTenant(tenantId) });
       toast.success(t("Liberação encerrada"));
+    },
+    onError: (err: Error) => toast.error(t("Não foi possível encerrar"), { description: err.message }),
+  });
+}
+
+// ── Conexões extras por empresa (0281, spec 21 §10) ─────────────────────────
+
+const chaveDosExtras = (id: string) => ["admin", "tenant", id, "extras"] as const;
+
+export function useExtrasDoTenant(tenantId: string) {
+  return useQuery({
+    queryKey: chaveDosExtras(tenantId),
+    queryFn: () => apiClient.get<{ data: ExtraDaOrganizacao[] }>(`/api/v1/admin/tenants/${tenantId}/extras`).then((r) => r.data),
+  });
+}
+
+export function useCriarExtra(tenantId: string) {
+  const t = useT();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (corpo: ExtraCriar) =>
+      apiClient.post<{ data: { id: string } }>(`/api/v1/admin/tenants/${tenantId}/extras`, corpo).then((r) => r.data),
+    onSuccess: () => {
+      // O consumo mostra o teto COM o extra: as duas consultas andam juntas.
+      void qc.invalidateQueries({ queryKey: chaveDosExtras(tenantId) });
+      void qc.invalidateQueries({ queryKey: chaveDoTenant(tenantId) });
+      toast.success(t("Conexões extras adicionadas"));
+    },
+    onError: (err: Error) => toast.error(t("Não foi possível adicionar"), { description: err.message }),
+  });
+}
+
+export function useRevogarExtra(tenantId: string) {
+  const t = useT();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiClient.delete<{ data: { revoked: boolean } }>(`/api/v1/admin/tenants/${tenantId}/extras/${id}`).then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: chaveDosExtras(tenantId) });
+      void qc.invalidateQueries({ queryKey: chaveDoTenant(tenantId) });
+      toast.success(t("Extra encerrado"));
     },
     onError: (err: Error) => toast.error(t("Não foi possível encerrar"), { description: err.message }),
   });

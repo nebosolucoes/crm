@@ -206,10 +206,8 @@ export const AUDIT_ACTIONS = [
   "ai_agent.run_completed",
   "ai_agent.run_failed",
   "channel.connected",
-  // Instagram Direct / Messenger (spec 21): a chave do intermediário da
-  // organização foi gravada ou trocada, e a tentativa de conexão que voltou do
-  // OAuth sem conectar. O sucesso usa `channel.connected`, como os outros.
-  "channel.provider_key_saved",
+  // Instagram Direct / Messenger (spec 21): a tentativa de conexão que voltou
+  // do OAuth sem conectar. O sucesso usa `channel.connected`, como os outros.
   "channel.connect_failed",
   "channel.ai_access_updated",
   "channel.reconnected",
@@ -637,6 +635,9 @@ export const AUDIT_ACTIONS = [
   // metadata: feature, mode, starts_at, ends_at, limits, reason
   "tenant.feature_override_created",
   "tenant.feature_override_revoked",
+  // Conexões extras por empresa (0281, spec 21 §10): "+N" que soma ao plano.
+  "tenant.limit_extra_added",
+  "tenant.limit_extra_revoked",
   // Leituras de `admin/`, auditadas como toda leitura de admin neste repo.
   "platform_admin.plans_listed",
   "platform_admin.tenant_entitlements_viewed",

@@ -20,10 +20,8 @@
 --     errada. DIRC: integra (aponta para o contato), não duplica.
 --   * `fn_upsert_social_contact` — reencontra ou cria o contato pela
 --     identidade social, resolvendo a corrida de dois webhooks simultâneos.
---   * `channel_provider_keys` — a chave de API do intermediário, UMA por
---     organização, cifrada. Só o service role alcança; a chave nunca volta
---     numa leitura. Cada sessão conectada copia a cifra para
---     `zernio_token_encrypted`, que é de onde o envio já lê.
+--   * A chave do intermediário é da INSTALAÇÃO (`ZERNIO_API_KEY` no .env) e
+--     não mora no banco: sessão social tem `zernio_token_encrypted` nulo.
 --   * `fn_upsert_wa_conversation` e `fn_service_begin` gravam o canal da
 --     SESSÃO, não o literal 'whatsapp'; e `fn_service_begin`, quando escolhe a
 --     sessão sozinho, escolhe uma de WhatsApp — o destino ali é um contato
@@ -193,26 +191,6 @@ end; $$;
 
 revoke execute on function public.fn_upsert_social_contact(uuid, text, text, uuid, text, text) from public, anon, authenticated;
 grant execute on function public.fn_upsert_social_contact(uuid, text, text, uuid, text, text) to service_role;
-
--- 5 · a chave do intermediário, uma por organização -------------------------
-create table if not exists public.channel_provider_keys (
-  organization_id   uuid not null references public.organizations(id) on delete cascade,
-  provider          text not null,
-  -- fn_encrypt_oauth, a mesma cifra de `zernio_token_encrypted`.
-  api_key_encrypted bytea not null,
-  created_by        uuid,
-  created_at        timestamptz not null default now(),
-  updated_at        timestamptz not null default now(),
-  primary key (organization_id, provider),
-  constraint channel_provider_keys_provider_check check (provider in ('zernio'))
-);
-
-comment on table public.channel_provider_keys is
-  'Chave de API do intermediário de canais, uma por organização, cifrada (fn_encrypt_oauth). Server-side only: RLS ligada, zero policy e zero grant a anon/authenticated. Spec 21 §2.3.';
-
-alter table public.channel_provider_keys enable row level security;
-revoke all on public.channel_provider_keys from public, anon, authenticated;
-grant select, insert, update, delete on public.channel_provider_keys to service_role;
 
 -- 6 · a conversa nasce com a rede da sessão ---------------------------------
 create or replace function public.fn_upsert_wa_conversation(
@@ -507,7 +485,7 @@ notify pgrst, 'reload schema';
 
 -- ---- travas do modo somente leitura do suporte nas tabelas novas ----
 -- Mesma razão da 0278: na CADEIA ninguém replanta as travas depois da 0274, e
--- `contact_platform_identities`/`channel_provider_keys` nasceriam sem elas. No
+-- `contact_platform_identities` nasceria sem elas. No
 -- baseline quem planta é o último bloco do arquivo. Guardado pela existência
 -- da função.
 do $f$

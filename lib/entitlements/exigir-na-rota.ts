@@ -18,6 +18,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { audit } from "@/lib/audit";
 import { fail, type ApiError } from "@/lib/api/wrappers";
+import type { Plataforma } from "@/lib/channels/plataformas";
 
 import { limiteAtingido } from "./consumo";
 import { LIMITES, type ChaveDeLimite } from "./limites";
@@ -94,4 +95,43 @@ export async function recusaPorLimite(
     409,
     { requestId: opts.requestId, details: { limite: chave, ...atingido } },
   );
+}
+
+/** A chave de limite de cada rede (spec 21 §10). */
+export const LIMITE_DA_REDE: Record<Plataforma, ChaveDeLimite> = {
+  whatsapp: "max_whatsapp",
+  instagram: "max_instagram",
+  messenger: "max_messenger",
+};
+
+/**
+ * Conexão nova conta em DOIS tetos: o total (`max_channels`) e o da rede
+ * (`max_whatsapp`/`max_instagram`/`max_messenger`). A empresa respeita os
+ * dois; o primeiro que estourar recusa, e a mensagem diz qual.
+ */
+export async function recusaPorLimiteDeConexao(
+  organizationId: string,
+  rede: Plataforma,
+  opts: RecusaPorRecursoOpts & { admin: SupabaseClient },
+): Promise<NextResponse<ApiError> | null> {
+  return (
+    (await recusaPorLimite(organizationId, "max_channels", opts)) ??
+    (await recusaPorLimite(organizationId, LIMITE_DA_REDE[rede], opts))
+  );
+}
+
+/**
+ * A mesma pergunta para quem não responde JSON (a volta do OAuth redireciona):
+ * `null` = cabe; senão a frase para a tela.
+ */
+export async function limiteDeConexaoAtingido(
+  admin: SupabaseClient,
+  organizationId: string,
+  rede: Plataforma,
+): Promise<string | null> {
+  for (const chave of ["max_channels", LIMITE_DA_REDE[rede]] as const) {
+    const atingido = await limiteAtingido(admin, organizationId, chave);
+    if (atingido) return `${LIMITES[chave].rotulo}: o plano permite ${atingido.teto} e a organização já usa ${atingido.uso}.`;
+  }
+  return null;
 }

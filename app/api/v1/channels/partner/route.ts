@@ -33,7 +33,8 @@ import { urlDoWebhookDoCanal } from "@/lib/channels/url-publica";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { encryptWebhookSecret } from "@/lib/webhooks/secrets";
 import { traduzir } from "@/lib/i18n/dicionario";
-import { recusaPorLimite } from "@/lib/entitlements/exigir-na-rota";
+import { recusaPorLimiteDeConexao } from "@/lib/entitlements/exigir-na-rota";
+import { PLATAFORMA_WHATSAPP } from "@/lib/channels/plataformas";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -120,7 +121,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const existente = await findPartnerSession(admin, orgId);
   // Limite do plano (etapa 8): canal novo, ou arquivado voltando à vida, conta.
   if (!existente || existente.archivedAt) {
-    const noTeto = await recusaPorLimite(orgId, "max_channels", {
+    const noTeto = await recusaPorLimiteDeConexao(orgId, PLATAFORMA_WHATSAPP, {
       admin,
       requestId,
       resource: "channels_partner",

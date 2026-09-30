@@ -38,7 +38,7 @@ export const PARTNER_CHANNEL_PROVIDER: ChannelProvider = CHANNEL_PROVIDER_ZERNIO
  * tela que diz "provedor parceiro" obriga a adivinhar. O rótulo é dado, não
  * decisão de quem desenha a tela.
  */
-export const PARTNER_CHANNEL_LABEL = "Zernio";
+export { PARTNER_CHANNEL_LABEL } from "./rotulos";
 
 export interface PartnerCredentialsInput {
   accountId: string;

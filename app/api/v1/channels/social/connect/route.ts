@@ -17,7 +17,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { PLATAFORMAS_SOCIAIS } from "@/lib/channels/plataformas";
 import { CAMINHO_DO_CALLBACK_SOCIAL, iniciarConexaoSocial } from "@/lib/channels/social";
 import { alcancavelPelaInternet, urlPublicaDaInstalacao } from "@/lib/channels/url-publica";
-import { recusaPorLimite } from "@/lib/entitlements/exigir-na-rota";
+import { recusaPorLimiteDeConexao } from "@/lib/entitlements/exigir-na-rota";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { authenticatedSessionId, requireSupportWrite } from "@/lib/impersonate/support";
 import { env } from "@/lib/env";
@@ -57,7 +57,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const admin = createAdminClient();
   // Limite do plano ANTES de mandar o operador para a Meta: descobrir o teto
   // depois de autorizar lá seria fazê-lo repetir o caminho à toa.
-  const noTeto = await recusaPorLimite(authz.org.orgId, "max_channels", {
+  // Teto total e o da rede escolhida (spec 21 §10).
+  const noTeto = await recusaPorLimiteDeConexao(authz.org.orgId, lido.data.platform, {
     admin,
     requestId,
     resource: "channels_social",
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   });
   if (noTeto) return noTeto;
 
-  const r = await iniciarConexaoSocial(admin, {
+  const r = await iniciarConexaoSocial({
     organizationId: authz.org.orgId,
     nomeDaOrganizacao: authz.org.name,
     userId: authz.user.id,

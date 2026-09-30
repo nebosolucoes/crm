@@ -3,7 +3,9 @@ impacto: capacidade_nova
 secao: adicionado
 titulo: Instagram Direct e Messenger entram no Atendimento, com o mesmo robô, filas e setores do WhatsApp
 ---
-As mensagens diretas do Instagram e da página do Facebook (Messenger) agora chegam ao Atendimento junto com as do WhatsApp. Em Conexões há uma aba nova, "Redes sociais": você cola uma vez a chave de API da sua conta Zernio e clica em "Conectar Instagram" ou "Conectar Messenger". A tela da Meta pede a autorização e você volta ao CRM já conectado — o webhook é registrado sozinho, não há nada para copiar e colar.
+As mensagens diretas do Instagram e da página do Facebook (Messenger) agora chegam ao Atendimento junto com as do WhatsApp. A tela de Conexões virou uma lista única com todas as conexões — WhatsApp, Instagram e Messenger — e um botão "Adicionar conexão" que abre as opções. Ao escolher Instagram ou Messenger, a tela da Meta pede a autorização e você volta ao CRM já conectado; o webhook é registrado sozinho. "Desconectar" remove a conta também no provedor, para ela deixar de ser cobrada.
+
+Para quem instala: Instagram e Messenger usam a chave da conta Zernio da instalação, `ZERNIO_API_KEY` no `.env`. Sem ela, as duas opções aparecem desligadas com o motivo; nada mais muda. Os planos ganharam limites por rede (WhatsApp, Instagram, Messenger), e o admin da instalação pode vender conexões extras por empresa, que somam ao plano.
 
 Cada conta conectada vira um canal como os outros. Você pode amarrar a ela um agente de IA ou um roteador, as conversas caem na fila e nos setores do jeito de sempre, e o lead nasce no funil como "Novo contato pelo Instagram". Na inbox, as conversas dessas redes aparecem com o ícone da rede e o @ do perfil do cliente.
 

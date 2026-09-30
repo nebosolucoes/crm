@@ -12,13 +12,23 @@ import { useT } from "@/hooks/i18n/useT";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import {
   useAtribuirPlano,
+  useCriarExtra,
   useCriarOverride,
+  useExtrasDoTenant,
+  useRevogarExtra,
   usePlanoDoTenant,
   useRevogarOverride,
   type OverrideDaOrganizacao,
 } from "@/hooks/admin/usePlanos";
 import { overrideCriarSchema, type OverrideCriar } from "@/lib/entitlements/admin/schemas";
-import { CHAVES_DE_LIMITE, LIMITES, type ChaveDeLimite, type Limites } from "@/lib/entitlements/limites";
+import {
+  CHAVES_COM_EXTRA,
+  CHAVES_DE_LIMITE,
+  LIMITES,
+  type ChaveComExtra,
+  type ChaveDeLimite,
+  type Limites,
+} from "@/lib/entitlements/limites";
 import { RECURSOS, ROTULO_DO_RECURSO, sempreLigado, type Recurso } from "@/lib/entitlements/recursos";
 import { MODOS_DE_OVERRIDE, temRecurso, type ModoDeOverride } from "@/lib/entitlements/tipos";
 
@@ -218,7 +228,14 @@ export function PlanoDoTenantClient({ tenantId }: { tenantId: string }) {
                       {m.enforced ? t("barra") : t("informativo")}
                     </span>
                   </td>
-                  <td className="px-3 py-2">{m.teto === undefined ? t("sem limite") : m.teto}</td>
+                  <td className="px-3 py-2">
+                    {m.teto === undefined ? t("sem limite") : m.teto}
+                    {m.extra > 0 && (
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        ({t("inclui")} +{m.extra} {t("extra")})
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-2">{m.uso}</td>
                   <td className="px-3 py-2">
                     {m.teto === undefined ? "—" : m.excedido ? <Badge variant="outline" className="text-error-fg">{t("no teto")}</Badge> : <Badge variant="outline">{t("dentro")}</Badge>}
@@ -229,6 +246,8 @@ export function PlanoDoTenantClient({ tenantId }: { tenantId: string }) {
           </table>
         </div>
       </Card>
+
+      <ExtrasCard tenantId={tenantId} />
 
       {/* ── Nova liberação ── */}
       <Card className="p-6">
@@ -328,5 +347,91 @@ export function PlanoDoTenantClient({ tenantId }: { tenantId: string }) {
         )}
       </Card>
     </div>
+  );
+}
+
+/**
+ * Conexões extras (0281, spec 21 §10): "+N" que SOMA ao teto do plano — ao
+ * contrário da liberação especial acima, que substitui o número. Continua
+ * valendo quando a empresa troca de plano.
+ */
+function ExtrasCard({ tenantId }: { tenantId: string }) {
+  const t = useT();
+  const data = formatador(useTagDeIdioma());
+  const { data: extras } = useExtrasDoTenant(tenantId);
+  const criar = useCriarExtra(tenantId);
+  const revogar = useRevogarExtra(tenantId);
+  const [chave, setChave] = useState<ChaveComExtra>("max_instagram");
+  const [quantidade, setQuantidade] = useState("1");
+  const [motivo, setMotivo] = useState("");
+
+  const n = Number(quantidade);
+  const valido = Number.isInteger(n) && n >= 1 && n <= 1000 && motivo.trim().length >= 3;
+
+  return (
+    <Card className="p-6" data-testid="conexoes-extras">
+      <h2 className="text-lg font-semibold">{t("Conexões extras")}</h2>
+      <p className="text-sm text-muted-foreground">
+        {t("Somam ao limite do plano e continuam valendo se a empresa trocar de plano. Plano sem limite naquela rede segue sem limite.")}
+      </p>
+      <form
+        className="mt-4 grid gap-3 sm:grid-cols-[1fr_120px_2fr_auto] sm:items-end"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!valido) return;
+          criar.mutate(
+            { limit_key: chave, quantidade: n, reason: motivo.trim() },
+            { onSuccess: () => { setMotivo(""); setQuantidade("1"); } },
+          );
+        }}
+      >
+        <div className="space-y-1">
+          <Label htmlFor="extra-chave">{t("Conexão")}</Label>
+          <select
+            id="extra-chave"
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            value={chave}
+            onChange={(e) => setChave(e.target.value as ChaveComExtra)}
+          >
+            {CHAVES_COM_EXTRA.map((c) => (
+              <option key={c} value={c}>{t(LIMITES[c].rotulo)}</option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="extra-qtd">{t("Quantidade")}</Label>
+          <Input id="extra-qtd" type="number" min={1} max={1000} step={1} value={quantidade} onChange={(e) => setQuantidade(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="extra-motivo">{t("Motivo")}</Label>
+          <Input id="extra-motivo" value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder={t("Pedido de 2 Instagram a mais em …")} />
+        </div>
+        <Button type="submit" disabled={!valido || criar.isPending} data-testid="adicionar-extra">
+          {criar.isPending ? t("Salvando…") : t("Adicionar")}
+        </Button>
+      </form>
+      {(extras ?? []).length > 0 && (
+        <ul className="mt-4 divide-y">
+          {(extras ?? []).map((e) => (
+            <li key={e.id} className="flex flex-wrap items-center justify-between gap-3 py-2" data-extra={e.id}>
+              <div className="min-w-0 text-sm">
+                <span className="font-medium">+{e.quantidade} {t(LIMITES[e.limit_key].rotulo)}</span>
+                {e.revoked_at ? (
+                  <Badge variant="outline" className="ml-2">{t("encerrado")}</Badge>
+                ) : (
+                  <Badge variant="secondary" className="ml-2">{t("valendo")}</Badge>
+                )}
+                <p className="text-xs text-muted-foreground">{data(e.created_at)} · {e.reason}</p>
+              </div>
+              {!e.revoked_at && (
+                <Button variant="outline" size="sm" disabled={revogar.isPending} onClick={() => revogar.mutate(e.id)}>
+                  {t("Encerrar")}
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }

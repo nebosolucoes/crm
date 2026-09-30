@@ -69,6 +69,13 @@ const PARES: Array<{
     simbolo: "PLATAFORMAS_SOCIAIS",
   },
   {
+    // Conexões extras (0281): as chaves de limite que aceitam "+N" por empresa.
+    tabela: "organization_limit_extras",
+    coluna: "limit_key",
+    arquivo: "lib/entitlements/limites.ts",
+    simbolo: "CHAVES_COM_EXTRA",
+  },
+  {
     tabela: "sectors",
     coluna: "scope",
     // Setores de atendimento (0278). `own` vê só o próprio setor; `all` é o setor

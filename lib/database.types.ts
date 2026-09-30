@@ -2879,41 +2879,6 @@ export type Database = {
           },
         ]
       }
-      channel_provider_keys: {
-        Row: {
-          api_key_encrypted: string
-          created_at: string
-          created_by: string | null
-          organization_id: string
-          provider: string
-          updated_at: string
-        }
-        Insert: {
-          api_key_encrypted: string
-          created_at?: string
-          created_by?: string | null
-          organization_id: string
-          provider: string
-          updated_at?: string
-        }
-        Update: {
-          api_key_encrypted?: string
-          created_at?: string
-          created_by?: string | null
-          organization_id?: string
-          provider?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "channel_provider_keys_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       channel_session_health: {
         Row: {
           channel_session_id: string
@@ -6661,6 +6626,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "organization_feature_overrides_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_limit_extras: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          limit_key: string
+          organization_id: string
+          quantidade: number
+          reason: string
+          revoked_at: string | null
+          revoked_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          limit_key: string
+          organization_id: string
+          quantidade: number
+          reason: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          limit_key?: string
+          organization_id?: string
+          quantidade?: number
+          reason?: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_limit_extras_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"

@@ -148,6 +148,11 @@ const schema = z.object({
   // contêiner do WAHA; o app precisa dele para CONFERIR a assinatura — e não o
   // declarava aqui, então nunca teve como verificar nada.
   WAHA_HMAC_SECRET: z.string().optional().default(""),
+  // Zernio (intermediário): a chave da conta DA INSTALAÇÃO. Instagram/Messenger
+  // conectam por ela (spec 21). Vazia = as opções sociais ficam desligadas.
+  ZERNIO_API_KEY: z.string().optional().default(""),
+  ZERNIO_ACCOUNT_ID: z.string().optional().default(""),
+  ZERNIO_API_BASE_URL: z.string().optional().default(""),
   // "true" exige assinatura válida em todo webhook do WAHA. Fica desligado por
   // padrão porque o WAHA Core não assina (medido: 2026.7.2 CORE manda os
   // eventos sem header mesmo com WHATSAPP_HOOK_HMAC configurado), e exigir

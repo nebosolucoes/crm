@@ -1,18 +1,19 @@
 /**
  * Conexões de Instagram Direct e Messenger — do lado de dentro do seam.
  *
- * Spec 21 §3. A rota e a tela falam em conceitos ("a chave", "conectar o
- * Instagram", "a conexão"); quem transporta, como se chamam as colunas dele e
+ * Spec 21 §3. A rota e a tela falam em conceitos ("conectar o Instagram", "a
+ * conexão", "desconectar"); quem transporta, como se chamam as colunas dele e
  * como se fala com a API dele moram aqui e em `./zernio/social.ts`. Mesma regra
  * de `./connect.ts`, pelo mesmo motivo: o `lint:channels`.
  *
- * ─── A chave é da ORGANIZAÇÃO; a cópia é da SESSÃO ─────────────────────────
+ * ─── A conta é da INSTALAÇÃO ───────────────────────────────────────────────
  *
- * O operador cola a chave uma vez (`channel_provider_keys`). Cada conexão
- * copia a cifra para `zernio_token_encrypted` da própria sessão, porque é de
- * lá que envio, mídia e saúde já leem (`resolveZernioCreds`). Trocar a chave
- * depois NÃO reescreve as sessões antigas por conta própria — `salvarChaveSocial`
- * propaga explicitamente, e diz quantas.
+ * Decisão do dono (30/09): uma chave só, a da instalação (`ZERNIO_API_KEY` no
+ * `.env`). Cada "Conectar" cria um profile NESSA conta, e cada "Desconectar"
+ * remove a conta conectada e o profile de lá — o provedor cobra por conta
+ * conectada, e uma conta esquecida do lado de lá é cobrança sem cliente. A
+ * sessão não guarda chave: `resolveZernioCreds` usa a da instalação com o
+ * `zernio_account_id` da própria sessão.
  */
 import { randomBytes, randomUUID } from "node:crypto";
 
@@ -20,20 +21,22 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { metadataInicialDoCanal } from "@/lib/ai/elegibilidade/pre-go-live";
 import { logger } from "@/lib/logger";
-import { decryptWebhookSecret, encryptWebhookSecret } from "@/lib/webhooks/secrets";
+import { encryptWebhookSecret } from "@/lib/webhooks/secrets";
 
 import { CHANNEL_PROVIDER_ZERNIO } from "./capabilities";
 import { PARTNER_CHANNEL_LABEL } from "./connect";
 import { PLATAFORMAS_SOCIAIS, type PlataformaSocial, ROTULO_DA_PLATAFORMA } from "./plataformas";
 import { emitirEstadoSocial, type EstadoSocial } from "./social-state";
+import { zernioApiKeyDaInstalacao } from "./zernio/credentials";
 import {
   contaDoProfile,
   criarProfile,
   nomeDoProfile,
   registrarWebhook,
+  removerConta,
+  removerProfile,
   removerWebhook,
   urlDeAutorizacao,
-  validarChaveSocial,
 } from "./zernio/social";
 
 /** A frase em português para o erro que o OAuth devolveu (vocabulário do provedor). */
@@ -42,82 +45,26 @@ export { explicarErroDoCallback } from "./zernio/social";
 /** Onde o OAuth volta. O cookie de vínculo vive SÓ neste caminho. */
 export const CAMINHO_DO_CALLBACK_SOCIAL = "/api/v1/channels/social/callback";
 
-/** Como o provedor se chama para o usuário (o nome da conta que ele contratou). */
+/** Como o provedor se chama para o usuário. */
 export const SOCIAL_PROVIDER_LABEL = PARTNER_CHANNEL_LABEL;
+
+/** O nome da variável que a tela cita quando ela falta. */
+export const VARIAVEL_DA_CHAVE_SOCIAL = "ZERNIO_API_KEY";
 
 const PROVIDER = CHANNEL_PROVIDER_ZERNIO;
 
-// ---------------------------------------------------------------------------
-// A chave da organização
-// ---------------------------------------------------------------------------
-
-export async function temChaveSocial(admin: SupabaseClient, organizationId: string): Promise<boolean> {
-  const { data } = await admin
-    .from("channel_provider_keys")
-    .select("organization_id")
-    .eq("organization_id", organizationId)
-    .eq("provider", PROVIDER)
-    .maybeSingle();
-  return !!data;
-}
-
-async function chaveCifrada(admin: SupabaseClient, organizationId: string): Promise<string | null> {
-  const { data } = await admin
-    .from("channel_provider_keys")
-    .select("api_key_encrypted")
-    .eq("organization_id", organizationId)
-    .eq("provider", PROVIDER)
-    .maybeSingle();
-  return (data?.api_key_encrypted as string | undefined) ?? null;
-}
-
-async function lerChaveSocial(admin: SupabaseClient, organizationId: string): Promise<string | null> {
-  const cifrada = await chaveCifrada(admin, organizationId);
-  return cifrada ? decryptWebhookSecret(admin, cifrada) : null;
-}
-
 export type ResultadoSocial<T = null> = { ok: true; valor: T } | { ok: false; motivo: string };
 
-/**
- * Valida contra o provedor e só então grava. Propaga a cifra nova às sessões
- * sociais já conectadas — trocar a chave e continuar mandando pela velha
- * (revogada) seria o defeito calado clássico.
- */
-export async function salvarChaveSocial(
-  admin: SupabaseClient,
-  input: { organizationId: string; apiKey: string; userId: string },
-): Promise<ResultadoSocial<{ sessoesAtualizadas: number }>> {
-  const apiKey = input.apiKey.trim();
-  const v = await validarChaveSocial(apiKey);
-  if (!v.ok) return { ok: false, motivo: v.motivo };
+/** A instalação tem a chave do provedor? Sem ela, Instagram e Messenger ficam desligados. */
+export function socialConfigurado(): boolean {
+  return zernioApiKeyDaInstalacao() !== null;
+}
 
-  const cifrada = await encryptWebhookSecret(admin, apiKey);
-  if (!cifrada) {
-    return { ok: false, motivo: "Cifra indisponível nesta instalação — a chave não foi gravada." };
-  }
-
-  const { error } = await admin.from("channel_provider_keys").upsert(
-    {
-      organization_id: input.organizationId,
-      provider: PROVIDER,
-      api_key_encrypted: cifrada,
-      created_by: input.userId,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "organization_id,provider" },
-  );
-  if (error) return { ok: false, motivo: error.message };
-
-  const { data: atualizadas } = await admin
-    .from("channel_sessions")
-    .update({ zernio_token_encrypted: cifrada })
-    .eq("organization_id", input.organizationId)
-    .eq("provider", PROVIDER)
-    .in("platform", [...PLATAFORMAS_SOCIAIS])
-    .is("archived_at", null)
-    .select("id");
-
-  return { ok: true, valor: { sessoesAtualizadas: (atualizadas ?? []).length } };
+function semChave(): ResultadoSocial<never> {
+  return {
+    ok: false,
+    motivo: `Instagram e Messenger não estão configurados nesta instalação (falta ${VARIAVEL_DA_CHAVE_SOCIAL} no .env).`,
+  };
 }
 
 /**
@@ -203,20 +150,17 @@ export async function listarConexoesSociais(
  * browser. Nada é gravado no CRM ainda — se o operador desistir na tela do
  * Facebook, não sobra sessão fantasma.
  */
-export async function iniciarConexaoSocial(
-  admin: SupabaseClient,
-  input: {
-    organizationId: string;
-    nomeDaOrganizacao: string;
-    userId: string;
-    authSessionId: string;
-    plataforma: PlataformaSocial;
-    /** Nosso callback, SEM o `state` — ele é acrescentado aqui. */
-    callbackUrl: string;
-  },
-): Promise<ResultadoSocial<{ authUrl: string; nonce: string }>> {
-  const apiKey = await lerChaveSocial(admin, input.organizationId);
-  if (!apiKey) return { ok: false, motivo: "Cadastre a chave de API antes de conectar." };
+export async function iniciarConexaoSocial(input: {
+  organizationId: string;
+  nomeDaOrganizacao: string;
+  userId: string;
+  authSessionId: string;
+  plataforma: PlataformaSocial;
+  /** Nosso callback, SEM o `state` — ele é acrescentado aqui. */
+  callbackUrl: string;
+}): Promise<ResultadoSocial<{ authUrl: string; nonce: string }>> {
+  const apiKey = zernioApiKeyDaInstalacao();
+  if (!apiKey) return semChave();
 
   const sufixo = randomUUID();
   const profile = await criarProfile(
@@ -264,9 +208,8 @@ export async function concluirConexaoSocial(
   },
 ): Promise<ResultadoSocial<{ sessionId: string; plataforma: PlataformaSocial }>> {
   const { estado } = input;
-  const cifrada = await chaveCifrada(admin, estado.orgId);
-  const apiKey = cifrada ? await decryptWebhookSecret(admin, cifrada) : null;
-  if (!cifrada || !apiKey) return { ok: false, motivo: "A chave de API sumiu durante a conexão. Cadastre de novo." };
+  const apiKey = zernioApiKeyDaInstalacao();
+  if (!apiKey) return semChave();
 
   const conta = await contaDoProfile(apiKey, {
     profileId: estado.profileId,
@@ -316,7 +259,8 @@ export async function concluirConexaoSocial(
     provider: PROVIDER,
     platform: estado.plataforma,
     zernio_account_id: input.accountId,
-    zernio_token_encrypted: cifrada,
+    // A chave é da instalação: a sessão não guarda cópia (ver o cabeçalho).
+    zernio_token_encrypted: null,
     webhook_path_token: token,
     webhook_secret_encrypted: segredoCifrado,
     display_name: conta.valor.displayName ?? (conta.valor.username ? `@${conta.valor.username}` : rotulo),
@@ -346,27 +290,57 @@ export async function concluirConexaoSocial(
 }
 
 /**
- * Ao remover a conexão: apaga o webhook do lado do provedor. Best-effort — a
- * remoção no CRM já rotaciona o token do webhook, então uma falha aqui só deixa
- * entregas que serão recusadas, nunca mensagem entrando num canal removido.
+ * "Desconectar": remove a conexão DO LADO DO PROVEDOR — o webhook, a conta
+ * conectada e o profile que o "Conectar" criou.
+ *
+ * Falha fechado, e é de propósito: a conta é cobrada enquanto existir lá. Se
+ * o provedor não confirmou a remoção, a rota NÃO arquiva a sessão e diz o
+ * porquê — arquivar mesmo assim faria o CRM mostrar "removida" enquanto a
+ * cobrança segue. Já removida (404) conta como removida.
+ *
+ * `ok: true, valor: false` = a sessão não é deste provedor (nada a fazer aqui).
  */
-export async function revogarConexaoSocialNoProvedor(
+export async function desconectarNoProvedor(
   admin: SupabaseClient,
   organizationId: string,
   sessionId: string,
-): Promise<void> {
+): Promise<ResultadoSocial<boolean>> {
   const { data } = await admin
     .from("channel_sessions")
-    .select("provider, platform, metadata")
+    .select("provider, platform, zernio_account_id, metadata")
     .eq("organization_id", organizationId)
     .eq("id", sessionId)
     .maybeSingle();
-  if (!data || data.provider !== PROVIDER) return;
-  const webhookId = ((data.metadata ?? {}) as Record<string, unknown>).zernio_webhook_id;
-  if (typeof webhookId !== "string") return;
+  if (!data || data.provider !== PROVIDER || !(PLATAFORMAS_SOCIAIS as readonly unknown[]).includes(data.platform)) {
+    return { ok: true, valor: false };
+  }
 
-  const apiKey = await lerChaveSocial(admin, organizationId);
-  if (!apiKey) return;
-  const r = await removerWebhook(apiKey, webhookId);
-  if (!r.ok) logger.warn("[social] webhook não removido no provedor", { sessionId, detail: r.motivo });
+  const apiKey = zernioApiKeyDaInstalacao();
+  if (!apiKey) return semChave();
+
+  const meta = (data.metadata ?? {}) as Record<string, unknown>;
+  const webhookId = typeof meta.zernio_webhook_id === "string" ? meta.zernio_webhook_id : null;
+  const profileId = typeof meta.zernio_profile_id === "string" ? meta.zernio_profile_id : null;
+
+  if (webhookId) {
+    const r = await removerWebhook(apiKey, webhookId);
+    // Webhook que sobra não cobra: o token rotacionado no arquivamento já recusa
+    // qualquer entrega. Loga e segue.
+    if (!r.ok) logger.warn("[social] webhook não removido no provedor", { sessionId, detail: r.motivo });
+  }
+
+  const accountId = data.zernio_account_id as string | null;
+  if (accountId) {
+    const r = await removerConta(apiKey, accountId);
+    if (!r.ok) return { ok: false, motivo: `O provedor não removeu a conta conectada: ${r.motivo}` };
+  }
+
+  if (profileId) {
+    const r = await removerProfile(apiKey, profileId);
+    // O profile vazio não é cobrado (a cobrança é por conta conectada); falhar
+    // aqui deixaria a pessoa presa a um "não consigo desconectar" sem motivo.
+    if (!r.ok) logger.warn("[social] profile não removido no provedor", { sessionId, detail: r.motivo });
+  }
+
+  return { ok: true, valor: true };
 }

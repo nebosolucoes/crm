@@ -32,9 +32,9 @@ inbox — e o CRM joga fora de propósito:
 
 | Tema | Decisão | Por quê |
 |---|---|---|
-| Conta Zernio | **cada organização usa a própria chave** (BYO) | Pedido do dono. Mantém o modelo self-host: quem paga a conta conectada é o cliente. |
+| Conta Zernio | **uma conta, a da instalação** (`ZERNIO_API_KEY` no `.env`) — *mudou em 30/09; a versão de 29/09 era uma chave por organização* | Pedido do dono (30/09): a Nebo opera a conta e revende as conexões. Cada conexão é um profile nessa conta; "Desconectar" remove a conta e o profile de lá para parar a cobrança. |
 | Conexão | **botão OAuth** ("Conectar Instagram" / "Conectar Messenger") com o seletor hospedado pela Zernio | Leigo não sabe o que é `accountId`. A chave da Zernio é colada **uma vez** por organização. |
-| Tela | aba nova na tela de **Conexões** existente (`/app/connections`), no mesmo padrão das outras | "Seguir o mesmo padrão de hoje." |
+| Tela | **lista única** em `/app/connections` com botão "Adicionar conexão" (popup com WhatsApp QR, API oficial, parceiro, Instagram, Messenger, voz) — *mudou em 30/09; era uma aba por tipo* | Pedido do dono: ver todas as conexões num lugar só. Os links `?aba=` antigos abrem o painel certo no popup. |
 | Roteamento | **idêntico ao de hoje**: agente/roteador amarrado à sessão, fila humana, setores, políticas por número | Pedido do dono. O roteamento já é por sessão e por conversa, nunca por telefone (auditoria de 29/09). |
 | IA | **atende desde a primeira entrega** | Pedido do dono. Exige gate pré-go-live por `@usuário` (§6) e janela de 24h por plataforma (§5). |
 | Uma sessão por conta conectada | cada conta de Instagram / página do Facebook = **uma linha** de `channel_sessions` (`provider='zernio'`) | Agente, roteador, política e setor já se amarram a sessão. Nada novo a inventar. |
@@ -226,3 +226,22 @@ Pendências conhecidas, fora da primeira entrega:
 - Se `data.messageId` do envio é igual ao `platformMessageId` do eco `message.sent` em IG/FB.
 - Se `conversation.participantPicture` existe.
 - Tamanho máximo de anexo em IG/FB.
+
+## 10. Limites por rede e conexões extras (30/09)
+
+Decisões do dono em 30/09:
+
+- **Limite por rede no plano:** `max_whatsapp`, `max_instagram`, `max_messenger` em
+  `platform_plans.limits`, ao lado do `max_channels` (teto total). Uma conexão nova precisa caber nos
+  dois (`recusaPorLimiteDeConexao`, em `lib/entitlements/exigir-na-rota.ts`). Aparecem sozinhas no editor
+  de planos e no de liberação especial, porque os dois leem `CHAVES_DE_LIMITE`.
+- **Conexões extras por empresa somam ao plano:** tabela `organization_limit_extras` (migration 0281).
+  O admin da instalação vende "+N" em Admin › Empresa › Plano › Conexões extras. Teto efetivo = teto do
+  plano (ou do override) + extras ativos; plano **sem** limite continua sem limite. Encerrar um extra não
+  desconecta nada: só a próxima conexão é recusada.
+- **Chave da instalação:** `ZERNIO_API_KEY` no `.env`. Sem ela, Instagram e Messenger aparecem desligados
+  no popup, com o motivo. A tabela `channel_provider_keys` (chave por organização) saiu antes de ser
+  distribuída.
+- **Desconectar:** remove o webhook, a conta (`DELETE /v1/accounts/{id}`) e o profile na Zernio, e só
+  então arquiva a sessão no CRM (histórico preservado). Se o provedor não confirmar a remoção da conta, a
+  sessão **não** é arquivada e a tela mostra o erro, porque a conta segue cobrada enquanto existir lá.

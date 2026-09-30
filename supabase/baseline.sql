@@ -28194,10 +28194,8 @@ revoke execute on function public.fn_aplicar_travas_de_suporte() from public, an
 --     errada. DIRC: integra (aponta para o contato), não duplica.
 --   * `fn_upsert_social_contact` — reencontra ou cria o contato pela
 --     identidade social, resolvendo a corrida de dois webhooks simultâneos.
---   * `channel_provider_keys` — a chave de API do intermediário, UMA por
---     organização, cifrada. Só o service role alcança; a chave nunca volta
---     numa leitura. Cada sessão conectada copia a cifra para
---     `zernio_token_encrypted`, que é de onde o envio já lê.
+--   * A chave do intermediário é da INSTALAÇÃO (`ZERNIO_API_KEY` no .env) e
+--     não mora no banco: sessão social tem `zernio_token_encrypted` nulo.
 --   * `fn_upsert_wa_conversation` e `fn_service_begin` gravam o canal da
 --     SESSÃO, não o literal 'whatsapp'; e `fn_service_begin`, quando escolhe a
 --     sessão sozinho, escolhe uma de WhatsApp — o destino ali é um contato
@@ -28367,26 +28365,6 @@ end; $$;
 
 revoke execute on function public.fn_upsert_social_contact(uuid, text, text, uuid, text, text) from public, anon, authenticated;
 grant execute on function public.fn_upsert_social_contact(uuid, text, text, uuid, text, text) to service_role;
-
--- 5 · a chave do intermediário, uma por organização -------------------------
-create table if not exists public.channel_provider_keys (
-  organization_id   uuid not null references public.organizations(id) on delete cascade,
-  provider          text not null,
-  -- fn_encrypt_oauth, a mesma cifra de `zernio_token_encrypted`.
-  api_key_encrypted bytea not null,
-  created_by        uuid,
-  created_at        timestamptz not null default now(),
-  updated_at        timestamptz not null default now(),
-  primary key (organization_id, provider),
-  constraint channel_provider_keys_provider_check check (provider in ('zernio'))
-);
-
-comment on table public.channel_provider_keys is
-  'Chave de API do intermediário de canais, uma por organização, cifrada (fn_encrypt_oauth). Server-side only: RLS ligada, zero policy e zero grant a anon/authenticated. Spec 21 §2.3.';
-
-alter table public.channel_provider_keys enable row level security;
-revoke all on public.channel_provider_keys from public, anon, authenticated;
-grant select, insert, update, delete on public.channel_provider_keys to service_role;
 
 -- 6 · a conversa nasce com a rede da sessão ---------------------------------
 create or replace function public.fn_upsert_wa_conversation(
@@ -28678,6 +28656,62 @@ grant execute on function public.fn_lgpd_cascade_redact_contact(uuid,uuid,uuid) 
 -- A inbox embute `contact_platform_identities` em `contacts`: o PostgREST
 -- precisa reler o schema para enxergar a relação nova.
 notify pgrst, 'reload schema';
+
+-- ---- conexões extras por empresa: somam ao limite do plano (migration 0281) ----
+--
+-- Spec: docs/specs/21-spec-direct-e-messenger.md, §10. Decisão do dono (30/09):
+-- o plano diz quantos WhatsApp, Instagram e Messenger a empresa pode conectar
+-- (`max_whatsapp`, `max_instagram`, `max_messenger`, ao lado do `max_channels`
+-- que já existia), e o admin da instalação VENDE conexões avulsas por empresa.
+--
+-- Por que uma tabela e não o override que já existe
+-- (`organization_feature_overrides.limits`): o override SUBSTITUI o número do
+-- plano. Um extra SOMA — "+2 Instagram" continua valendo +2 quando a empresa
+-- troca de plano. Guardar o total no override deixaria o número da empresa
+-- congelado na troca de plano, e é justamente o caso em que se quer que ele
+-- mude.
+--
+-- Semântica (aplicada em `lib/entitlements/consumo.ts`): teto efetivo = teto do
+-- plano/override + soma dos extras ativos. Chave SEM teto (sem limite) segue
+-- sem limite — extra não inventa um teto que não existia.
+--
+-- Escrita só pelo service role (rota do admin da instalação, com auditoria).
+-- Leitura para membros da organização: a tela de plano mostra "3 + 2 extras".
+--
+-- Idempotente: `create ... if not exists`, `drop policy if exists`.
+
+create table if not exists public.organization_limit_extras (
+  id              uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  limit_key       text not null,
+  quantidade      integer not null,
+  reason          text not null,
+  created_by      uuid,
+  created_at      timestamptz not null default now(),
+  revoked_at      timestamptz,
+  revoked_by      uuid,
+  constraint organization_limit_extras_key_check
+    check (limit_key in ('max_channels', 'max_whatsapp', 'max_instagram', 'max_messenger')),
+  constraint organization_limit_extras_quantidade_check check (quantidade between 1 and 1000),
+  constraint organization_limit_extras_reason_check check (length(btrim(reason)) between 1 and 500)
+);
+
+create index if not exists idx_organization_limit_extras_ativos
+  on public.organization_limit_extras (organization_id, limit_key)
+  where revoked_at is null;
+
+comment on table public.organization_limit_extras is
+  'Conexões extras vendidas a UMA organização: somam ao teto do plano (não substituem, como o override). Ativo enquanto revoked_at is null. Escrita só service_role (admin da instalação). Vocabulário de limit_key em lib/entitlements/limites.ts (CHAVES_COM_EXTRA). Spec 21 §10.';
+
+alter table public.organization_limit_extras enable row level security;
+revoke all on public.organization_limit_extras from public, anon, authenticated;
+grant select on public.organization_limit_extras to authenticated;
+grant select, insert, update, delete on public.organization_limit_extras to service_role;
+
+drop policy if exists tenant_isolation_organization_limit_extras_select on public.organization_limit_extras;
+create policy tenant_isolation_organization_limit_extras_select on public.organization_limit_extras
+  for select to authenticated
+  using (organization_id in (select public.fn_user_org_ids()) or public.fn_is_platform_admin());
 
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --

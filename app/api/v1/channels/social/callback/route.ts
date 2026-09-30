@@ -27,7 +27,7 @@ import {
 } from "@/lib/channels/social";
 import { conferirEstadoSocial } from "@/lib/channels/social-state";
 import { urlDoWebhookDoCanal, urlPublicaDaInstalacao } from "@/lib/channels/url-publica";
-import { limiteAtingido } from "@/lib/entitlements/consumo";
+import { limiteDeConexaoAtingido } from "@/lib/entitlements/exigir-na-rota";
 import { env } from "@/lib/env";
 import { supportCallbackWriteAllowed } from "@/lib/impersonate/support";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -96,9 +96,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
   // O teto foi conferido ao começar, mas dez minutos numa tela do Facebook dão
   // tempo de outra pessoa ocupar a última vaga.
-  if (await limiteAtingido(admin, estado.orgId, "max_channels")) {
-    return falhou("O plano da organização atingiu o limite de canais.", { reason: "max_channels" });
-  }
+  const noTeto = await limiteDeConexaoAtingido(admin, estado.orgId, estado.plataforma);
+  if (noTeto) return falhou(noTeto, { reason: "limit_reached" });
 
   const r = await concluirConexaoSocial(admin, {
     estado,

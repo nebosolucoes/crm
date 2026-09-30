@@ -96,39 +96,6 @@ function explicar(status: number, json: Json | null): string {
 
 const SEM_REDE = "Não foi possível falar com o provedor. Tente de novo.";
 
-/**
- * A chave presta, e ela alcança a caixa de entrada?
- *
- * São duas perguntas porque falham de formas diferentes: chave recusada é
- * 401; chave boa numa conta sem o recurso de inbox é 403 SÓ nos endpoints de
- * inbox. Gravar a chave sem a segunda conferência faria o operador conectar o
- * Instagram e nunca receber uma mensagem — o defeito silencioso que esta tela
- * existe para impedir.
- */
-export async function validarChaveSocial(apiKey: string): Promise<Resultado<null>> {
-  const contas = await chamar(apiKey, "GET", "/v1/accounts");
-  if (contas.status === 0) return { ok: false, motivo: SEM_REDE };
-  if (contas.status === 401 || contas.status === 403) {
-    return { ok: false, motivo: "Chave recusada pelo provedor.", status: contas.status };
-  }
-  if (contas.status < 200 || contas.status >= 300) {
-    return { ok: false, motivo: explicar(contas.status, contas.json), status: contas.status };
-  }
-
-  const inbox = await chamar(apiKey, "GET", "/v1/inbox/conversations?limit=1");
-  if (inbox.status === 0) return { ok: false, motivo: SEM_REDE };
-  if (inbox.status === 403) {
-    return {
-      ok: false,
-      motivo: "A chave funciona, mas a conta do provedor não tem a caixa de entrada (inbox) liberada.",
-      status: 403,
-    };
-  }
-  // Qualquer outra resposta do inbox (inclusive 400 por parâmetro) prova que o
-  // recurso existe para esta chave — o que se queria saber.
-  return { ok: true, valor: null };
-}
-
 /** Cria o profile desta conexão. Ver o cabeçalho: um por conexão. */
 export async function criarProfile(
   apiKey: string,
@@ -259,6 +226,29 @@ export async function removerWebhook(apiKey: string, webhookId: string): Promise
   const r = await chamar(apiKey, "DELETE", `/v1/webhooks/settings?webhookId=${encodeURIComponent(webhookId)}`);
   if (r.status === 0) return { ok: false, motivo: SEM_REDE };
   // 404 = já não existe; é o desfecho que se queria.
+  if (r.status === 404 || (r.status >= 200 && r.status < 300)) return { ok: true, valor: null };
+  return { ok: false, motivo: explicar(r.status, r.json), status: r.status };
+}
+
+/**
+ * Desconecta e remove a conta conectada (`DELETE /v1/accounts/{id}`). É o que
+ * encerra a cobrança: o provedor cobra por conta conectada. 404 = já removida
+ * (a doc: repetir a chamada devolve 404 e não refaz nada).
+ */
+export async function removerConta(apiKey: string, accountId: string): Promise<Resultado<null>> {
+  const r = await chamar(apiKey, "DELETE", `/v1/accounts/${encodeURIComponent(accountId)}`);
+  if (r.status === 0) return { ok: false, motivo: SEM_REDE };
+  if (r.status === 404 || (r.status >= 200 && r.status < 300)) return { ok: true, valor: null };
+  return { ok: false, motivo: explicar(r.status, r.json), status: r.status };
+}
+
+/**
+ * Apaga o profile que o "Conectar" criou. Só funciona depois de a conta sair
+ * dele (a doc: conta ativa bloqueia com 400). 404 = já não existe.
+ */
+export async function removerProfile(apiKey: string, profileId: string): Promise<Resultado<null>> {
+  const r = await chamar(apiKey, "DELETE", `/v1/profiles/${encodeURIComponent(profileId)}`);
+  if (r.status === 0) return { ok: false, motivo: SEM_REDE };
   if (r.status === 404 || (r.status >= 200 && r.status < 300)) return { ok: true, valor: null };
   return { ok: false, motivo: explicar(r.status, r.json), status: r.status };
 }

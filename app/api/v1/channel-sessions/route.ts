@@ -22,7 +22,8 @@ import { createChannelSchema } from "@/lib/schemas/channels";
 import { createClient } from "@/lib/supabase/server";
 import { getWahaClient } from "@/lib/waha/client";
 import { traduzir } from "@/lib/i18n/dicionario";
-import { recusaPorLimite } from "@/lib/entitlements/exigir-na-rota";
+import { recusaPorLimiteDeConexao } from "@/lib/entitlements/exigir-na-rota";
+import { PLATAFORMA_WHATSAPP } from "@/lib/channels/plataformas";
 
 export const dynamic = "force-dynamic";
 
@@ -85,7 +86,8 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (await mfaEmDivida()) return fail("mfa_required", t("Confirme a verificação em duas etapas."), 403, { requestId });
 
   // Limite do plano (etapa 8): o teto de canais barra ANTES de falar com o WAHA.
-  const noTeto = await recusaPorLimite(activeOrg.orgId, "max_channels", {
+  // Conta no teto total E no de WhatsApp (spec 21 §10).
+  const noTeto = await recusaPorLimiteDeConexao(activeOrg.orgId, PLATAFORMA_WHATSAPP, {
     admin: createAdminClient(),
     requestId,
     resource: "channel_sessions",

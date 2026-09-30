@@ -21,10 +21,21 @@ describe("registro de limites", () => {
 
   it("só se declara enforced quem tem rota recusando a criação — a lista é esta, e cada um tem teste de rota", () => {
     // max_channels: channel-sessions/route.test.ts · max_users: team/invite ·
-    // max_ai_agents: ai/agents · max_sectors: sectors/route.test.ts. Marcar
-    // `true` sem a rota é promessa vazia.
+    // max_ai_agents: ai/agents · max_sectors: sectors/route.test.ts ·
+    // max_whatsapp/instagram/messenger (spec 21 §10): recusaPorLimiteDeConexao
+    // em channel-sessions, channels/official, channels/partner e
+    // channels/social/connect + a volta do OAuth. Marcar `true` sem a rota é
+    // promessa vazia.
     const barram = CHAVES_DE_LIMITE.filter((c) => LIMITES[c].enforced).sort();
-    expect(barram).toEqual(["max_ai_agents", "max_channels", "max_sectors", "max_users"]);
+    expect(barram).toEqual([
+      "max_ai_agents",
+      "max_channels",
+      "max_instagram",
+      "max_messenger",
+      "max_sectors",
+      "max_users",
+      "max_whatsapp",
+    ]);
   });
 });
 

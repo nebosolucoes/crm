@@ -109,7 +109,7 @@ describe("listagem que falhou não vira 'primeira instalação'", () => {
 
     expect(screen.getByText("Não foi possível carregar seus números.")).toBeInTheDocument();
     expect(screen.getByText(/esta lista não está mostrando o que existe/)).toBeInTheDocument();
-    expect(screen.queryByText(/Conecte seu primeiro número/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Conecte seu primeiro canal/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Nenhum número conectado ainda/)).not.toBeInTheDocument();
   });
 
@@ -118,7 +118,7 @@ describe("listagem que falhou não vira 'primeira instalação'", () => {
 
     render(wrap(<ConnectionsClient wahaConfigured />));
 
-    expect(screen.getByText(/Conecte seu primeiro número/)).toBeInTheDocument();
+    expect(screen.getByText(/Conecte seu primeiro canal/)).toBeInTheDocument();
   });
 
   it("banco sem a migration: avisa que canal excluído volta à lista", () => {

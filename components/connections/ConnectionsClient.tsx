@@ -34,13 +34,17 @@ import {
   ArrowsClockwise,
   CheckCircle,
   CircleNotch,
+  FileText,
+  Gear,
   Phone,
   Plus,
   ShieldCheck,
   Trash,
   Warning,
 } from "@/lib/ui/icons";
+import { IconeDaPlataforma } from "@/components/channels/IconeDaPlataforma";
 import { lerEstadoDoCanal } from "@/lib/channels/estado";
+import { tipoDaConexao } from "@/lib/channels/tipo-da-conexao";
 import { useT } from "@/hooks/i18n/useT";
 
 type Variant = "success" | "warning" | "error" | "neutral";
@@ -104,7 +108,30 @@ function enumerar(partes: (string | null)[], t: (texto: string) => string): stri
   return uteis.length > 0 ? `${uteis.join(", ")} ${t("e")} ${ultimo}` : ultimo;
 }
 
-export function ConnectionsClient({ wahaConfigured }: { wahaConfigured: boolean }) {
+/**
+ * A LISTA ÚNICA de Conexões (decisão do dono, 30/09): QR, API oficial,
+ * parceiro, Instagram e Messenger no mesmo lugar, cada cartão com as ações que
+ * existem para o tipo dele. Conectar é um botão só, "Adicionar conexão", que
+ * abre o popup de `ConexoesShell` — por isso as props de navegação vêm de fora.
+ * Todas são opcionais: sem elas a lista continua funcionando como antes.
+ */
+export function ConnectionsClient({
+  wahaConfigured,
+  onAdicionar,
+  onConfigurar,
+  onModelos,
+  pedidoDeQr = 0,
+}: {
+  wahaConfigured: boolean;
+  /** Abre o popup "Adicionar conexão". Ausente = o botão pareia por QR direto. */
+  onAdicionar?: () => void;
+  /** Abre o formulário da conexão por credencial (API oficial / parceiro). */
+  onConfigurar?: (via: "oficial" | "parceiro") => void;
+  /** Abre os modelos aprovados da conexão. */
+  onModelos?: (fonte: "oficial" | "parceiro") => void;
+  /** Muda de valor quando o popup pede um pareamento por QR. */
+  pedidoDeQr?: number;
+}) {
   const tagDoIdioma = useTagDeIdioma();
   const t = useT();
   const qc = useQueryClient();
@@ -182,6 +209,14 @@ export function ConnectionsClient({ wahaConfigured }: { wahaConfigured: boolean 
     }
   }, [invalidate, t]);
 
+  // O popup "Adicionar conexão" escolheu QR: o diálogo do QR é desta lista.
+  const ultimoPedido = useRef(pedidoDeQr);
+  useEffect(() => {
+    if (pedidoDeQr === ultimoPedido.current) return;
+    ultimoPedido.current = pedidoDeQr;
+    void handleConnectNew();
+  }, [pedidoDeQr, handleConnectNew]);
+
   // Reconexão suave: a maioria das quedas é passageira (rede, container
   // reiniciado) e a credencial pareada continua boa, então o número volta sem
   // ninguém pegar o celular. O modo que DESCARTA a credencial custa um
@@ -231,8 +266,8 @@ export function ConnectionsClient({ wahaConfigured }: { wahaConfigured: boolean 
           {isError
             ? t("Não foi possível carregar seus números.")
             : list.length === 0
-              ? t("Nenhum número conectado ainda.")
-              : `${list.length} ${list.length === 1 ? t("número conectado") : t("números conectados")}.`}
+              ? t("Nenhuma conexão ainda.")
+              : `${list.length} ${list.length === 1 ? t("conexão") : t("conexões")}.`}
         </p>
         <div className="flex gap-2">
           {list.length > 0 && (
@@ -250,14 +285,25 @@ export function ConnectionsClient({ wahaConfigured }: { wahaConfigured: boolean 
               {t("Atualizar saúde")}
             </Button>
           )}
-          <Button size="sm" disabled={creating || !wahaConfigured} onClick={handleConnectNew}>
-            {creating ? (
-              <CircleNotch size={14} className="animate-spin" aria-hidden />
-            ) : (
-              <Plus size={14} aria-hidden />
-            )}
-            {t("Conectar novo WhatsApp")}
-          </Button>
+          {onAdicionar ? (
+            <Button size="sm" disabled={creating} onClick={onAdicionar} data-testid="adicionar-conexao">
+              {creating ? (
+                <CircleNotch size={14} className="animate-spin" aria-hidden />
+              ) : (
+                <Plus size={14} aria-hidden />
+              )}
+              {t("Adicionar conexão")}
+            </Button>
+          ) : (
+            <Button size="sm" disabled={creating || !wahaConfigured} onClick={handleConnectNew}>
+              {creating ? (
+                <CircleNotch size={14} className="animate-spin" aria-hidden />
+              ) : (
+                <Plus size={14} aria-hidden />
+              )}
+              {t("Conectar novo WhatsApp")}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -269,7 +315,7 @@ export function ConnectionsClient({ wahaConfigured }: { wahaConfigured: boolean 
         else toast.error(t("Não foi possível copiar. Selecione e copie manualmente."));
       }}>{t("Copiar detalhes")}</Button></details>}
       <Link href="/app/settings/atendimento" className="text-sm underline">{t("Configurar responsáveis por número")}</Link>
-      {!wahaConfigured && (
+      {!wahaConfigured && list.some((c) => dependeDoTransporte(c)) && (
         <div className="rounded-md border border-warning bg-warning-bg p-4 text-sm text-warning-fg">
           <p className="font-medium">{t("O serviço do WhatsApp não está configurado.")}</p>
           <p className="mt-1">
@@ -324,8 +370,14 @@ export function ConnectionsClient({ wahaConfigured }: { wahaConfigured: boolean 
         <Card className="flex flex-col items-center gap-3 p-8 text-center">
           <Phone size={28} className="text-muted-foreground" aria-hidden />
           <p className="text-sm text-muted-foreground">
-            {t("Conecte seu primeiro número de WhatsApp para começar a atender.")}
+            {t("Conecte seu primeiro canal — WhatsApp, Instagram ou Messenger — para começar a atender.")}
           </p>
+          {onAdicionar && (
+            <Button size="sm" onClick={onAdicionar}>
+              <Plus size={14} aria-hidden />
+              {t("Adicionar conexão")}
+            </Button>
+          )}
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -338,14 +390,18 @@ export function ConnectionsClient({ wahaConfigured }: { wahaConfigured: boolean 
             // podendo ser excluído.
             const vivaNoTransporte = dependeDoTransporte(c);
             const podeExcluir = wahaConfigured || !vivaNoTransporte;
+            const tipo = tipoDaConexao(c);
             return (
-              <Card key={c.id} className="flex flex-col gap-3 p-4">
+              <Card key={c.id} className="flex flex-col gap-3 p-4" data-conexao={c.id} data-via={tipo.via}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <Phone size={16} className="text-muted-foreground" aria-hidden />
-                      <span className="truncate text-sm font-medium">{channelLabel(c, t)}</span>
+                      <IconeDaPlataforma plataforma={tipo.rede} />
+                      <span className="truncate text-sm font-medium">{c.display_name || c.phone_number || channelLabel(c, t)}</span>
                     </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground" data-testid="tipo-da-conexao">
+                      {t(tipo.rotulo)}
+                    </p>
                     {c.phone_number && c.display_name && (
                       <p className="mt-0.5 font-mono text-xs text-muted-foreground">
                         {c.phone_number}
@@ -381,22 +437,41 @@ export function ConnectionsClient({ wahaConfigured }: { wahaConfigured: boolean 
                       {t("Reconectar")}
                     </Button>
                   )}
-                  <Button variant="outline" size="sm" onClick={() => setAntiBanId(c.id)}>
-                    <ShieldCheck size={14} aria-hidden />
-                    {t("Proteção de envio")}
-                  </Button>
+                  {/* Proteção de envio é anti-banimento: só o WhatsApp por QR corre esse
+                      risco. Nos outros ela não tem o que proteger. */}
+                  {tipo.via === "qr" && (
+                    <Button variant="outline" size="sm" onClick={() => setAntiBanId(c.id)}>
+                      <ShieldCheck size={14} aria-hidden />
+                      {t("Proteção de envio")}
+                    </Button>
+                  )}
+                  {(tipo.via === "oficial" || tipo.via === "parceiro") && onConfigurar && (
+                    <Button variant="outline" size="sm" onClick={() => onConfigurar(tipo.via as "oficial" | "parceiro")}>
+                      <Gear size={14} aria-hidden />
+                      {t("Configurar")}
+                    </Button>
+                  )}
+                  {tipo.modelos && onModelos && (
+                    <Button variant="outline" size="sm" onClick={() => onModelos(tipo.modelos!)}>
+                      <FileText size={14} aria-hidden />
+                      {t("Modelos")}
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
                     disabled={!podeExcluir}
                     aria-label={
-                      podeExcluir
-                        ? `${t("Excluir")} ${channelLabel(c, t)}`
-                        : `${t("Excluir")} ${channelLabel(c, t)} — ${t("indisponível enquanto o serviço do WhatsApp não estiver ativo")}`
+                      tipo.via === "social"
+                        ? `${t("Desconectar")} ${channelLabel(c, t)}`
+                        : podeExcluir
+                          ? `${t("Excluir")} ${channelLabel(c, t)}`
+                          : `${t("Excluir")} ${channelLabel(c, t)} — ${t("indisponível enquanto o serviço do WhatsApp não estiver ativo")}`
                     }
                     onClick={() => setToDelete(c)}
                   >
                     <Trash size={14} aria-hidden />
+                    {tipo.via === "social" && t("Desconectar")}
                   </Button>
                 </div>
               </Card>
@@ -518,6 +593,9 @@ function ExcluirCanalDialog({
 }) {
   const t = useT();
   const [excluindo, setExcluindo] = useState(false);
+  // Instagram/Messenger: "desconectar" remove a conta do provedor (é ela que é
+  // cobrada) — o texto diz isso, em vez de falar em "número".
+  const social = tipoDaConexao(canal).via === "social";
   const {
     data: impact,
     isPending,
@@ -562,11 +640,15 @@ function ExcluirCanalDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {t("Excluir")} {channelLabel(canal, t)}?
+            {social ? t("Desconectar") : t("Excluir")} {channelLabel(canal, t)}?
           </DialogTitle>
           <DialogDescription asChild>
             <div className="space-y-2">
-              <p>{t("O número será desconectado do WhatsApp e sai desta lista.")}</p>
+              <p>
+                {social
+                  ? t("A conta é desconectada e removida do provedor — deixa de ser cobrada — e sai desta lista. As mensagens novas param de chegar.")
+                  : t("O número será desconectado do WhatsApp e sai desta lista.")}
+              </p>
               {isPending ? (
                 <p>{t("Verificando o que está ligado a este número…")}</p>
               ) : isError || !impact ? (
@@ -582,7 +664,11 @@ function ExcluirCanalDialog({
                   ))}
                 </ul>
               )}
-              <p>{t("Para usar este número de novo, será preciso conectá-lo outra vez.")}</p>
+              <p>
+                {social
+                  ? t("Para usar esta conta de novo, conecte-a outra vez em Adicionar conexão.")
+                  : t("Para usar este número de novo, será preciso conectá-lo outra vez.")}
+              </p>
             </div>
           </DialogDescription>
         </DialogHeader>
@@ -599,7 +685,7 @@ function ExcluirCanalDialog({
             ) : (
               <Trash size={14} aria-hidden />
             )}
-            {t("Excluir")}
+            {social ? t("Desconectar") : t("Excluir")}
           </Button>
         </div>
       </DialogContent>

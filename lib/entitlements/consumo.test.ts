@@ -8,12 +8,16 @@ const { consumoDaOrg, limiteAtingido } = await import("./consumo");
 const ORG = "22222222-2222-4222-8222-222222222222";
 
 /** Admin fake: `from(tabela)` → builder encadeável cuja contagem vem de `contagens[tabela]`. */
-function admin(contagens: Record<string, number>, registrar?: (tabela: string, ops: Array<[string, unknown[]]>) => void) {
+function admin(
+  contagens: Record<string, number>,
+  registrar?: (tabela: string, ops: Array<[string, unknown[]]>) => void,
+  extras: Array<{ limit_key: string; quantidade: number }> = [],
+) {
   return {
     from: (tabela: string) => {
       const ops: Array<[string, unknown[]]> = [];
       const b: Record<string, unknown> = {};
-      for (const m of ["select", "eq", "is", "gt", "gte"]) {
+      for (const m of ["select", "eq", "is", "gt", "gte", "in"]) {
         b[m] = (...a: unknown[]) => {
           ops.push([m, a]);
           return b;
@@ -21,7 +25,7 @@ function admin(contagens: Record<string, number>, registrar?: (tabela: string, o
       }
       b.then = (res: (v: unknown) => void) => {
         registrar?.(tabela, ops);
-        res({ count: contagens[tabela] ?? 0, error: null });
+        res({ count: contagens[tabela] ?? 0, data: tabela === "organization_limit_extras" ? extras : null, error: null });
       };
       return b;
     },
@@ -52,6 +56,39 @@ describe("consumoDaOrg", () => {
     for (const tabela of Object.keys(filtros)) {
       expect(filtros[tabela], `${tabela} sem filtro de organization_id`).toEqual(expect.arrayContaining([["organization_id", ORG]]));
     }
+  });
+});
+
+describe("conexões por rede e extras (spec 21 §10)", () => {
+  it("o extra SOMA ao teto do plano; sem teto no plano segue sem teto", async () => {
+    const a = admin({ channel_sessions: 3 }, undefined, [
+      { limit_key: "max_instagram", quantidade: 2 },
+      { limit_key: "max_instagram", quantidade: 1 },
+      { limit_key: "max_messenger", quantidade: 5 },
+    ]);
+    const medidas = await consumoDaOrg(a, ORG, { max_instagram: 1 });
+    const por = Object.fromEntries(medidas.map((m) => [m.chave, m]));
+    expect(por.max_instagram).toMatchObject({ teto: 4, extra: 3, uso: 3, excedido: false, enforced: true });
+    // Messenger sem teto no plano: o extra não inventa um teto.
+    expect(por.max_messenger).toMatchObject({ teto: undefined, extra: 0 });
+  });
+
+  it("a contagem por rede filtra a rede e só canais de mensagem", async () => {
+    const filtros: Array<[string, unknown[]]>[] = [];
+    const a = admin({ channel_sessions: 1 }, (tabela, ops) => {
+      if (tabela === "channel_sessions") filtros.push(ops);
+    });
+    await consumoDaOrg(a, ORG, {});
+    const daRede = filtros.find((ops) => ops.some(([m, args]) => m === "eq" && args[0] === "platform" && args[1] === "instagram"));
+    expect(daRede, "nenhuma contagem filtrou platform=instagram").toBeTruthy();
+    expect(daRede!.some(([m, args]) => m === "in" && args[0] === "provider")).toBe(true);
+  });
+
+  it("limiteAtingido usa o teto COM extra", async () => {
+    entitlementsDaOrg.mockResolvedValue({ limits: { max_instagram: 1 } });
+    const extras = [{ limit_key: "max_instagram", quantidade: 1 }];
+    expect(await limiteAtingido(admin({ channel_sessions: 1 }, undefined, extras), ORG, "max_instagram")).toBeNull();
+    expect(await limiteAtingido(admin({ channel_sessions: 2 }, undefined, extras), ORG, "max_instagram")).toEqual({ teto: 2, uso: 2 });
   });
 });
 

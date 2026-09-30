@@ -37,7 +37,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { metadataInicialDoCanal } from "@/lib/ai/elegibilidade/pre-go-live";
 import { encryptWebhookSecret } from "@/lib/webhooks/secrets";
 import { traduzir } from "@/lib/i18n/dicionario";
-import { recusaPorLimite } from "@/lib/entitlements/exigir-na-rota";
+import { recusaPorLimiteDeConexao } from "@/lib/entitlements/exigir-na-rota";
+import { PLATAFORMA_WHATSAPP } from "@/lib/channels/plataformas";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -235,7 +236,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // Limite do plano (etapa 8): conta como canal novo quem não existia ou
   // estava arquivado — ressuscitar é +1 canal ativo.
   if (!existente || existente.archived_at) {
-    const noTeto = await recusaPorLimite(orgId, "max_channels", {
+    const noTeto = await recusaPorLimiteDeConexao(orgId, PLATAFORMA_WHATSAPP, {
       admin,
       requestId,
       resource: "channels_official",

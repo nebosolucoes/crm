@@ -10,9 +10,6 @@ import { countAs, GOV_AGENT_A, GOV_ADMIN, GOV_ORG, GOV_SESSION, lastLine, seedGo
  *
  *   1. `contact_platform_identities`: membro lê as da própria organização e
  *      NÃO as da vizinha; ninguém do PostgREST escreve (a escrita é da RPC).
- *   2. `channel_provider_keys`: nem admin da organização lê a própria chave —
- *      `permission denied`, que distingue "privilégio não existe" de "a policy
- *      filtrou" (uma policy de leitura acrescentada depois não reabriria).
  *   3. `fn_upsert_social_contact`: reencontra a mesma pessoa, separa por
  *      organização, recusa rede desconhecida e não é alcançável por
  *      `authenticated`.
@@ -65,9 +62,8 @@ beforeAll(() => {
       values ('${SESSAO_IG}',   '${GOV_ORG}', 'zernio', 'instagram', 'acc-social-a', '\\x00'::bytea),
              ('${SESSAO_IG_B}', '${ORG_B}',   'zernio', 'instagram', 'acc-social-b', '\\x00'::bytea)
       on conflict do nothing;
-    insert into public.channel_provider_keys (organization_id, provider, api_key_encrypted)
-      values ('${GOV_ORG}', 'zernio', '\\x01'::bytea), ('${ORG_B}', 'zernio', '\\x02'::bytea)
-      on conflict do nothing;
+    insert into public.organization_limit_extras (organization_id, limit_key, quantidade, reason)
+      values ('${GOV_ORG}', 'max_instagram', 2, 'extra vendido (invariante)');
   `);
   upsert(GOV_ORG, "instagram", "igsid-a", SESSAO_IG, "pessoa_a");
   upsert(ORG_B, "instagram", "igsid-b", SESSAO_IG_B, "pessoa_b");
@@ -92,14 +88,28 @@ describe("contact_platform_identities — isolamento por organização", () => {
   });
 });
 
-describe("channel_provider_keys — server-side only", () => {
-  it("admin da organização NÃO lê a própria chave (privilégio, não policy)", () => {
-    const erro = comoUsuario(GOV_ADMIN, `select count(*) from public.channel_provider_keys;`);
+describe("organization_limit_extras — conexões extras por empresa (0281)", () => {
+  it("membro lê o extra da própria organização (controle positivo)", () => {
+    expect(countAs(GOV_AGENT_A, "select count(*) from public.organization_limit_extras where limit_key = 'max_instagram'")).toBeGreaterThan(0);
+  });
+
+  it("membro da vizinha NÃO lê", () => {
+    expect(countAs(MEMBRO_B, "select count(*) from public.organization_limit_extras")).toBe(0);
+  });
+
+  it("nem admin da organização escreve pela REST — quem vende o extra é o admin da instalação", () => {
+    const erro = comoUsuario(
+      GOV_ADMIN,
+      `insert into public.organization_limit_extras (organization_id, limit_key, quantidade, reason) values ('${GOV_ORG}', 'max_instagram', 50, 'eu mesmo');`,
+    );
     expect(erro).toMatch(/permission denied/);
   });
 
-  it("o service role lê (controle positivo)", () => {
-    expect(lastLine(sql(`select count(*) from public.channel_provider_keys where organization_id = '${GOV_ORG}';`))).toBe("1");
+  it("chave fora do vocabulário é recusada pelo banco", () => {
+    const erro = falha(
+      `insert into public.organization_limit_extras (organization_id, limit_key, quantidade, reason) values ('${GOV_ORG}', 'max_users', 1, 'x');`,
+    );
+    expect(erro).toMatch(/organization_limit_extras_key_check/);
   });
 });
 

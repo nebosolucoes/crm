@@ -78,6 +78,16 @@ export function zernioBaseUrl(): string {
  * Credencial do ambiente. `null` quando não configurada — o chamador trata como
  * canal não conectado (noop), nunca como erro.
  */
+/**
+ * A chave da conta Zernio DA INSTALAÇÃO (`ZERNIO_API_KEY`). É por ela que as
+ * conexões de Instagram/Messenger são feitas e operadas (spec 21): a conta
+ * conectada é um profile NESTA conta, e a sessão não guarda chave própria.
+ */
+export function zernioApiKeyDaInstalacao(): string | null {
+  const k = process.env.ZERNIO_API_KEY?.trim();
+  return k ? k : null;
+}
+
 export function zernioCredsFromEnv(): ZernioCredentials | null {
   const accountId = process.env.ZERNIO_ACCOUNT_ID;
   const apiKey = process.env.ZERNIO_API_KEY;
@@ -122,8 +132,19 @@ export async function zernioCredsForAccountId(
     );
   }
 
-  const cifrado = data?.zernio_token_encrypted;
-  if (!data || !cifrado) return null;
+  if (!data) return null;
+  const cifrado = data.zernio_token_encrypted;
+
+  // Sessão SEM chave própria (Instagram/Messenger, spec 21): a conta é desta
+  // sessão, a chave é da instalação. O par tem de sair daqui, e não de
+  // `zernioCredsFromEnv`: aquele devolve o `ZERNIO_ACCOUNT_ID` do ambiente —
+  // o do WhatsApp parceiro —, e a resposta sairia pela conta errada.
+  const daInstalacao = zernioApiKeyDaInstalacao();
+  if (!cifrado) {
+    return daInstalacao
+      ? { accountId: data.zernio_account_id as string, apiKey: daInstalacao, baseUrl: zernioBaseUrl(), source: "env" }
+      : null;
+  }
 
   const apiKey = await decryptWebhookSecret(admin, cifrado as unknown as string);
   // Decifra que falha devolve null: a chave (GUC) pode não estar configurada

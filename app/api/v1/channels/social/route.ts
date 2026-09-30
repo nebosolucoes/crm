@@ -1,8 +1,7 @@
 /**
  * GET /api/v1/channels/social — as conexões de Instagram Direct e Messenger da
- * organização, e se a chave do provedor já foi cadastrada.
+ * organização, e se a instalação tem a chave do provedor (`configured`).
  *
- * A chave **nunca volta**: a resposta diz que ela existe, não qual é.
  * Spec 21 §3. Admin only — conectar canal expõe a conta da empresa.
  */
 import { randomUUID } from "node:crypto";
@@ -10,7 +9,12 @@ import type { NextResponse } from "next/server";
 
 import { ok } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
-import { listarConexoesSociais, SOCIAL_PROVIDER_LABEL, temChaveSocial } from "@/lib/channels/social";
+import {
+  listarConexoesSociais,
+  SOCIAL_PROVIDER_LABEL,
+  socialConfigurado,
+  VARIAVEL_DA_CHAVE_SOCIAL,
+} from "@/lib/channels/social";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -21,16 +25,13 @@ export async function GET(): Promise<NextResponse> {
   const authz = await requireRole("admin", { requestId, resource: "channels_social" });
   if (!authz.ok) return authz.response;
 
-  const admin = createAdminClient();
-  const [temChave, conexoes] = await Promise.all([
-    temChaveSocial(admin, authz.org.orgId),
-    listarConexoesSociais(admin, authz.org.orgId),
-  ]);
+  const conexoes = await listarConexoesSociais(createAdminClient(), authz.org.orgId);
 
   return ok(
     {
       label: SOCIAL_PROVIDER_LABEL,
-      has_api_key: temChave,
+      configured: socialConfigurado(),
+      env_var: VARIAVEL_DA_CHAVE_SOCIAL,
       connections: conexoes.map((c) => ({
         id: c.id,
         platform: c.plataforma,
