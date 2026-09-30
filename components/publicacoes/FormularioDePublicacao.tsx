@@ -308,7 +308,7 @@ function Formulario({ fuso, editarId, inicial, cabecalho }: { fuso: string; edit
         {editarId ? <p className="-mt-3 text-xs text-muted-foreground">{t("Salvar altera todas as datas pendentes desta publicação.")}</p> : null}
 
         {/* As colunas, centralizadas: 1 Redes + 2 Data e horário | 3 Conteúdo | 4 Prévia */}
-        <div className="mx-auto grid w-full max-w-[1280px] gap-6 lg:grid-cols-[minmax(300px,1fr)_minmax(300px,1fr)] xl:grid-cols-[minmax(380px,1.25fr)_minmax(300px,1fr)_320px]" data-testid="formulario-em-colunas">
+        <div className="mx-auto grid w-full max-w-[1280px] gap-6 xl:gap-12 lg:grid-cols-[minmax(300px,1fr)_minmax(300px,1fr)] xl:grid-cols-[minmax(380px,1.25fr)_minmax(300px,1fr)_320px]" data-testid="formulario-em-colunas">
           <div className="flex min-w-0 flex-col gap-6">
             <section className="flex min-w-0 flex-col gap-3" aria-labelledby="passo-destinos">
               <h2 id="passo-destinos" className="flex items-center gap-2 text-base font-semibold">
