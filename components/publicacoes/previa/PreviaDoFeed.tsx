@@ -26,7 +26,7 @@ interface Props {
  */
 export function PreviaDoFeed({ rede, conta, midias, legenda, hora, quando }: Props) {
   const t = useT();
-  const nome = nomeDaConta(conta, rede === "instagram" ? "sua.conta" : t("Sua Página"));
+  const nome = nomeDaConta(conta, rede === "instagram" ? "sua.conta" : t("Sua Página"), rede);
   const visuais = midias.filter((m) => m.kind === "image" || m.kind === "video");
   const [i, setI] = useState(0);
   const atual = visuais[Math.min(i, Math.max(0, visuais.length - 1))] ?? null;
@@ -35,7 +35,7 @@ export function PreviaDoFeed({ rede, conta, midias, legenda, hora, quando }: Pro
   if (rede === "instagram") {
     return (
       <Aparelho hora={hora} rotulo={rotulo}>
-        <div className="flex h-full flex-col bg-white text-[#262626]">
+        <div className="flex h-full flex-col overflow-y-auto bg-white text-[#262626] [scrollbar-width:none]">
           <div className="flex items-center justify-between px-3 py-2">
             <span className="text-[20px] font-semibold tracking-tight" style={{ fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
               Instagram
@@ -52,7 +52,7 @@ export function PreviaDoFeed({ rede, conta, midias, legenda, hora, quando }: Pro
             <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{nome}</span>
             <DotsThree size={20} weight="bold" aria-hidden />
           </div>
-          <div className="relative aspect-[4/5] w-full bg-[#111]">
+          <div className="relative aspect-square w-full shrink-0 bg-[#111]">
             <MidiaVisual midia={atual} className="h-full w-full" poster />
             {visuais.length > 1 ? (
               <>
@@ -79,11 +79,12 @@ export function PreviaDoFeed({ rede, conta, midias, legenda, hora, quando }: Pro
             ) : null}
             <BookmarkSimple size={24} aria-hidden />
           </div>
-          <div className="px-3 pt-2 text-[13px] leading-[17px]">
+          <div className="px-3 pt-2 pb-4 text-[13px] leading-[17px]">
             <p className="font-semibold">{t("Curtido por")} <span className="font-semibold">{t("outras pessoas")}</span></p>
-            <p className="mt-0.5 line-clamp-3 whitespace-pre-wrap">
+            <p className="mt-0.5 whitespace-pre-wrap">
               <span className="font-semibold">{nome}</span> {legenda.trim() || <span className="text-[#8e8e8e]">{t("(sem legenda)")}</span>}
             </p>
+            <p className="mt-1 text-[12px] text-[#8e8e8e]">{t("Ver todos os comentários")}</p>
             <p className="mt-1 text-[11px] uppercase text-[#8e8e8e]">{quando}</p>
           </div>
         </div>
@@ -95,7 +96,7 @@ export function PreviaDoFeed({ rede, conta, midias, legenda, hora, quando }: Pro
   const excedente = visuais.length - 4;
   return (
     <Aparelho hora={hora} rotulo={rotulo}>
-      <div className="flex h-full flex-col bg-[#f0f2f5] text-[#050505]">
+      <div className="flex h-full flex-col overflow-y-auto bg-[#f0f2f5] text-[#050505] [scrollbar-width:none]">
         <div className="flex items-center justify-between bg-white px-3 py-2">
           <span className="text-[22px] font-bold tracking-tight text-[#1877f2]">facebook</span>
           <span className="flex gap-2" aria-hidden>
@@ -114,9 +115,9 @@ export function PreviaDoFeed({ rede, conta, midias, legenda, hora, quando }: Pro
             </span>
             <DotsThree size={22} weight="bold" aria-hidden />
           </div>
-          {legenda.trim() ? <p className="px-3 pt-2 pb-2 text-[14px] leading-[19px] whitespace-pre-wrap line-clamp-4">{legenda}</p> : <div className="h-2" />}
+          {legenda.trim() ? <p className="px-3 pt-2 pb-2 text-[14px] leading-[19px] whitespace-pre-wrap">{legenda}</p> : <div className="h-2" />}
           {grade.length === 1 ? (
-            <div className="relative aspect-[4/5] w-full bg-[#111]">
+            <div className="relative aspect-square w-full bg-[#111]">
               <MidiaVisual midia={grade[0]!} className="h-full w-full" poster />
             </div>
           ) : grade.length > 1 ? (

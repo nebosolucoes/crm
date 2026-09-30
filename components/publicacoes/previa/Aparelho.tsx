@@ -87,9 +87,15 @@ export interface MidiaDaPrevia {
   nome: string;
 }
 
-/** O @ da conta, ou o nome, ou um marcador — nunca vazio. */
-export function nomeDaConta(conta: ContaDaPrevia, padrao: string): string {
-  return conta.username ? conta.username.replace(/^@/, "") : conta.displayName?.trim() || padrao;
+/**
+ * Como a rede chama a conta: no Instagram é o @; no Facebook é o NOME DA
+ * PÁGINA (o @ do Instagram ligado a ela não aparece no post). Nunca vazio.
+ */
+export function nomeDaConta(conta: ContaDaPrevia, padrao: string, rede: "instagram" | "facebook" = "instagram"): string {
+  const arroba = conta.username ? conta.username.replace(/^@/, "") : null;
+  const nome = conta.displayName?.trim() || null;
+  if (rede === "facebook") return nome ?? arroba ?? padrao;
+  return arroba ?? nome ?? padrao;
 }
 
 /** Uma mídia visual (foto/vídeo) para a área principal. */

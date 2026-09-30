@@ -20,7 +20,7 @@ interface Props {
  */
 export function PreviaDoReel({ rede, conta, midias, legenda, hora }: Props) {
   const t = useT();
-  const nome = nomeDaConta(conta, rede === "instagram" ? "sua.conta" : t("Sua Página"));
+  const nome = nomeDaConta(conta, rede === "instagram" ? "sua.conta" : t("Sua Página"), rede);
   const video = midias.find((m) => m.kind === "video") ?? midias.find((m) => m.kind === "image") ?? null;
   const rotulo = `${t("Prévia do Reel")} · ${rede === "instagram" ? "Instagram" : "Facebook"}`;
   const Curtir = rede === "instagram" ? Heart : ThumbsUp;

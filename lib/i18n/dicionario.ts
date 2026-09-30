@@ -9864,6 +9864,8 @@ export const DICIONARIO: Traducoes = {
   "outras pessoas": { es: "otras personas" },
   "Áudio original": { es: "Audio original" },
 
+  "Ver todos os comentários": { es: "Ver todos los comentarios" },
+
 };
 
 /**

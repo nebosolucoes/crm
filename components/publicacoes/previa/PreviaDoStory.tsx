@@ -23,7 +23,7 @@ interface Props {
  */
 export function PreviaDoStory({ rede, conta, midias, hora }: Props) {
   const t = useT();
-  const nome = nomeDaConta(conta, rede === "instagram" ? "sua.conta" : t("Sua Página"));
+  const nome = nomeDaConta(conta, rede === "instagram" ? "sua.conta" : t("Sua Página"), rede);
   const visuais = midias.filter((m) => m.kind === "image" || m.kind === "video");
   const [i, setI] = useState(0);
   const idx = Math.min(i, Math.max(0, visuais.length - 1));
