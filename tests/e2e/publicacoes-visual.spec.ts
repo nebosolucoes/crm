@@ -126,7 +126,8 @@ async function mockarApi(page: import("@playwright/test").Page, capturar: { cria
     if (p === "/api/v1/publicacoes" && m === "GET") return json([]);
     return json([]);
   });
-  await page.route("**/api/v1/agendamentos/grupos**", async (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ data: GRUPOS }) }));
+  // O contrato real da rota de grupos: a lista vem embrulhada em `groups`.
+  await page.route("**/api/v1/agendamentos/grupos**", async (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ data: { groups: GRUPOS } }) }));
 }
 
 test("Lista: só o pendente, por dia, com chips por rede, '1 de 2' e o Sheet com destinos", async ({ page }) => {

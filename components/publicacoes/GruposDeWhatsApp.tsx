@@ -43,7 +43,8 @@ export function GruposDeWhatsApp({ podeEditar }: { podeEditar: boolean }) {
 
   const { data: grupos, isLoading } = useQuery({
     queryKey: ["publicacoes", "grupos", conexaoAtual],
-    queryFn: async () => (await apiClient.get<{ data: GrupoSalvo[] }>(`/api/v1/agendamentos/grupos?channel_session_id=${conexaoAtual}`)).data,
+    // A rota (herdada do Disparo) embrulha a lista em `groups`.
+    queryFn: async () => (await apiClient.get<{ data: { groups: GrupoSalvo[] } }>(`/api/v1/agendamentos/grupos?channel_session_id=${conexaoAtual}`)).data.groups ?? [],
     enabled: conexaoAtual !== null,
   });
   const invalidar = () => {

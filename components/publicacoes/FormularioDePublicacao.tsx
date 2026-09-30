@@ -123,7 +123,8 @@ function Formulario({ fuso, editarId, inicial }: { fuso: string; editarId: strin
   const { data: contas, isLoading: carregandoContas } = useContasPublicaveis();
   const { data: grupos } = useQuery({
     queryKey: ["publicacoes", "grupos-salvos"],
-    queryFn: async () => (await apiClient.get<{ data: GrupoSelecionavel[] }>("/api/v1/agendamentos/grupos?active=true")).data,
+    // A rota (herdada do Disparo) embrulha a lista em `groups`.
+    queryFn: async () => (await apiClient.get<{ data: { groups: GrupoSelecionavel[] } }>("/api/v1/agendamentos/grupos?active=true")).data.groups ?? [],
     staleTime: 30_000,
   });
   const { criar, editar } = useMutacoesDePublicacao();
