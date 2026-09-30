@@ -153,6 +153,10 @@ const schema = z.object({
   ZERNIO_API_KEY: z.string().optional().default(""),
   ZERNIO_ACCOUNT_ID: z.string().optional().default(""),
   ZERNIO_API_BASE_URL: z.string().optional().default(""),
+  // Endereço PÚBLICO só para os webhooks (Zernio). Opcional: vazio usa o
+  // endereço da instalação. Serve para testar com o CRM na rede local e um
+  // túnel público recebendo as mensagens. Ver lib/channels/url-publica.ts.
+  PUBLIC_WEBHOOK_URL: z.string().optional().default(""),
   // "true" exige assinatura válida em todo webhook do WAHA. Fica desligado por
   // padrão porque o WAHA Core não assina (medido: 2026.7.2 CORE manda os
   // eventos sem header mesmo com WHATSAPP_HOOK_HMAC configurado), e exigir

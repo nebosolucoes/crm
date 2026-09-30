@@ -130,7 +130,7 @@ export const DICIONARIO: Traducoes = {
   "IA aberta ao público": { es: "IA abierta al público" },
   "IA restrita por origem": { es: "IA restringida por origen" },
   "Configurar acesso da IA": { es: "Configurar acceso de la IA" },
-  "Acesso da IA no WhatsApp": { es: "Acceso de la IA en WhatsApp" },
+  "Acesso da IA na Conexão": { es: "Acceso de la IA en la Conexión" },
   "Teste com pessoas de confiança antes de liberar o atendimento automático.": { es: "Prueba con personas de confianza antes de habilitar la atención automática." },
   "Não foi possível carregar o acesso da IA.": { es: "No se pudo cargar el acceso de la IA." },
   "Use um telefone com DDI por linha, por exemplo +5511999998888.": { es: "Usa un teléfono con prefijo internacional por línea, por ejemplo +5511999998888." },
@@ -9627,6 +9627,10 @@ export const DICIONARIO: Traducoes = {
   "Contas de Instagram": { es: "Cuentas de Instagram" },
   "Páginas do Messenger": { es: "Páginas de Messenger" },
   "Instagram e Messenger não estão configurados nesta instalação (falta ZERNIO_API_KEY no .env).": { es: "Instagram y Messenger no están configurados en esta instalación (falta ZERNIO_API_KEY en el .env)." },
+  "O endereço que receberia as mensagens não é alcançável pela internet": { es: "La dirección que recibiría los mensajes no es alcanzable desde internet" },
+  "Abra o CRM pelo endereço público da instalação (um domínio com https) ou preencha PUBLIC_WEBHOOK_URL no .env com um endereço público.": {
+    es: "Abre el CRM desde la dirección pública de la instalación (un dominio con https) o completa PUBLIC_WEBHOOK_URL en el .env con una dirección pública.",
+  },
 };
 
 /**

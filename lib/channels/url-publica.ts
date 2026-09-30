@@ -46,9 +46,24 @@ function origemDaRequisicao(req: NextRequest): string {
   return `${proto.split(",")[0]!.trim()}://${host.split(",")[0]!.trim()}`;
 }
 
+/**
+ * A BASE dos webhooks — o endereço que um provedor na internet chama.
+ *
+ * `PUBLIC_WEBHOOK_URL` (opcional) vence tudo: é o jeito de testar com o CRM
+ * aberto pela rede local (`http://192.168.x.x`) e o webhook registrado num
+ * endereço público (um túnel). Decisão do dono em 30/09: a volta do OAuth pode
+ * ser local — quem volta é o navegador, que está na mesma rede —; só o webhook
+ * precisa ser alcançável pela internet. Sem a variável, vale o endereço
+ * público da instalação, que numa instalação de verdade serve para os dois.
+ */
+export function baseDoWebhook(req: NextRequest): string {
+  const explicita = env.PUBLIC_WEBHOOK_URL?.trim();
+  return explicita ? explicita.replace(/\/+$/, "") : urlPublicaDaInstalacao(req);
+}
+
 /** Onde um canal por credencial recebe o webhook do provedor. */
 export function urlDoWebhookDoCanal(req: NextRequest, token: string): string {
-  return `${urlPublicaDaInstalacao(req)}/api/v1/webhooks/channel/${token}`;
+  return `${baseDoWebhook(req)}/api/v1/webhooks/channel/${token}`;
 }
 
 /**
