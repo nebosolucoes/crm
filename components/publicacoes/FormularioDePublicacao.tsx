@@ -251,7 +251,7 @@ function Formulario({ fuso, editarId, inicial }: { fuso: string; editarId: strin
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="grid gap-6 lg:grid-cols-[minmax(280px,1fr)_minmax(320px,1fr)] xl:grid-cols-[minmax(340px,1fr)_minmax(380px,1.2fr)_minmax(360px,0.95fr)] xl:gap-8" data-testid="formulario-em-colunas">
+      <div className="grid w-full max-w-[1180px] gap-6 lg:grid-cols-[minmax(260px,1fr)_minmax(300px,1fr)] xl:grid-cols-[minmax(280px,0.95fr)_minmax(320px,1.05fr)_300px]" data-testid="formulario-em-colunas">
         {/* 1ª coluna: as redes e, embaixo, as datas — cada data com as redes que saem nela */}
         <div className="flex min-w-0 flex-col gap-6">
           <section className="flex min-w-0 flex-col gap-3" aria-labelledby="passo-destinos">

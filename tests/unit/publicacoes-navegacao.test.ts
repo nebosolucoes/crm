@@ -49,7 +49,9 @@ describe("Publicações — portas reais de navegação", () => {
     // A prévia é um carrossel por destino; o celular do WhatsApp mora dentro dele.
     expect(form).toContain("<PreviaDosDestinos");
     const previa = readFileSync("components/publicacoes/previa/PreviaDosDestinos.tsx", "utf8");
-    expect(previa).toContain("<PreviaDoCelular");
+    // O WhatsApp usa o MESMO aparelho das outras redes; só a tela é do Disparo.
+    expect(previa).toContain("<TelaDoWhatsApp");
+    expect(previa).toContain("<Aparelho");
     expect(previa).toContain("<PreviaDoFeed");
     expect(previa).toContain("<PreviaDoStory");
     expect(previa).toContain("<PreviaDoReel");

@@ -263,14 +263,13 @@ const ONDA = [
   6, 10, 14, 9, 16, 12, 7, 15, 11, 8, 13, 17, 10, 6, 12, 9, 14, 8, 11, 7, 15, 10, 6, 12, 9, 13,
 ];
 
-export function PreviaDoCelular({
-  grupos,
-  mensagem,
-  anexos,
-  horario,
-  dataLegenda,
-  className,
-}: Props) {
+/**
+ * A TELA do WhatsApp (cabeçalho do grupo, conversa e barra de digitação),
+ * sem a moldura nem a barra de status — para caber no mesmo aparelho das
+ * outras redes (`components/publicacoes/previa/Aparelho.tsx`). Ocupa toda a
+ * altura que o pai der; a conversa rola e fica no fim, onde está a legenda.
+ */
+export function TelaDoWhatsApp({ grupos, mensagem, anexos, horario, dataLegenda }: Omit<Props, "className">) {
   const t = useT();
   const titulo = grupos[0] ?? t("Grupo do WhatsApp");
   const subtitulo =
@@ -290,6 +289,73 @@ export function PreviaDoCelular({
   }, [mensagem, anexos]);
 
   return (
+    <div className="flex h-full min-h-0 flex-col bg-[#efeae2]">
+      {/* Cabeçalho do grupo */}
+      <div className="flex items-center gap-2 bg-[#008069] px-2 pt-1 pb-2 text-white">
+        <ArrowLeft size={20} aria-hidden />
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dfe5e7] text-[#8696a0]">
+          <UsersThree size={20} weight="fill" aria-hidden />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] leading-tight font-medium">{titulo}</span>
+          <span className="block truncate text-[11.5px] leading-tight text-white/85">{subtitulo}</span>
+        </span>
+        <VideoCamera size={20} aria-hidden />
+        <Phone size={18} aria-hidden />
+        <DotsThreeVertical size={20} weight="bold" aria-hidden />
+      </div>
+
+      {/* A conversa */}
+      <div ref={conversaRef} className="relative min-h-0 flex-1 overflow-y-auto [scrollbar-width:none]">
+        <FundoDoChat />
+        <div className="relative space-y-1.5 px-2.5 pt-2 pb-3">
+          <div className="flex justify-center pb-1">
+            <span className="rounded-lg bg-white/95 px-3 py-1 text-[11px] font-medium text-[#54656f] uppercase shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]">
+              {dataLegenda}
+            </span>
+          </div>
+          {vazio ? (
+            <div className="flex justify-center pt-8">
+              <span className="max-w-[210px] rounded-lg bg-[#fff5c4] px-3 py-2 text-center text-[12px] text-[#54656f] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]">
+                {t("Escreva a mensagem ou anexe um arquivo para ver como vai chegar.")}
+              </span>
+            </div>
+          ) : null}
+          {anexos.map((anexo, i) => {
+            const ultimo = i === anexos.length - 1;
+            return <BalaoDeAnexo key={anexo.id} anexo={anexo} legenda={ultimo && textoLimpo ? textoLimpo : null} horario={horario} />;
+          })}
+          {anexos.length === 0 && textoLimpo ? (
+            <Balao>
+              <div className="break-words whitespace-pre-wrap">
+                <TextoFormatado texto={textoLimpo} />
+                <Carimbo horario={horario} />
+              </div>
+            </Balao>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Barra de digitação — enfeite: a mensagem já está agendada */}
+      <div className="flex items-center gap-1.5 bg-[#f0f2f5] px-2 py-1.5 pb-4">
+        <div className="flex flex-1 items-center gap-2 rounded-full bg-white px-3 py-1.5 text-[#8696a0]">
+          <Smiley size={20} aria-hidden />
+          <span className="flex-1 text-[13.5px]">{t("Mensagem")}</span>
+          <Paperclip size={18} aria-hidden />
+          <Camera size={18} aria-hidden />
+        </div>
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#008069] text-white">
+          <Microphone size={18} weight="fill" aria-hidden />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** O celular inteiro (moldura + barra de status) com a tela do WhatsApp — a prévia do Disparo. */
+export function PreviaDoCelular({ grupos, mensagem, anexos, horario, dataLegenda, className }: Props) {
+  const t = useT();
+  return (
     <div
       className={cn("mx-auto w-[300px] select-none", className)}
       data-previa-do-celular
@@ -297,87 +363,17 @@ export function PreviaDoCelular({
       aria-label={t("Prévia da mensagem como aparece no WhatsApp")}
     >
       <div className="rounded-[2.2rem] border-[9px] border-[#1f1f1f] bg-[#1f1f1f] shadow-[0_18px_40px_-16px_rgba(0,0,0,0.55)]">
-        <div className="relative overflow-hidden rounded-[1.7rem] bg-[#efeae2]">
+        <div className="relative flex h-[560px] flex-col overflow-hidden rounded-[1.7rem] bg-[#efeae2]">
           {/* Barra de status */}
-          <div className="flex h-7 items-center justify-between bg-[#008069] px-5 text-[11px] font-medium text-white">
+          <div className="flex h-7 shrink-0 items-center justify-between bg-[#008069] px-5 text-[11px] font-medium text-white">
             <span>{horario}</span>
-            <span
-              className="absolute top-1.5 left-1/2 h-4 w-20 -translate-x-1/2 rounded-full bg-[#1f1f1f]"
-              aria-hidden
-            />
+            <span className="absolute top-1.5 left-1/2 h-4 w-20 -translate-x-1/2 rounded-full bg-[#1f1f1f]" aria-hidden />
             <span className="flex items-center gap-1" aria-hidden>
               <span className="inline-block h-2.5 w-2.5 rounded-[2px] bg-white/90" />
               <span className="inline-block h-2.5 w-5 rounded-[3px] border border-white/90" />
             </span>
           </div>
-
-          {/* Cabeçalho do grupo */}
-          <div className="flex items-center gap-2 bg-[#008069] px-2 pt-1 pb-2 text-white">
-            <ArrowLeft size={20} aria-hidden />
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dfe5e7] text-[#8696a0]">
-              <UsersThree size={20} weight="fill" aria-hidden />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[15px] leading-tight font-medium">{titulo}</span>
-              <span className="block truncate text-[11.5px] leading-tight text-white/85">
-                {subtitulo}
-              </span>
-            </span>
-            <VideoCamera size={20} aria-hidden />
-            <Phone size={18} aria-hidden />
-            <DotsThreeVertical size={20} weight="bold" aria-hidden />
-          </div>
-
-          {/* A conversa */}
-          <div ref={conversaRef} className="relative max-h-[500px] min-h-[380px] overflow-y-auto">
-            <FundoDoChat />
-            <div className="relative space-y-1.5 px-2.5 pt-2 pb-3">
-              <div className="flex justify-center pb-1">
-                <span className="rounded-lg bg-white/95 px-3 py-1 text-[11px] font-medium text-[#54656f] uppercase shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]">
-                  {dataLegenda}
-                </span>
-              </div>
-              {vazio ? (
-                <div className="flex justify-center pt-8">
-                  <span className="max-w-[210px] rounded-lg bg-[#fff5c4] px-3 py-2 text-center text-[12px] text-[#54656f] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]">
-                    {t("Escreva a mensagem ou anexe um arquivo para ver como vai chegar.")}
-                  </span>
-                </div>
-              ) : null}
-              {anexos.map((anexo, i) => {
-                const ultimo = i === anexos.length - 1;
-                return (
-                  <BalaoDeAnexo
-                    key={anexo.id}
-                    anexo={anexo}
-                    legenda={ultimo && textoLimpo ? textoLimpo : null}
-                    horario={horario}
-                  />
-                );
-              })}
-              {anexos.length === 0 && textoLimpo ? (
-                <Balao>
-                  <div className="break-words whitespace-pre-wrap">
-                    <TextoFormatado texto={textoLimpo} />
-                    <Carimbo horario={horario} />
-                  </div>
-                </Balao>
-              ) : null}
-            </div>
-          </div>
-
-          {/* Barra de digitação — enfeite: a mensagem já está agendada */}
-          <div className="flex items-center gap-1.5 bg-[#f0f2f5] px-2 py-1.5">
-            <div className="flex flex-1 items-center gap-2 rounded-full bg-white px-3 py-1.5 text-[#8696a0]">
-              <Smiley size={20} aria-hidden />
-              <span className="flex-1 text-[13.5px]">{t("Mensagem")}</span>
-              <Paperclip size={18} aria-hidden />
-              <Camera size={18} aria-hidden />
-            </div>
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#008069] text-white">
-              <Microphone size={18} weight="fill" aria-hidden />
-            </span>
-          </div>
+          <TelaDoWhatsApp grupos={grupos} mensagem={mensagem} anexos={anexos} horario={horario} dataLegenda={dataLegenda} />
         </div>
       </div>
     </div>

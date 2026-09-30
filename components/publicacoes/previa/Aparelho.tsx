@@ -17,20 +17,23 @@ export function Aparelho({
   children,
   className,
   rotulo,
+  barra,
 }: {
   hora: string;
   tema?: "claro" | "escuro";
   children: React.ReactNode;
   className?: string;
   rotulo: string;
+  /** Cor de fundo da barra de status quando o app pinta a dele (o verde do WhatsApp). */
+  barra?: string;
 }) {
   const escuro = tema === "escuro";
   return (
-    <div className={cn("mx-auto w-[300px] select-none 2xl:w-[340px]", className)} role="img" aria-label={rotulo} data-testid="aparelho-de-previa">
-      <div className="rounded-[2.6rem] border-[8px] border-[#1c1c1e] bg-[#1c1c1e] shadow-[0_24px_48px_-20px_rgba(0,0,0,0.6)]">
-        <div className={cn("relative aspect-[9/19.5] overflow-hidden rounded-[2.1rem]", escuro ? "bg-black text-white" : "bg-white text-[#0f1419]")}>
+    <div className={cn("mx-auto w-[248px] select-none", className)} role="img" aria-label={rotulo} data-testid="aparelho-de-previa">
+      <div className="rounded-[2.2rem] border-[7px] border-[#1c1c1e] bg-[#1c1c1e] shadow-[0_20px_40px_-18px_rgba(0,0,0,0.6)]">
+        <div className={cn("relative aspect-[9/19.5] overflow-hidden rounded-[1.8rem]", escuro ? "bg-black text-white" : "bg-white text-[#0f1419]")}>
           {/* Barra de status */}
-          <div className={cn("relative z-20 flex h-8 items-center justify-between px-6 text-[11px] font-semibold", escuro ? "text-white" : "text-[#0f1419]")}>
+          <div className={cn("relative z-20 flex h-8 items-center justify-between px-6 text-[11px] font-semibold", escuro || barra ? "text-white" : "text-[#0f1419]")} style={barra ? { backgroundColor: barra } : undefined}>
             <span>{hora}</span>
             <span className="absolute top-1.5 left-1/2 h-[18px] w-[86px] -translate-x-1/2 rounded-full bg-[#1c1c1e]" aria-hidden />
             <span className="flex items-center gap-1" aria-hidden>

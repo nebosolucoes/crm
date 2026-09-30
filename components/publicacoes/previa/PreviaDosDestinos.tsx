@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import { PreviaDoCelular, type AnexoDaPrevia } from "@/components/disparo/PreviaDoCelular";
+import { TelaDoWhatsApp, type AnexoDaPrevia } from "@/components/disparo/PreviaDoCelular";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/hooks/i18n/useT";
 import type { DestinoDaPublicacao } from "@/lib/publicacoes/schema";
@@ -11,7 +11,7 @@ import { CaretLeft, CaretRight } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
 import { PONTO_DA_REDE } from "../rotulos";
-import type { MidiaDaPrevia } from "./Aparelho";
+import { Aparelho, type MidiaDaPrevia } from "./Aparelho";
 import { PreviaDoFeed } from "./PreviaDoFeed";
 import { PreviaDoReel } from "./PreviaDoReel";
 import { PreviaDoStory } from "./PreviaDoStory";
@@ -87,7 +87,9 @@ export function PreviaDosDestinos({ destinos, contas, nomesDosGrupos, midias, le
 
       <div key={slide.chave} data-testid={`previa-${slide.rede}-${slide.formato}`}>
         {slide.rede === "whatsapp" ? (
-          <PreviaDoCelular grupos={nomesDosGrupos(slide.grupoIds)} mensagem={legenda} anexos={anexosDoWhatsApp} horario={hora} dataLegenda={dataLegenda} />
+          <Aparelho hora={hora} rotulo={t("Prévia da mensagem como aparece no WhatsApp")} barra="#008069">
+            <TelaDoWhatsApp grupos={nomesDosGrupos(slide.grupoIds)} mensagem={legenda} anexos={anexosDoWhatsApp} horario={hora} dataLegenda={dataLegenda} />
+          </Aparelho>
         ) : slide.formato === "story" ? (
           <PreviaDoStory rede={slide.rede} conta={contaDaPrevia} midias={midias} hora={hora} />
         ) : slide.formato === "reel" ? (

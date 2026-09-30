@@ -128,7 +128,7 @@ export function SeletorDeHorarios({
                             onClick={() => alternarDestino(i, chave)}
                             className="rounded-full p-px outline-hidden transition-all focus-visible:ring-2 focus-visible:ring-accent"
                           >
-                            <ChannelIcon channel={d.network} format={formatoParaChannelFormat(d.format)} state={ligado ? "active" : "inactive"} size={26} decorative />
+                            <ChannelIcon channel={d.network} format={formatoParaChannelFormat(d.format)} state={ligado ? "active" : "inactive"} size={22} decorative />
                           </button>
                         </TooltipTrigger>
                         <TooltipContent side="bottom">{ligado ? rotulo : `${rotulo} — ${t("não sai nesta data")}`}</TooltipContent>

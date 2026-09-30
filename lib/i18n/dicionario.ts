@@ -9894,6 +9894,11 @@ export const DICIONARIO: Traducoes = {
   "Formato": { es: "Formato" },
   "Tamanhos": { es: "Tamaños" },
 
+  // ── Publicações: janela de grupos do WhatsApp ──
+  "Escolher grupos": { es: "Elegir grupos" },
+  "Grupos do WhatsApp": { es: "Grupos de WhatsApp" },
+  "Marque os grupos que recebem esta publicação.": { es: "Marca los grupos que reciben esta publicación." },
+
 };
 
 /**
