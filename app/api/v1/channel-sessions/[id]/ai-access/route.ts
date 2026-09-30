@@ -38,7 +38,7 @@ export async function PATCH(req: NextRequest, { params }: Context): Promise<Resp
   const { id } = await params;
   if (!z.uuid().safeParse(id).success) return fail("validation_failed", "Canal inválido.", 422, { requestId });
   const parsed = aiAccessUpdateSchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return fail("validation_failed", "Use telefones com DDI, por exemplo +5511999998888.", 422, { requestId });
+  if (!parsed.success) return fail("validation_failed", "Use um telefone com DDI (+5511999998888) ou o @ do perfil (@minhaloja) por linha.", 422, { requestId });
   const { mode, test_phone_numbers } = parsed.data;
   // RPC atômica: não sobrescreve as demais configurações de metadata.
   const { data, error } = await createAdminClient().rpc("fn_configurar_pre_go_live_canal", {

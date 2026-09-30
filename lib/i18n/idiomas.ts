@@ -45,7 +45,7 @@
  * alcançar quem entra depois e nunca abriu o próprio perfil.
  */
 
-import { IDIOMAS_VISIVEIS, type IdiomaVisivel } from "./registro";
+import { IDIOMAS_OFERECIDOS, type IdiomaVisivel } from "./registro";
 
 /**
  * Os códigos que a interface serve. Derivados do registro (`./registro`): um
@@ -53,7 +53,7 @@ import { IDIOMAS_VISIVEIS, type IdiomaVisivel } from "./registro";
  * servido na leitura e não é oferecido em tela nenhuma.
  */
 export type Idioma = IdiomaVisivel["codigo"];
-export const IDIOMAS: readonly Idioma[] = IDIOMAS_VISIVEIS.map((idioma) => idioma.codigo);
+export const IDIOMAS: readonly Idioma[] = IDIOMAS_OFERECIDOS.map((idioma) => idioma.codigo);
 
 export const IDIOMA_PADRAO: Idioma = "pt-BR";
 
@@ -95,7 +95,7 @@ export function parseAcceptLanguage(header: string | null | undefined): Idioma |
 
   for (const { tag } of candidatos) {
     const primario = tag.split("-")[0] ?? "";
-    const servido = IDIOMAS_VISIVEIS.find((idioma) =>
+    const servido = IDIOMAS_OFERECIDOS.find((idioma) =>
       idioma.subtagsDoNavegador.some((subtag) => subtag === primario),
     );
     if (servido) return servido.codigo;

@@ -1,0 +1,2569 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#241043" />
+    <title>Nebo — Dashboard Comercial</title>
+    <style>
+      @font-face {
+        font-family: Inter;
+        src: url("assets/inter.woff2") format("woff2");
+        font-weight: 100 900;
+        font-display: swap;
+      }
+      :root {
+        --ink: #190b60;
+        --muted: #7775c5;
+        --purple: #7128ff;
+        --line: #e9e6fc;
+        --green: #00b66b;
+        --red: #ff3258;
+        --orange: #ff7900;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f3f5ff;
+        color: var(--ink);
+        font-family: Inter, Arial, sans-serif;
+        font-size: 12px;
+        -webkit-font-smoothing: antialiased;
+      }
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+      button,
+      a,
+      input,
+      select {
+        -webkit-tap-highlight-color: transparent;
+      }
+      button {
+        cursor: pointer;
+        color: inherit;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible,
+      select:focus-visible {
+        outline: 3px solid #b38aff;
+        outline-offset: 3px;
+      }
+      button {
+        border: 0;
+      }
+      svg {
+        display: block;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      .icon {
+        width: 22px;
+        height: 22px;
+        flex-shrink: 0;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      .sidebar {
+        width: 237px;
+        position: fixed;
+        inset: 0 auto 0 0;
+        z-index: 20;
+        min-height: 720px;
+        overflow: hidden;
+        background:
+          radial-gradient(ellipse at 105% 0%, #4b246c80, transparent 48%),
+          linear-gradient(121deg, #211037, #251045 53%, #1f0c48);
+        color: #e9ddff;
+      }
+      .sidebar:before,
+      .sidebar:after {
+        content: "";
+        position: absolute;
+        z-index: -1;
+        inset: 52% -60% -20% -20%;
+        transform: rotate(-35deg);
+        border-radius: 45%;
+        background: linear-gradient(90deg, #3d195d44, transparent);
+      }
+      .sidebar:after {
+        inset: 69% -60% -45% -10%;
+        background: #42155f33;
+      }
+      .brand {
+        display: block;
+        position: relative;
+        margin: 14px 0 29px 25px;
+        width: 100px;
+        height: 50px;
+        font-weight: 800;
+        font-size: 48px;
+        letter-spacing: -3px;
+        line-height: 1;
+        color: #fff;
+      }
+      .brand:after {
+        content: "";
+        position: absolute;
+        bottom: -5px;
+        left: 47px;
+        width: 48px;
+        height: 6px;
+        border-radius: 8px;
+        background: linear-gradient(90deg, #ff9b11, #ff682c);
+      }
+      .brand .brand-dot {
+        position: absolute;
+        right: 12px;
+        top: 9px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #ffc15d;
+      }
+      .nav {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 0 20px 0 17px;
+      }
+      .nav a {
+        height: 46px;
+        border: 1px solid transparent;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding: 0 9px;
+        border-radius: 12px;
+        font-size: 14px;
+        transition: background 0.18s;
+      }
+      .nav a .icon {
+        width: 24px;
+        height: 24px;
+        color: #dac3ff;
+        stroke-width: 1.85;
+      }
+      .nav a:hover {
+        background: #ffffff0a;
+      }
+      .nav a.active {
+        background: linear-gradient(110deg, #b34c67d9, #6323b6cf 65%, #5630abb3);
+        border-color: #ab72df8c;
+        box-shadow: inset 0 1px 5px #ffffff15;
+        color: white;
+      }
+      .nav a.active .icon {
+        color: white;
+        fill: white;
+        stroke-width: 1;
+      }
+      .sidebar-ad {
+        position: absolute;
+        left: 26px;
+        right: 26px;
+        bottom: 94px;
+        height: 193px;
+        border: 1px solid #9969b1;
+        border-left-color: #f08b45;
+        border-radius: 12px;
+        overflow: hidden;
+        background:
+          radial-gradient(ellipse at 0 0, #bb573b9c, transparent 47%),
+          linear-gradient(145deg, #40205e, #291149 75%);
+      }
+      .ad-spark {
+        color: #ffac29;
+        font-size: 27px;
+        display: block;
+        margin: 15px 18px 7px;
+      }
+      .sidebar-ad p {
+        position: relative;
+        z-index: 1;
+        font-size: 16px;
+        line-height: 20px;
+        font-weight: 600;
+        color: #fff;
+        margin: 0 18px;
+      }
+      .sidebar-ad svg {
+        position: absolute;
+        bottom: 0;
+        width: 100%;
+        height: 75px;
+      }
+      .sidebar-version {
+        height: 73px;
+        position: absolute;
+        inset: auto 0 0;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        padding: 0 30px;
+        color: #a77ada;
+        font-size: 10px;
+        border-top: 1px solid #7c429c30;
+      }
+      .sidebar-version .icon {
+        width: 12px;
+        height: 12px;
+      }
+      .main {
+        margin-left: 237px;
+        min-height: 941px;
+        padding: 0 20px 11px;
+        background:
+          radial-gradient(ellipse at 4% 27%, #f6f2ff95, transparent 60%),
+          linear-gradient(135deg, #f8f8ff, #edf3ff);
+      }
+      .topbar {
+        height: 70px;
+        display: flex;
+        align-items: center;
+        gap: 19px;
+      }
+      .greeting {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 310px;
+        margin-right: auto;
+      }
+      .greeting .icon {
+        color: var(--orange);
+        width: 26px;
+        height: 26px;
+        fill: #ff8700;
+        stroke-width: 1.4;
+      }
+      .greeting strong {
+        display: block;
+        font-size: 12px;
+        margin-bottom: 2px;
+      }
+      .greeting small {
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .top-control {
+        height: 38px;
+        border: 1px solid #dfdafc;
+        border-radius: 13px;
+        display: flex;
+        align-items: center;
+        background: #ffffff38;
+        gap: 10px;
+        padding: 0 12px;
+      }
+      .date-control {
+        width: 239px;
+        white-space: nowrap;
+        font-size: 10px;
+        font-weight: 600;
+      }
+      .date-control > .icon {
+        width: 17px;
+        height: 17px;
+      }
+      .date-control > .chevron {
+        width: 13px;
+        margin-left: auto;
+        color: #8a70d4;
+      }
+      .search {
+        width: 277px;
+      }
+      .search .icon {
+        width: 17px;
+        height: 17px;
+      }
+      .search input {
+        width: 100%;
+        min-width: 0;
+        border: 0;
+        outline: none;
+        background: transparent;
+        font-size: 10px;
+        color: var(--ink);
+      }
+      .search input::placeholder {
+        color: #7b78c9;
+        opacity: 1;
+      }
+      .notification {
+        position: relative;
+        width: 36px;
+        height: 36px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: #ffffffa0;
+      }
+      .notification span {
+        position: absolute;
+        right: -1px;
+        top: -2px;
+        width: 14px;
+        height: 14px;
+        display: grid;
+        place-items: center;
+        background: #ff7700;
+        color: #fff;
+        border-radius: 50%;
+        font-size: 9px;
+      }
+      .profile {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        min-width: 181px;
+        background: none;
+        padding: 0;
+      }
+      .profile img {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        object-fit: cover;
+      }
+      .profile-text {
+        text-align: left;
+        flex: 1;
+      }
+      .profile strong {
+        display: block;
+        font-size: 10px;
+        margin-bottom: 4px;
+      }
+      .profile small {
+        display: block;
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .profile > .icon {
+        width: 14px;
+        height: 14px;
+        margin-left: 17px;
+      }
+      .mobile-menu {
+        display: none;
+        background: none;
+        padding: 0;
+      }
+      .intro {
+        height: 81px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding-top: 6px;
+      }
+      .intro h1 {
+        font-size: 34px;
+        line-height: 41px;
+        letter-spacing: -1.05px;
+        margin: 0;
+        font-weight: 750;
+      }
+      .intro p {
+        font-size: 13.5px;
+        color: var(--muted);
+        margin: 0;
+        line-height: 20px;
+      }
+      .intro blockquote {
+        margin: 20px 0 0;
+        font-size: 12px;
+        line-height: 17px;
+        text-align: center;
+        color: var(--muted);
+      }
+      .metrics {
+        display: grid;
+        grid-template-columns: 1.07fr 1fr 1fr 0.97fr 1fr;
+        gap: 12px;
+      }
+      .card {
+        background: #ffffffc9;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        min-width: 0;
+        overflow: hidden;
+      }
+      .metric {
+        height: 126px;
+        display: flex;
+        position: relative;
+        padding: 12px 15px;
+        gap: 14px;
+        background: linear-gradient(125deg, #fff, #fcfaff);
+      }
+      .metric:nth-child(2) {
+        background: linear-gradient(130deg, #fffdf9, #fffaff);
+      }
+      .metric:nth-child(3) {
+        background: linear-gradient(130deg, #fff8ff, #fff8fa);
+      }
+      .metric:nth-child(5) {
+        background: linear-gradient(130deg, #fffdfa, #fffaf8);
+      }
+      .metric-icon {
+        width: 44px;
+        height: 46px;
+        flex-shrink: 0;
+        border-radius: 15px;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(circle at 65% 65%, #eee6ff, #dfd4ff);
+        color: #6913ff;
+        box-shadow: inset 0 -2px 6px #d6c7ff44;
+      }
+      .metric-icon .icon {
+        width: 27px;
+        height: 27px;
+        stroke-width: 2.3;
+      }
+      .metric-icon.orange {
+        background: radial-gradient(circle, #fff5df, #ffe5b9);
+        color: #ff8400;
+      }
+      .metric-icon.pink {
+        background: radial-gradient(circle, #ffe9f2, #ffd0e5);
+        color: #ff2d6c;
+      }
+      .metric-icon.pink .icon {
+        fill: #ff2d6c;
+        stroke: white;
+        stroke-width: 1.3;
+      }
+      .metric-copy {
+        position: relative;
+        z-index: 1;
+        min-width: 0;
+      }
+      .metric h2 {
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+        margin: 4px 0 9px;
+      }
+      .metric-value {
+        font-size: 23px;
+        line-height: 27px;
+        font-weight: 750;
+        letter-spacing: -0.55px;
+        white-space: nowrap;
+      }
+      .change {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: var(--green);
+        font-size: 12px;
+        font-weight: 600;
+        margin-top: 8px;
+      }
+      .change .icon {
+        height: 13px;
+        width: 13px;
+        stroke-width: 2.8;
+      }
+      .change.negative {
+        color: var(--red);
+      }
+      .metric small {
+        display: block;
+        color: var(--muted);
+        font-size: 10px;
+        margin-top: 3px;
+      }
+      .mini-chart {
+        position: absolute;
+        width: 74px;
+        height: 43px;
+        bottom: 29px;
+        right: 15px;
+      }
+      .middle {
+        display: grid;
+        grid-template-columns: 617fr 303fr 450fr;
+        gap: 12px;
+        margin-top: 13px;
+      }
+      .middle > .card {
+        height: 282px;
+      }
+      .panel-header {
+        height: 51px;
+        display: flex;
+        align-items: center;
+        padding: 0 15px;
+        gap: 10px;
+        white-space: nowrap;
+      }
+      .panel-header h2 {
+        font-size: 12px;
+        letter-spacing: -0.25px;
+        font-weight: 650;
+        margin: 0;
+      }
+      .panel-icon {
+        display: grid;
+        place-items: center;
+        width: 29px;
+        height: 31px;
+        border-radius: 50%;
+        background: #f0eaff;
+        color: #7325ff;
+        flex-shrink: 0;
+      }
+      .panel-icon .icon {
+        width: 21px;
+        height: 21px;
+        stroke-width: 2;
+      }
+      .panel-icon.orange {
+        background: #fff0dd;
+        color: #ff7b00;
+      }
+      .panel-icon.coral {
+        background: #fff0ec;
+        color: #ff592e;
+      }
+      .live {
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        color: var(--muted);
+        font-size: 10px;
+        margin-left: 7px;
+      }
+      .live:before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #00b467;
+        box-shadow: 0 0 0 3px #e7f8ed;
+      }
+      .select-wrap {
+        position: relative;
+        margin-left: auto;
+      }
+      .select-wrap:after {
+        content: "⌄";
+        position: absolute;
+        right: 12px;
+        top: 6px;
+        color: #9883d7;
+        pointer-events: none;
+      }
+      .select-wrap select {
+        appearance: none;
+        border: 1px solid #e5e0fe;
+        border-radius: 12px;
+        height: 30px;
+        background: #ffffff85;
+        padding: 0 29px 0 12px;
+        font-size: 10px;
+        color: var(--ink);
+        min-width: 128px;
+        cursor: pointer;
+      }
+      .sales-value {
+        padding: 0 16px;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        height: 31px;
+      }
+      .sales-value strong {
+        font-size: 28px;
+        letter-spacing: -0.65px;
+        font-weight: 750;
+      }
+      .today {
+        color: #00aa69;
+        font-size: 11px;
+        background: #ddfaf0;
+        padding: 5px 9px;
+        border-radius: 8px;
+        font-weight: 600;
+      }
+      .chart-legend {
+        display: flex;
+        align-items: center;
+        gap: 19px;
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .chart-legend span {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .chart-legend i {
+        width: 8px;
+        height: 8px;
+        background: var(--purple);
+        border-radius: 50%;
+      }
+      .chart-legend i.pale {
+        background: #d9ceff;
+      }
+      .sales .chart-legend {
+        height: 22px;
+        justify-content: flex-end;
+        padding-right: 30px;
+      }
+      .sales-chart {
+        display: block;
+        width: 100%;
+        height: 177px;
+        overflow: visible;
+      }
+      .chart-text {
+        font-size: 10px;
+        fill: var(--muted);
+        font-family: Inter, Arial, sans-serif;
+      }
+      .chart-grid {
+        stroke: #e8e4fa;
+        stroke-width: 0.7;
+        stroke-dasharray: 2 2;
+      }
+      .chart-tooltip {
+        filter: drop-shadow(0 2px 7px #44308010);
+      }
+      .link-button {
+        margin-left: auto;
+        padding: 0;
+        background: transparent;
+        color: #8e5cff;
+        font-size: 10px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .link-button .icon {
+        width: 13px;
+        height: 13px;
+      }
+      .goal .panel-header {
+        padding: 0 16px;
+      }
+      .gauge {
+        position: relative;
+        width: 228px;
+        height: 171px;
+        margin: 0 auto;
+      }
+      .gauge svg {
+        width: 228px;
+        height: 171px;
+      }
+      .gauge-copy {
+        position: absolute;
+        top: 62px;
+        left: 0;
+        right: 0;
+        text-align: center;
+      }
+      .gauge-copy strong {
+        display: block;
+        font-size: 29px;
+        letter-spacing: -1px;
+        margin-bottom: 6px;
+      }
+      .gauge-copy b {
+        display: block;
+        font-size: 14px;
+        margin-bottom: 6px;
+      }
+      .gauge-copy span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .goal-message {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 11px;
+        height: 40px;
+        margin: 6px 15px 0;
+        border-radius: 11px;
+        background: #fff3e2;
+        color: #ff7700;
+        font-size: 10px;
+      }
+      .goal-message .icon {
+        width: 22px;
+        height: 22px;
+        fill: #ff8700;
+        stroke: #ff7900;
+      }
+      .performance .panel-header {
+        padding: 0 15px;
+      }
+      .performance .select-wrap select {
+        min-width: 136px;
+      }
+      .performance .chart-legend {
+        height: 29px;
+        justify-content: flex-start;
+        padding-left: 60px;
+      }
+      .bars-chart {
+        width: 100%;
+        height: 196px;
+        overflow: visible;
+      }
+      .chart-bar {
+        cursor: pointer;
+      }
+      .chart-bar:hover {
+        filter: brightness(1.12);
+      }
+      .bottom {
+        display: grid;
+        grid-template-columns: 617fr 407fr 347fr;
+        gap: 12px;
+        margin-top: 11px;
+      }
+      .bottom > .card {
+        height: 283px;
+      }
+      .outline-button {
+        border: 1px solid #e4dffd;
+        border-radius: 11px;
+        padding: 7px 11px;
+        background: #fcfcff;
+        color: #6530e9;
+        font-size: 10px;
+        white-space: nowrap;
+      }
+      .panel-header > .outline-button {
+        margin-left: auto;
+      }
+      .prices .panel-header {
+        height: 51px;
+      }
+      .prices-table {
+        width: calc(100% - 30px);
+        margin: 0 15px;
+        border-collapse: collapse;
+        font-size: 9.5px;
+        line-height: 14px;
+      }
+      .prices-table th {
+        height: 29px;
+        background: #f8f8fe;
+        color: #655ac5;
+        font-weight: 400;
+        text-align: center;
+        white-space: nowrap;
+      }
+      .prices-table th:first-child {
+        text-align: left;
+        padding-left: 11px;
+        border-radius: 8px 0 0 8px;
+      }
+      .prices-table th:last-child {
+        border-radius: 0 8px 8px 0;
+      }
+      .prices-table td {
+        height: 39px;
+        text-align: center;
+        color: var(--muted);
+        border-bottom: 1px solid #f4f2fc;
+      }
+      .prices-table tr:last-child td {
+        border: 0;
+      }
+      .prices-table td:first-child {
+        width: 140px;
+        text-align: left;
+        color: #473c93;
+      }
+      .product-cell {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+      }
+      .product-cell img {
+        width: 33px;
+        height: 35px;
+        object-fit: contain;
+        mix-blend-mode: multiply;
+      }
+      .prices-table td:nth-child(2) {
+        font-weight: 650;
+        color: var(--ink);
+        white-space: nowrap;
+      }
+      .prices-table .difference {
+        color: var(--red);
+        font-weight: 600;
+      }
+      .badge {
+        height: 24px;
+        min-width: 75px;
+        border-radius: 9px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 10px;
+        background: #dbf8ed;
+        color: #009a62;
+        white-space: nowrap;
+        font-size: 9px;
+        font-weight: 500;
+      }
+      .badge.attention {
+        background: #fff1d7;
+        color: #ed8a00;
+      }
+      .badge.low {
+        background: #ffe0e6;
+        color: #ff3e59;
+      }
+      .badge-dot {
+        margin-right: 4px;
+        font-size: 9px;
+        color: #60d57d;
+      }
+      .attention .badge-dot {
+        color: #ffc46a;
+      }
+      .low .badge-dot {
+        color: #ff859c;
+      }
+      .promotions .panel-header {
+        padding-left: 14px;
+      }
+      .promotions-table {
+        width: calc(100% - 32px);
+        margin: 0 16px;
+        border-collapse: collapse;
+        font-size: 10px;
+      }
+      .promotions-table th {
+        height: 25px;
+        text-align: left;
+        color: var(--muted);
+        font-weight: 400;
+        font-size: 9.5px;
+      }
+      .promotions-table th:last-child {
+        text-align: center;
+      }
+      .promotions-table td {
+        height: 40px;
+        border-bottom: 1px solid #f6f4fc;
+      }
+      .promotions-table tr:last-child td {
+        border: 0;
+      }
+      .promotion-product {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--ink);
+        white-space: nowrap;
+      }
+      .promotion-product img {
+        width: 31px;
+        height: 35px;
+        object-fit: contain;
+        mix-blend-mode: multiply;
+      }
+      .promotion-product small {
+        display: block;
+        color: var(--muted);
+        font-size: 9px;
+        line-height: 16px;
+      }
+      .trend {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #00ad69;
+        white-space: nowrap;
+        font-size: 9px;
+      }
+      .trend.down {
+        color: #ff3458;
+      }
+      .trend svg {
+        width: 61px;
+        height: 26px;
+      }
+      .promotions-table .badge {
+        min-width: 64px;
+        padding: 0 8px;
+      }
+      .promotions-table td:last-child {
+        text-align: right;
+      }
+      .insights .panel-header {
+        height: 39px;
+        padding-top: 7px;
+      }
+      .insights .panel-header h2 {
+        font-size: 13px;
+        color: #301293;
+      }
+      .insights .panel-icon {
+        background: #fff2d9;
+      }
+      .tabs {
+        display: flex;
+        margin: 1px 14px 11px;
+        height: 25px;
+        border-radius: 20px;
+        background: #f0f2ff;
+        padding: 2px 4px;
+      }
+      .tabs button {
+        background: transparent;
+        border-radius: 15px;
+        color: var(--muted);
+        flex: 1;
+        font-size: 10px;
+        padding: 0;
+      }
+      .tabs button[aria-selected="true"] {
+        background: linear-gradient(110deg, #7041c4, #5c2fbe);
+        box-shadow: 0 1px 4px #653bb522;
+        color: #fff;
+        font-weight: 500;
+      }
+      .insight-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 0 14px;
+      }
+      .insight {
+        display: flex;
+        gap: 12px;
+        min-height: 47px;
+        align-items: flex-start;
+      }
+      .insight-symbol {
+        width: 38px;
+        height: 38px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        flex-shrink: 0;
+        background: radial-gradient(circle at 60% 60%, #f2fff9, #d3f4e5);
+        color: #00aa5b;
+      }
+      .insight-symbol .icon {
+        width: 23px;
+        height: 23px;
+        fill: currentColor;
+        stroke-width: 2;
+      }
+      .insight-symbol.purple {
+        background: radial-gradient(circle, #fbf7ff, #eadeff);
+        color: #8541ed;
+      }
+      .insight-symbol.amber {
+        background: radial-gradient(circle, #fffaf0, #ffe9b8);
+        color: #ff8400;
+      }
+      .insight-symbol.blue {
+        background: radial-gradient(circle, #f1f8ff, #d6e6ff);
+        color: #1479ff;
+      }
+      .insight-copy {
+        padding-top: 2px;
+      }
+      .insight h3 {
+        font-weight: 550;
+        font-size: 10px;
+        margin: 0 0 3px;
+      }
+      .insight p {
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 14px;
+        margin: 0;
+      }
+      .footer {
+        display: grid;
+        grid-template-columns: 915fr 451fr;
+        gap: 27px;
+        margin-top: 9px;
+      }
+      .next-step {
+        border: 1px solid #cd86a4;
+        border-radius: 13px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 0 33px 0 29px;
+        height: 55px;
+        color: white;
+        background:
+          radial-gradient(ellipse at 0 100%, #ff9457a3, transparent 35%),
+          linear-gradient(105deg, #9f466d, #603cac 53%, #9950b7);
+        box-shadow: 0 3px 7px #8461c015;
+      }
+      .next-step-symbol {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(130deg, #ff8700, #ffc348);
+        font-size: 27px;
+      }
+      .next-step strong {
+        font-size: 11px;
+        font-weight: 600;
+        display: block;
+        margin-bottom: 4px;
+      }
+      .next-step p {
+        margin: 0;
+        font-size: 9.5px;
+        color: #fff6fd;
+      }
+      .next-step button {
+        margin-left: auto;
+        border-radius: 10px;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        white-space: nowrap;
+        background: linear-gradient(110deg, #ff9855, #ff7751);
+        color: white;
+        padding: 7px 13px;
+        font-size: 9px;
+      }
+      .next-step button .icon {
+        width: 12px;
+        height: 12px;
+      }
+      .month-goal {
+        height: 55px;
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        gap: 10px;
+      }
+      .month-goal .panel-icon {
+        width: 31px;
+        height: 34px;
+      }
+      .month-goal .panel-icon .icon {
+        width: 24px;
+        height: 24px;
+      }
+      .month-copy {
+        font-size: 10px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .month-copy strong {
+        display: block;
+        color: #6330ff;
+        font-size: 10px;
+        margin-top: 5px;
+      }
+      .progress {
+        height: 5px;
+        background: #eeedff;
+        border-radius: 5px;
+        flex: 1;
+        margin: 16px 6px 0 9px;
+        overflow: hidden;
+      }
+      .progress span {
+        display: block;
+        width: 68%;
+        height: 100%;
+        background: linear-gradient(90deg, #7242d4, #671cd1 80%, #ff7154);
+        border-radius: 5px;
+      }
+      .month-goal > b {
+        font-size: 10px;
+        color: #6635c9;
+      }
+      dialog {
+        border: 1px solid #e3d9ff;
+        border-radius: 18px;
+        padding: 25px;
+        max-width: 520px;
+        width: calc(100% - 32px);
+        color: var(--ink);
+        box-shadow: 0 20px 80px #180b6130;
+        background: #fcfbff;
+      }
+      dialog::backdrop {
+        background: #16073570;
+        backdrop-filter: blur(4px);
+      }
+      dialog h2 {
+        font-size: 22px;
+        margin: 0 30px 15px 0;
+      }
+      dialog p {
+        color: #71649d;
+        font-size: 13px;
+        line-height: 1.7;
+      }
+      dialog .close-dialog {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        background: #eee7fc;
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        font-size: 20px;
+      }
+      dialog .dialog-note {
+        padding: 12px;
+        background: #eee8fc;
+        border-radius: 10px;
+        font-size: 11px;
+      }
+      dialog .dialog-data {
+        background: white;
+        border: 1px solid var(--line);
+        padding: 15px;
+        border-radius: 10px;
+        line-height: 1.9;
+        font-size: 13px;
+      }
+      .empty-result {
+        display: none;
+        text-align: center;
+        padding: 20px;
+        color: var(--muted);
+      }
+      .mobile-overlay {
+        display: none;
+      }
+      .search-match {
+        background: #f3eaff;
+      }
+      .tip-hide {
+        display: none;
+      }
+      @media (min-width: 1750px) {
+        .main {
+          padding-left: 28px;
+          padding-right: 28px;
+        }
+        .middle > .card {
+          height: 310px;
+        }
+        .sales-chart {
+          height: 200px;
+        }
+        .bars-chart {
+          height: 220px;
+        }
+        .gauge {
+          margin-top: 10px;
+        }
+        .goal-message {
+          margin-top: 20px;
+        }
+        .bottom > .card {
+          height: 295px;
+        }
+        .prices-table td,
+        .promotions-table td {
+          height: 42px;
+        }
+      }
+      @media (max-width: 1450px) and (min-width: 1101px) {
+        .sidebar {
+          width: 210px;
+        }
+        .main {
+          margin-left: 210px;
+          padding-left: 16px;
+          padding-right: 16px;
+        }
+        .topbar {
+          gap: 12px;
+        }
+        .greeting {
+          min-width: 230px;
+        }
+        .profile {
+          min-width: 150px;
+        }
+        .profile > .icon {
+          margin-left: 2px;
+        }
+        .search {
+          width: 235px;
+        }
+        .metric {
+          gap: 10px;
+          padding-left: 12px;
+        }
+        .metric-icon {
+          width: 38px;
+          height: 42px;
+        }
+        .metric-value {
+          font-size: 21px;
+        }
+        .metric h2 {
+          font-size: 10px;
+        }
+        .metric small {
+          font-size: 9px;
+        }
+        .mini-chart {
+          width: 55px;
+          right: 10px;
+        }
+        .panel-header {
+          gap: 7px;
+          padding: 0 12px;
+        }
+        .panel-header h2 {
+          font-size: 11px;
+        }
+        .live {
+          font-size: 8px;
+          margin-left: 1px;
+          gap: 4px;
+        }
+        .select-wrap select {
+          min-width: 108px;
+          padding-left: 8px;
+          font-size: 9px;
+        }
+        .performance .select-wrap select {
+          min-width: 116px;
+        }
+        .panel-icon {
+          width: 25px;
+        }
+        .prices-table {
+          font-size: 8.5px;
+          width: calc(100% - 20px);
+          margin: 0 10px;
+        }
+        .product-cell {
+          gap: 5px;
+        }
+        .prices-table td:first-child {
+          width: 113px;
+        }
+        .badge {
+          min-width: 64px;
+          padding: 0 6px;
+          font-size: 8px;
+        }
+        .promotion-product {
+          font-size: 9px;
+          gap: 5px;
+        }
+        .promotion-product small {
+          font-size: 8px;
+        }
+        .trend {
+          gap: 5px;
+          font-size: 8px;
+        }
+        .trend svg {
+          width: 45px;
+        }
+        .promotions-table {
+          margin: 0 11px;
+          width: calc(100% - 22px);
+        }
+        .promotions-table .badge {
+          min-width: 55px;
+          font-size: 8px;
+        }
+        .insight {
+          gap: 8px;
+        }
+        .insight p {
+          font-size: 9px;
+        }
+        .insight h3 {
+          font-size: 9px;
+        }
+        .insights .panel-header h2 {
+          font-size: 11px;
+        }
+        .next-step {
+          padding: 0 15px;
+          gap: 10px;
+        }
+        .next-step strong {
+          font-size: 10px;
+        }
+        .next-step p {
+          font-size: 8px;
+        }
+        .month-goal {
+          gap: 7px;
+          padding: 0 10px;
+        }
+        .month-copy {
+          font-size: 9px;
+        }
+        .month-copy strong {
+          font-size: 9px;
+        }
+      }
+      @media (max-width: 1100px) {
+        .sidebar {
+          width: 190px;
+        }
+        .main {
+          margin-left: 190px;
+          padding: 0 16px 20px;
+          min-height: 100vh;
+        }
+        .nav {
+          padding: 0 12px;
+          gap: 7px;
+        }
+        .nav a {
+          font-size: 12px;
+          gap: 12px;
+        }
+        .sidebar-ad {
+          left: 17px;
+          right: 17px;
+        }
+        .topbar {
+          gap: 12px;
+          flex-wrap: wrap;
+          height: 112px;
+          align-content: center;
+        }
+        .greeting {
+          min-width: 220px;
+        }
+        .date-control {
+          order: 3;
+          width: 235px;
+        }
+        .search {
+          order: 4;
+          flex: 1;
+        }
+        .profile {
+          min-width: auto;
+        }
+        .profile-text {
+          display: none;
+        }
+        .profile > .icon {
+          margin-left: 0;
+        }
+        .intro {
+          height: 88px;
+        }
+        .intro h1 {
+          font-size: 28px;
+        }
+        .intro p {
+          font-size: 11px;
+        }
+        .intro blockquote {
+          display: none;
+        }
+        .metrics {
+          grid-template-columns: repeat(3, 1fr);
+        }
+        .metric {
+          height: 125px;
+        }
+        .middle {
+          grid-template-columns: 1.6fr 1fr;
+        }
+        .performance {
+          grid-column: 1/-1;
+        }
+        .performance .bars-chart {
+          height: 192px;
+        }
+        .middle > .performance {
+          height: 282px;
+        }
+        .bottom {
+          grid-template-columns: 1.5fr 1fr;
+        }
+        .prices {
+          grid-column: 1/-1;
+        }
+        .bottom > .prices {
+          height: 283px;
+        }
+        .prices-table {
+          font-size: 11px;
+        }
+        .bottom > .promotions,
+        .bottom > .insights {
+          height: 290px;
+        }
+        .footer {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+        .next-step {
+          padding: 0 15px;
+        }
+        .sidebar-version {
+          padding-left: 23px;
+        }
+        .sales .live {
+          display: none;
+        }
+        .panel-header {
+          padding: 0 12px;
+          gap: 7px;
+        }
+        .panel-header h2 {
+          font-size: 11px;
+        }
+        .gauge {
+          max-width: 100%;
+        }
+        .goal-message {
+          font-size: 9px;
+          gap: 5px;
+        }
+        .select-wrap select {
+          min-width: 112px;
+        }
+        .metric h2 {
+          font-size: 11px;
+        }
+        .metric-value {
+          font-size: 22px;
+        }
+        .metric {
+          padding-left: 12px;
+          gap: 10px;
+        }
+        .mini-chart {
+          width: 56px;
+          right: 10px;
+        }
+      }
+      @media (max-width: 700px) {
+        .sidebar {
+          transform: translateX(-100%);
+          width: 237px;
+          transition: transform 0.2s;
+          min-height: 0;
+        }
+        .sidebar.open {
+          transform: none;
+        }
+        .mobile-overlay.visible {
+          display: block;
+          position: fixed;
+          inset: 0;
+          background: #17073570;
+          z-index: 19;
+        }
+        .main {
+          margin-left: 0;
+          padding: 0 12px 16px;
+        }
+        .mobile-menu {
+          display: block;
+        }
+        .topbar {
+          gap: 10px;
+          height: 123px;
+        }
+        .greeting {
+          min-width: 0;
+          flex: 1;
+        }
+        .greeting .icon {
+          width: 22px;
+        }
+        .greeting small {
+          font-size: 8px;
+        }
+        .greeting strong {
+          font-size: 11px;
+        }
+        .profile {
+          display: none;
+        }
+        .date-control {
+          width: 190px;
+          font-size: 8px;
+          padding: 0 8px;
+          gap: 6px;
+        }
+        .search {
+          min-width: 120px;
+          padding: 0 8px;
+        }
+        .search input {
+          font-size: 9px;
+        }
+        .intro {
+          height: 93px;
+          padding-top: 7px;
+        }
+        .intro h1 {
+          font-size: 28px;
+          line-height: 38px;
+          letter-spacing: -1px;
+        }
+        .intro p {
+          font-size: 11px;
+          line-height: 16px;
+          max-width: 360px;
+        }
+        .metrics {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 9px;
+        }
+        .metric {
+          height: 125px;
+          padding: 11px 10px;
+          gap: 9px;
+        }
+        .metric-icon {
+          width: 34px;
+          height: 37px;
+          border-radius: 12px;
+        }
+        .metric-icon .icon {
+          width: 23px;
+          height: 23px;
+        }
+        .metric h2 {
+          font-size: 10px;
+          white-space: normal;
+          line-height: 14px;
+          margin: 2px 0 8px;
+        }
+        .metric-value {
+          font-size: 20px;
+          line-height: 23px;
+        }
+        .metric small {
+          font-size: 8px;
+        }
+        .change {
+          font-size: 10px;
+          margin-top: 9px;
+        }
+        .mini-chart {
+          width: 45px;
+          height: 30px;
+          right: 8px;
+          bottom: 18px;
+          opacity: 0.55;
+        }
+        .metric:last-child {
+          grid-column: 1/-1;
+          height: 113px;
+        }
+        .metric:last-child .mini-chart {
+          width: 115px;
+          height: 46px;
+          right: 20px;
+          bottom: 25px;
+          opacity: 1;
+        }
+        .middle,
+        .bottom {
+          grid-template-columns: 1fr;
+          gap: 10px;
+          margin-top: 10px;
+        }
+        .performance,
+        .prices {
+          grid-column: auto;
+        }
+        .middle > .card {
+          height: 282px;
+        }
+        .sales-value strong {
+          font-size: 26px;
+        }
+        .panel-header h2 {
+          font-size: 11px;
+        }
+        .panel-header {
+          gap: 7px;
+          padding: 0 12px;
+        }
+        .sales .panel-header .select-wrap select {
+          font-size: 9px;
+          min-width: 100px;
+          padding-left: 9px;
+        }
+        .sales-chart {
+          height: 175px;
+        }
+        .goal .gauge {
+          width: 228px;
+        }
+        .goal-message {
+          margin: 6px 18px 0;
+          font-size: 11px;
+        }
+        .bottom > .card,
+        .bottom > .promotions,
+        .bottom > .insights {
+          height: auto;
+          min-height: 283px;
+        }
+        .prices {
+          overflow-x: auto;
+        }
+        .prices-table {
+          min-width: 550px;
+          margin-bottom: 9px;
+          font-size: 10px;
+        }
+        .prices .panel-header {
+          position: sticky;
+          left: 0;
+          min-width: 350px;
+        }
+        .promotions-table {
+          margin-bottom: 10px;
+        }
+        .insight-list {
+          padding-bottom: 12px;
+        }
+        .insights .panel-header h2 {
+          font-size: 13px;
+        }
+        .insight {
+          gap: 12px;
+        }
+        .insight h3 {
+          font-size: 11px;
+        }
+        .insight p {
+          font-size: 11px;
+          line-height: 15px;
+        }
+        .footer {
+          margin-top: 10px;
+        }
+        .next-step {
+          height: auto;
+          min-height: 92px;
+          padding: 12px;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+        .next-step > div:nth-child(2) {
+          flex: 1;
+        }
+        .next-step strong {
+          font-size: 10px;
+          line-height: 15px;
+        }
+        .next-step p {
+          font-size: 9px;
+          line-height: 14px;
+        }
+        .next-step button {
+          margin-left: 45px;
+        }
+        .month-goal {
+          height: 60px;
+        }
+        .sidebar-ad {
+          bottom: 84px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          scroll-behavior: auto !important;
+          transition: none !important;
+        }
+      }
+    </style>
+    <style>
+      .brand {
+        margin: 20px 0 22px 24px;
+        width: 100px;
+        height: 51px;
+        background: url("assets/logo.png") no-repeat center/contain;
+        font-size: 0;
+        letter-spacing: 0;
+      }
+      .brand:after,
+      .brand .brand-dot {
+        display: none;
+      }
+      .sidebar {
+        background:
+          radial-gradient(ellipse at 115% 0%, #652c8b66, transparent 49%),
+          linear-gradient(121deg, #211037, #251045 53%, #1f0c48);
+      }
+      @media (min-width: 1101px) {
+        .panel-header h2 {
+          font-size: 13px;
+          font-weight: 600;
+          letter-spacing: -0.35px;
+        }
+        .metric h2 {
+          margin-bottom: 11px;
+        }
+        .metric-value {
+          transform: scaleX(0.95);
+          transform-origin: left center;
+        }
+        .metric:first-child .metric-value {
+          transform: scaleX(0.92);
+        }
+        .sales-value strong {
+          font-size: 27px;
+          letter-spacing: -0.9px;
+        }
+        .prices-table {
+          font-size: 10px;
+        }
+        .insight h3 {
+          font-size: 11px;
+        }
+        .live {
+          margin-left: 2px;
+        }
+        .panel-header {
+          gap: 9px;
+        }
+      }
+      @media (min-width: 1101px) and (max-width: 1450px) {
+        .panel-header h2 {
+          font-size: 11px;
+        }
+        .prices-table {
+          font-size: 8.5px;
+        }
+        .insight h3 {
+          font-size: 9px;
+        }
+        .sales-value strong {
+          font-size: 26px;
+        }
+      }
+      @media (max-width: 700px) {
+        .topbar {
+          display: grid;
+          grid-template-columns: 24px repeat(4, minmax(0, 1fr)) 36px;
+          grid-template-rows: 49px 38px;
+          gap: 8px;
+          height: 110px;
+          align-content: center;
+        }
+        .mobile-menu {
+          grid-column: 1;
+          grid-row: 1;
+        }
+        .greeting {
+          grid-column: 2/6;
+          grid-row: 1;
+          gap: 7px;
+        }
+        .greeting small {
+          font-size: 8px;
+          line-height: 12px;
+          display: block;
+        }
+        .notification {
+          grid-column: 6;
+          grid-row: 1;
+        }
+        .date-control {
+          grid-column: 1/4;
+          grid-row: 2;
+          width: 100%;
+          font-size: 8px;
+          padding: 0 7px;
+          gap: 5px;
+        }
+        .date-control > .icon {
+          width: 14px;
+        }
+        .search {
+          grid-column: 4/7;
+          grid-row: 2;
+          width: 100%;
+          min-width: 0;
+        }
+        .metric:first-child .metric-value {
+          font-size: 17px;
+          letter-spacing: -0.7px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="mobile-overlay" id="mobile-overlay"></div>
+    <aside class="sidebar" id="sidebar" aria-label="Navegação principal">
+      <a class="brand" href="#dashboard" aria-label="Nebo, início"
+        >nebo<span class="brand-dot"></span
+      ></a>
+      <nav class="nav">
+        <a href="#dashboard" class="active" aria-current="page"
+          ><i data-icon="home"></i>Dashboard</a
+        >
+        <a href="#vendas"><i data-icon="sales"></i>Vendas</a>
+        <a href="#promocoes"><i data-icon="tag"></i>Promoções</a>
+        <a href="#concorrentes"><i data-icon="users"></i>Concorrentes</a>
+        <a href="#ofertas"><i data-icon="percent"></i>Ofertas</a>
+        <a href="#estoque"><i data-icon="box"></i>Estoque</a>
+        <a href="#relatorios"><i data-icon="file"></i>Relatórios</a>
+        <a href="#configuracoes"><i data-icon="settings"></i>Configurações</a>
+      </nav>
+      <div class="sidebar-ad">
+        <span class="ad-spark">✦</span>
+        <p>Inteligência<br />para um varejo<br />mais forte.</p>
+        <svg viewBox="0 0 185 75" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="wave-orange" x1="0" y1="0" x2="0.5" y2="1">
+              <stop stop-color="#ffb21d" />
+              <stop offset=".55" stop-color="#ff6f18" />
+              <stop offset="1" stop-color="#ad3a51" />
+            </linearGradient>
+            <linearGradient id="wave-purple">
+              <stop stop-color="#a45181" stop-opacity=".4" />
+              <stop offset="1" stop-color="#52216c" />
+            </linearGradient>
+          </defs>
+          <path d="M-10 54 Q30 14 78 37 T195 20 L195 80 H-10Z" fill="#98436b" stroke="#cd693f" />
+          <path
+            d="M20 78 C63 64 91 42 117 23 S159 12 196 32 L196 78Z"
+            fill="url(#wave-orange)"
+            stroke="#ff9b20"
+          />
+          <path d="M-10 71 Q48 28 90 48 T196 62 L196 80 H-10Z" fill="url(#wave-purple)" />
+          <path d="M76 78 Q111 17 194 66 L194 80Z" fill="#532064" opacity=".55" />
+        </svg>
+      </div>
+      <div class="sidebar-version"><i data-icon="small-tag"></i>Versão 2.4.1</div>
+    </aside>
+    <main class="main" id="dashboard">
+      <header class="topbar">
+        <button
+          class="mobile-menu"
+          aria-label="Abrir menu"
+          aria-expanded="false"
+          aria-controls="sidebar"
+        >
+          <i data-icon="menu"></i>
+        </button>
+        <div class="greeting">
+          <i data-icon="sun"></i>
+          <div>
+            <strong>Olá, Ana!</strong
+            ><small>Aqui estão os principais dados do seu negócio hoje.</small>
+          </div>
+        </div>
+        <button class="top-control date-control" data-dialog="periodo">
+          <i data-icon="calendar"></i>01 de Mai 2024 – 31 de Mai 2024<i
+            data-icon="chevron"
+            class="chevron"
+          ></i>
+        </button>
+        <label class="top-control search"
+          ><i data-icon="search"></i
+          ><span class="sr-only">Buscar produtos, marcas ou relatórios</span
+          ><input id="search" type="search" placeholder="Buscar produtos, marcas ou relatórios..."
+        /></label>
+        <button class="notification" aria-label="Notificações: 3 novas" data-dialog="notificacoes">
+          <i data-icon="bell"></i><span>3</span>
+        </button>
+        <button class="profile" data-dialog="perfil" aria-label="Perfil de Ana Silva">
+          <img src="assets/avatar.png" alt="Ana Silva" /><span class="profile-text"
+            ><strong>Ana Silva</strong><small>Gerente Comercial</small></span
+          ><i data-icon="chevron"></i>
+        </button>
+      </header>
+      <section class="intro">
+        <div>
+          <h1>Dashboard Comercial</h1>
+          <p>Visão completa de vendas, promoções, concorrentes e performance do seu varejo.</p>
+        </div>
+        <blockquote>“Grandes decisões<br />nascem de grandes dados.”</blockquote>
+      </section>
+      <section class="metrics" aria-label="Indicadores comerciais">
+        <article class="card metric">
+          <div class="metric-icon"><i data-icon="bars"></i></div>
+          <div class="metric-copy">
+            <h2>Faturamento</h2>
+            <div class="metric-value">R$ 1.250.430</div>
+            <div class="change"><i data-icon="up"></i>12,5%</div>
+            <small>vs. período anterior</small>
+          </div>
+          <svg class="mini-chart" data-spark="purple" aria-label="Faturamento em alta"></svg>
+        </article>
+        <article class="card metric">
+          <div class="metric-icon orange"><i data-icon="pin"></i></div>
+          <div class="metric-copy">
+            <h2>Margem</h2>
+            <div class="metric-value">28,4%</div>
+            <div class="change"><i data-icon="up"></i>2,1 p.p.</div>
+            <small>vs. período anterior</small>
+          </div>
+          <svg class="mini-chart" data-spark="orange" aria-label="Margem em alta"></svg>
+        </article>
+        <article class="card metric">
+          <div class="metric-icon pink"><i data-icon="bag-alert"></i></div>
+          <div class="metric-copy">
+            <h2>Ruptura</h2>
+            <div class="metric-value">3,2%</div>
+            <div class="change"><i data-icon="down"></i>1,8 p.p.</div>
+            <small>vs. período anterior</small>
+          </div>
+          <svg class="mini-chart" data-spark="pink" aria-label="Variação da ruptura"></svg>
+        </article>
+        <article class="card metric">
+          <div class="metric-icon"><i data-icon="gift"></i></div>
+          <div class="metric-copy">
+            <h2>Itens em Oferta</h2>
+            <div class="metric-value">482</div>
+            <div class="change"><i data-icon="up"></i>15,6%</div>
+            <small>vs. período anterior</small>
+          </div>
+          <svg class="mini-chart" data-spark="purple" aria-label="Ofertas em alta"></svg>
+        </article>
+        <article class="card metric">
+          <div class="metric-icon orange"><i data-icon="people-fill"></i></div>
+          <div class="metric-copy">
+            <h2>Preço Médio do Concorrente</h2>
+            <div class="metric-value">R$ 12,40</div>
+            <div class="change negative"><i data-icon="up"></i>1,9%</div>
+            <small>vs. período anterior</small>
+          </div>
+          <svg class="mini-chart" data-spark="orange" aria-label="Preço médio em alta"></svg>
+        </article>
+      </section>
+      <section class="middle" aria-label="Análise de vendas">
+        <article class="card sales" id="vendas">
+          <div class="panel-header">
+            <span class="panel-icon"><i data-icon="analytics"></i></span>
+            <h2>Evolução de Vendas em Tempo Real</h2>
+            <span class="live">Atualizado agora</span
+            ><label class="select-wrap"
+              ><span class="sr-only">Período do gráfico de vendas</span
+              ><select id="sales-period">
+                <option value="30">Últimos 30 dias</option>
+                <option value="15">Últimos 15 dias</option>
+                <option value="7">Últimos 7 dias</option>
+              </select></label
+            >
+          </div>
+          <div class="sales-value">
+            <strong id="sales-total">R$ 125.430</strong><span class="today">↑ 8,2% hoje</span>
+          </div>
+          <div class="chart-legend">
+            <span><i></i>Vendas</span><span><i class="pale"></i>Vendas (período anterior)</span>
+          </div>
+          <svg
+            id="sales-chart"
+            class="sales-chart"
+            viewBox="0 0 617 177"
+            role="img"
+            aria-label="Evolução de vendas em maio, comparada ao período anterior"
+          ></svg>
+        </article>
+        <article class="card goal">
+          <div class="panel-header">
+            <span class="panel-icon coral"><i data-icon="target"></i></span>
+            <h2>Meta de Vendas</h2>
+            <button class="link-button" data-dialog="meta">
+              Ver detalhes<i data-icon="right"></i>
+            </button>
+          </div>
+          <div class="gauge">
+            <svg viewBox="0 0 228 171" role="img" aria-label="78% da meta de vendas alcançada">
+              <defs>
+                <linearGradient id="gauge-gradient" x1="0" y1="1" x2="1" y2="0">
+                  <stop stop-color="#ff5105" />
+                  <stop offset="1" stop-color="#ff8516" />
+                </linearGradient>
+              </defs>
+              <path
+                d="M42 138 A84 84 0 1 1 194 124"
+                fill="none"
+                stroke="#e7e1ff"
+                stroke-width="16"
+                stroke-linecap="round"
+              />
+              <path
+                d="M42 138 A84 84 0 0 1 168 31"
+                fill="none"
+                stroke="url(#gauge-gradient)"
+                stroke-width="16"
+                stroke-linecap="round"
+              />
+            </svg>
+            <div class="gauge-copy">
+              <strong>78%</strong><b>R$ 1.250.430</b><span>de R$ 1.600.000</span>
+            </div>
+          </div>
+          <div class="goal-message">
+            <i data-icon="trophy"></i>Falta apenas 22% para atingir a meta!
+          </div>
+        </article>
+        <article class="card performance">
+          <div class="panel-header">
+            <span class="panel-icon"><i data-icon="bars"></i></span>
+            <h2>Desempenho das Promoções</h2>
+            <label class="select-wrap"
+              ><span class="sr-only">Métrica das promoções</span
+              ><select id="promotion-metric">
+                <option value="revenue">Por faturamento</option>
+                <option value="volume">Por volume</option>
+              </select></label
+            >
+          </div>
+          <div class="chart-legend">
+            <span><i></i>Com promoção</span><span><i class="pale"></i>Sem promoção</span>
+          </div>
+          <svg
+            id="bars-chart"
+            class="bars-chart"
+            viewBox="0 0 450 196"
+            role="img"
+            aria-label="Comparação de faturamento por categoria, com e sem promoção"
+          ></svg>
+        </article>
+      </section>
+      <section class="bottom" aria-label="Detalhes comerciais">
+        <article class="card prices" id="concorrentes">
+          <div class="panel-header">
+            <span class="panel-icon"><i data-icon="scale"></i></span>
+            <h2>Comparativo de Preços – Concorrentes</h2>
+            <button class="outline-button" data-dialog="precos">Ver todos</button>
+          </div>
+          <table class="prices-table">
+            <thead>
+              <tr>
+                <th>Produto</th>
+                <th>Sua Loja</th>
+                <th>Conc. A</th>
+                <th>Conc. B</th>
+                <th>Conc. C</th>
+                <th>Diferença</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="price-rows"></tbody>
+          </table>
+          <p class="empty-result" id="empty-result">Nenhum produto encontrado.</p>
+        </article>
+        <article class="card promotions" id="promocoes">
+          <div class="panel-header">
+            <span class="panel-icon orange"><i data-icon="bolt"></i></span>
+            <h2>Promoções em Tempo Real</h2>
+            <button class="outline-button" data-dialog="promocoes">Ver todas</button>
+          </div>
+          <table class="promotions-table">
+            <thead>
+              <tr>
+                <th>Promoção</th>
+                <th>Desempenho</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="promotion-rows"></tbody>
+          </table>
+        </article>
+        <article class="card insights">
+          <div class="panel-header">
+            <span class="panel-icon orange"><i data-icon="bulb"></i></span>
+            <h2>Insights Comerciais</h2>
+          </div>
+          <div class="tabs" role="tablist" aria-label="Categoria dos insights">
+            <button
+              role="tab"
+              aria-selected="true"
+              aria-controls="insight-list"
+              id="tab-geral"
+              data-tab="geral"
+            >
+              Geral</button
+            ><button
+              role="tab"
+              aria-selected="false"
+              aria-controls="insight-list"
+              id="tab-oportunidades"
+              data-tab="oportunidades"
+              tabindex="-1"
+            >
+              Oportunidades</button
+            ><button
+              role="tab"
+              aria-selected="false"
+              aria-controls="insight-list"
+              id="tab-riscos"
+              data-tab="riscos"
+              tabindex="-1"
+            >
+              Riscos
+            </button>
+          </div>
+          <div
+            class="insight-list"
+            id="insight-list"
+            role="tabpanel"
+            aria-labelledby="tab-geral"
+          ></div>
+        </article>
+      </section>
+      <footer class="footer">
+        <div class="next-step">
+          <div class="next-step-symbol">✦</div>
+          <div>
+            <strong>Seu próximo passo: aumentar a cobertura das ofertas de hortifruti.</strong>
+            <p>
+              Com base nos dados de hoje, você pode aumentar em até 18% o volume de vendas nessa
+              categoria.
+            </p>
+          </div>
+          <button data-dialog="sugestao">Ver sugestão<i data-icon="right"></i></button>
+        </div>
+        <div class="card month-goal">
+          <span class="panel-icon"><i data-icon="target"></i></span>
+          <div class="month-copy">Meta do mês<strong>R$ 2.500.000,00</strong></div>
+          <div
+            class="progress"
+            role="progressbar"
+            aria-label="Progresso da meta do mês"
+            aria-valuenow="68"
+            aria-valuemin="0"
+            aria-valuemax="100"
+          >
+            <span></span>
+          </div>
+          <b>68%</b>
+        </div>
+      </footer>
+    </main>
+    <dialog id="details-dialog">
+      <button class="close-dialog" aria-label="Fechar detalhes">×</button>
+      <h2 id="dialog-title"></h2>
+      <div id="dialog-content"></div>
+      <p class="dialog-note">Prévia visual com os dados de exemplo da referência.</p>
+    </dialog>
+    <script>
+      // Protótipo independente: dados demonstrativos, sem conexão com serviços ou com o CRM.
+      const icons = {
+        home: '<path d="m3 11 9-8 9 8h-3v10h-4v-7h-4v7H6V11Z"/>',
+        sales:
+          '<rect x="3" y="6" width="17" height="15" rx="2"/><path d="M7 3v6m9-6v6M7 17v-4m4 4v-7m5 7v-6m-9-1 4-3 3 1 6-6"/>',
+        tag: '<path d="M3 3h8l10 10-8 8L3 11Z"/><circle cx="7.5" cy="7.5" r="1"/>',
+        "small-tag": '<path d="m3 10 7-7 10 10-7 7Z"/><circle cx="9" cy="9" r="1"/>',
+        users:
+          '<circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M17 4a3 3 0 0 1 0 6m2 5a5 5 0 0 1 2 6M7 16l2 3 2-3"/>',
+        percent:
+          '<path d="M4 21 20 3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/>',
+        box: '<path d="m3 7 9-5 9 5v11l-9 5-9-5Zm0 0 9 5 9-5M12 12v11"/>',
+        file: '<path d="M14 2H5v20h14V7Zm0 0v6h5M8 12h7m-7 4h7"/>',
+        settings:
+          '<path d="m9 3 .6-2h4.8l.6 2 2 .8 2-.5 2.4 4.1-1.4 1.5.3 2.2 1.7 1.4-2.4 4.2-2-.5-1.8 1.3-.4 2.2h-4.8L8 19l-2-1-2 .5-2.4-4.1L3 13l-.1-2.2L1.2 9.4l2.4-4.2 2 .5Z" transform="translate(1 1) scale(.9)"/><circle cx="12" cy="11" r="3.5"/>',
+        calendar:
+          '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M7 2v5m10-5v5M3 10h18m-13 4h2v3H8Zm6 0h2"/>',
+        chevron: '<path d="m7 10 5 5 5-5"/>',
+        search: '<circle cx="10.5" cy="10.5" r="7.5"/><path d="m16 16 5 5"/>',
+        bell: '<path d="M4 17h16l-2-4V9a6 6 0 0 0-12 0v4Zm6 3a2 2 0 0 0 4 0M12 1v2"/>',
+        sun: '<circle cx="12" cy="12" r="5"/><path d="M12 1v2m0 18v2M1 12h2m18 0h2M4 4l1.5 1.5m13 13L20 20M4 20l1.5-1.5m13-13L20 4"/>',
+        bars: '<rect x="3" y="13" width="4" height="8" rx="1" fill="currentColor" stroke="none"/><rect x="10" y="8" width="4" height="13" rx="1" fill="currentColor" stroke="none"/><rect x="17" y="2" width="4" height="19" rx="1" fill="currentColor" stroke="none"/>',
+        pin: '<path d="M12 23v-4a9 9 0 1 0-1 0" fill="currentColor" stroke="none"/><circle cx="12" cy="10" r="5" stroke="white"/><circle cx="12" cy="10" r="2" stroke="white"/>',
+        "bag-alert":
+          '<path d="M6 5h12l3 14a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3Z"/><path d="M9 7V4a3 3 0 0 1 6 0v3m-3 2-3 8h6Zm0 3v2"/>',
+        gift: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v10h14V12M12 8v14m0-14C1 9 5-4 12 8Zm0 0C23 9 19-4 12 8Z"/>',
+        "people-fill":
+          '<g fill="currentColor" stroke="none"><circle cx="8" cy="7" r="4"/><circle cx="17" cy="7" r="4"/><path d="M1 20c0-12 13-12 13 0-3 2-10 2-13 0m14 0c0-5-1-7-3-9 8-3 11 4 11 9-2 2-5 2-8 0"/></g>',
+        up: '<path d="M12 20V4m-6 6 6-6 6 6"/>',
+        down: '<path d="M12 4v16m-6-6 6 6 6-6"/>',
+        right: '<path d="M4 12h16m-5-5 5 5-5 5"/>',
+        analytics:
+          '<path d="M6 5 3 8m14-5 4 4M5 19l-2-2m14 4 4-4M8 3l-2 1M3 12v2m10 7h-3"/><path d="m5 18 5-7 4 3 4-8" stroke-width="2.5"/><path d="M15 6h3v3"/>',
+        target:
+          '<circle cx="11" cy="13" r="8"/><circle cx="11" cy="13" r="4"/><path d="m11 13 9-10m-1-2v5h4"/>',
+        trophy:
+          '<path d="M7 3h10v7a5 5 0 0 1-10 0Zm0 2H3v3a4 4 0 0 0 5 4m9-7h4v3a4 4 0 0 1-5 4M12 15v6m-5 1h10"/>',
+        scale:
+          '<path d="M12 2v20m-5 0h10M4 6h16M6 6l-4 8h8Zm12 0-4 8h8ZM2 14q4 5 8 0m4 0q4 5 8 0"/><circle cx="12" cy="5" r="2"/>',
+        bolt: '<path d="M13 1 5 13h6l-1 10 9-14h-7Z" fill="currentColor" stroke="none"/>',
+        bulb: '<path d="M8 15a7 7 0 1 1 8 0l-1 3H9Zm1 6h6m-5 2h4m-2-11V7m-2 3h4"/>',
+        "up-fill": '<path d="m12 3-9 9h5v9h8v-9h5Z" stroke="none"/>',
+        bag: '<path d="M4 7h16l-1 14H5Z"/><path d="M8 8V5a4 4 0 0 1 8 0v3m-8 3 4 3 4-3" stroke="white" fill="none"/>',
+        menu: '<path d="M3 6h18M3 12h18M3 18h18"/>',
+      };
+      const icon = (name) =>
+        `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${icons[name] || icons.bars}</svg>`;
+      function renderIcons(root = document) {
+        root.querySelectorAll("[data-icon]").forEach((el) => {
+          const wrapper = document.createElement("span");
+          wrapper.innerHTML = icon(el.dataset.icon);
+          const svg = wrapper.firstElementChild;
+          if (el.className) svg.classList.add(...el.className.split(" "));
+          el.replaceWith(svg);
+        });
+      }
+      renderIcons();
+      document.querySelectorAll("[data-spark]").forEach((el, i) => {
+        const color = { purple: "#773aff", orange: "#ff9000", pink: "#ff5182" }[el.dataset.spark];
+        const points =
+          el.dataset.spark === "pink"
+            ? "1,34 9,31 16,29 23,24 32,25 39,28 49,23 59,25 68,20 77,15"
+            : el.dataset.spark === "orange"
+              ? "1,33 12,30 22,22 34,24 42,18 54,16 65,16 72,11 78,2"
+              : "1,36 14,32 22,23 34,27 43,20 55,20 62,17 68,10 77,14";
+        el.setAttribute("viewBox", "0 0 80 45");
+        el.innerHTML = `<defs><linearGradient id="spark-${i}" x1="0" y1="0" x2="0" y2="1"><stop stop-color="${color}" stop-opacity=".16"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs><polygon points="${points} 78,45 1,45" fill="url(#spark-${i})"/><polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.1"/>`;
+      });
+      const sales = [
+        54, 65, 70, 61, 83, 100, 91, 96, 90, 113, 111, 117, 126, 113, 109, 114, 122, 121, 130, 140,
+        141, 158, 160, 162, 165, 190, 197, 216,
+      ];
+      const previous = [
+        30, 37, 39, 45, 62, 50, 51, 49, 62, 59, 59, 70, 74, 70, 62, 71, 82, 91, 79, 73, 91, 103, 93,
+        108, 148, 137, 153, 162,
+      ];
+      function drawSales(days = 30) {
+        const chart = document.getElementById("sales-chart");
+        const values = sales.slice(days === 30 ? 0 : -days);
+        const prior = previous.slice(days === 30 ? 0 : -days);
+        const x = (i) => 66 + (i * 524) / (values.length - 1);
+        const y = (n) => 139 - (n / 250) * 136;
+        const path = values.map((v, i) => `${i ? "L" : "M"}${x(i)},${y(v)}`).join(" ");
+        const priorPath = prior.map((v, i) => `${i ? "L" : "M"}${x(i)},${y(v)}`).join(" ");
+        const marks =
+          days === 30
+            ? ["1 Mai", "5 Mai", "10 Mai", "15 Mai", "20 Mai", "25 Mai", "31 Mai"]
+            : days === 15
+              ? ["17 Mai", "19 Mai", "21 Mai", "24 Mai", "26 Mai", "28 Mai", "31 Mai"]
+              : ["25 Mai", "26 Mai", "27 Mai", "28 Mai", "29 Mai", "30 Mai", "31 Mai"];
+        chart.innerHTML = `<defs><linearGradient id="sales-area" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#7940f6" stop-opacity=".17"/><stop offset="1" stop-color="#a477ff" stop-opacity=".025"/></linearGradient></defs>${[0, 50, 100, 150, 200, 250].map((v) => `<line class="chart-grid" x1="65" x2="590" y1="${y(v)}" y2="${y(v)}"/><text class="chart-text" x="54" y="${y(v) + 3}" text-anchor="end">${v ? v + " mil" : "0"}</text>`).join("")}${marks.map((t, i) => `<line class="chart-grid" x1="${66 + (i * 524) / 6}" x2="${66 + (i * 524) / 6}" y1="3" y2="139"/><text class="chart-text" x="${66 + (i * 524) / 6}" y="159" text-anchor="${i === 6 ? "end" : i === 0 ? "start" : "middle"}" style="font-size:9px">${t}</text>`).join("")}<path d="${path} L590,139 L66,139 Z" fill="url(#sales-area)"/><path d="${priorPath}" fill="none" stroke="#c5adff" stroke-width="1.2"/>${prior.map((v, i) => `<circle cx="${x(i)}" cy="${y(v)}" r="2" fill="#c5adff"/>`).join("")}<path d="${path}" fill="none" stroke="#7124ff" stroke-width="1.65"/>${values.map((v, i) => `<circle cx="${x(i)}" cy="${y(v)}" r="2.2" fill="#7124ff"/>`).join("")}<line x1="65" x2="590" y1="139" y2="139" stroke="#e4ddff"/>${days === 30 ? '<circle cx="395.9" cy="72.6" r="3.5" fill="white" stroke="#792dff" stroke-width="2.3"/><g class="chart-tooltip"><rect x="395" y="0" width="88" height="58" rx="7" fill="white"/><text class="chart-text" x="405" y="17" style="font-size:9px">20 de Mai</text><text x="405" y="34" fill="#1a0c64" font-size="11" font-weight="600">R$ 182.400</text><text x="405" y="49" fill="#00b76a" font-size="10">↑ 14,3%</text></g>' : ""}`;
+      }
+      drawSales();
+      const categories = ["Alimentos", "Bebidas", "Higiene", "Limpeza", "Beleza", "Perecíveis"];
+      function drawBars(volume = false) {
+        const chart = document.getElementById("bars-chart");
+        const withPromo = volume ? [350, 290, 190, 250, 360, 280] : [350, 275, 172, 224, 320, 256];
+        const without = [275, 190, 120, 190, 245, 185];
+        chart.innerHTML = `<defs><linearGradient id="bar-main" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#9962ed"/><stop offset="1" stop-color="#681ed5"/></linearGradient><linearGradient id="bar-pale" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#d8c9ff"/><stop offset="1" stop-color="#d5c8f7"/></linearGradient></defs>${[0, 100, 200, 300, 400].map((n) => `<line class="chart-grid" x1="63" x2="434" y1="${157 - n * 0.36}" y2="${157 - n * 0.36}"/><text class="chart-text" x="53" y="${161 - n * 0.36}" text-anchor="end">${n ? n + (volume ? " un." : " mil") : "0"}</text>`).join("")}${categories.map((c, i) => `<line class="chart-grid" x1="${63 + i * 62}" x2="${63 + i * 62}" y1="13" y2="157"/><g class="chart-bar" tabindex="0" role="button" aria-label="${c}: ${withPromo[i]} ${volume ? "unidades" : "mil reais"} com promoção" data-category="${i}"><rect x="${76 + i * 62}" y="${157 - withPromo[i] * 0.36}" width="18" height="${withPromo[i] * 0.36}" rx="3" fill="url(#bar-main)"/><rect x="${94 + i * 62}" y="${157 - without[i] * 0.36}" width="18" height="${without[i] * 0.36}" rx="3" fill="url(#bar-pale)"/><text class="chart-text" x="${94 + i * 62}" y="176" text-anchor="middle" style="font-size:9px">${c}</text></g>`).join("")}<line x1="63" x2="434" y1="157" y2="157" stroke="#dfd7fb"/><g class="chart-tooltip" id="bar-tooltip"><rect x="268" y="-29" width="165" height="70" rx="9" fill="white" stroke="#efebff"/><text id="bar-label" x="279" y="-9" font-size="10" fill="#1b0d62" font-weight="600">Beleza</text><circle cx="283" cy="8" r="4" fill="#a071ff"/><text class="chart-text" x="292" y="11" style="font-size:9px">Com promoção</text><text id="bar-value" x="422" y="11" font-size="9" fill="#46328b" text-anchor="end">${volume ? "360 un." : "R$ 320 mil"}</text><circle cx="283" cy="25" r="4" fill="#d9cbff"/><text class="chart-text" x="292" y="28" style="font-size:9px">Sem promoção</text><text id="bar-previous" x="422" y="28" font-size="9" fill="#46328b" text-anchor="end">${volume ? "245 un." : "R$ 180 mil"}</text></g>`;
+        chart.querySelectorAll("[data-category]").forEach((el) => {
+          const show = () => {
+            const i = Number(el.dataset.category);
+            document.getElementById("bar-label").textContent = categories[i];
+            document.getElementById("bar-value").textContent = volume
+              ? `${withPromo[i]} un.`
+              : `R$ ${withPromo[i]} mil`;
+            document.getElementById("bar-previous").textContent = volume
+              ? `${without[i]} un.`
+              : `R$ ${i === 4 ? 180 : without[i]} mil`;
+          };
+          el.addEventListener("pointerenter", show);
+          el.addEventListener("focus", show);
+          el.addEventListener("click", show);
+          el.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              show();
+            }
+          });
+        });
+      }
+      drawBars();
+      const products = [
+        ["cafe", "Café 500g", "18,90", "19,50", "18,40", "20,10", "2,7", false],
+        ["leite", "Leite 1L", "4,29", "4,49", "4,19", "4,69", "2,4", true],
+        ["oleo", "Óleo de Soja 900ml", "7,89", "7,99", "7,49", "8,29", "5,3", false],
+        ["detergente", "Detergente 500ml", "2,19", "2,39", "2,09", "2,49", "4,8", true],
+        ["papel", "Papel Higiênico<br>12 un", "16,90", "17,50", "16,20", "18,10", "4,1", false],
+      ];
+      function drawProducts(query = "") {
+        const normalized = query
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase();
+        const filtered = products.filter((p) =>
+          p[1]
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .includes(normalized),
+        );
+        document.getElementById("price-rows").innerHTML = filtered
+          .map(
+            (p) =>
+              `<tr><td><div class="product-cell"><img src="assets/${p[0]}.png" alt=""><span>${p[1]}</span></div></td>${p
+                .slice(2, 6)
+                .map((v) => `<td>R$ ${v}</td>`)
+                .join(
+                  "",
+                )}<td class="difference">+ ${p[6]}%</td><td><span class="badge ${p[7] ? "attention" : ""}">${p[7] ? '<span class="badge-dot">♦</span>Atenção' : "Competitivo"}</span></td></tr>`,
+          )
+          .join("");
+        document.getElementById("empty-result").style.display = filtered.length ? "none" : "block";
+      }
+      drawProducts();
+      const promotions = [
+        ["leite", "Leite Italac 1L", "20% de desconto", 35, "Ativa"],
+        ["cafe-promocao", "Café Pilão 500g", "Leve 3 Pague 2", -12, "Atenção"],
+        ["detergente", "Detergente Ypê", "15% de desconto", 28, "Ativa"],
+        ["sabao", "Sabão Omo 1kg", "Preço especial", 62, "Ativa"],
+        ["fralda", "Fralda Pampers", "30% de desconto", -8, "Baixo"],
+      ];
+      document.getElementById("promotion-rows").innerHTML = promotions
+        .map(
+          (p, i) =>
+            `<tr><td><div class="promotion-product"><img src="assets/${p[0]}.png" alt=""><span>${p[1]}<small>${p[2]}</small></span></div></td><td><div class="trend ${p[3] < 0 ? "down" : ""}"><svg viewBox="0 0 65 26" aria-hidden="true"><defs><linearGradient id="trend-${i}" x1="0" y1="0" x2="0" y2="1"><stop stop-color="${p[3] < 0 ? "#ff375b" : "#00b86a"}" stop-opacity=".12"/><stop offset="1" stop-color="white" stop-opacity="0"/></linearGradient></defs><path d="${p[3] === -8 ? "M1 6 8 11 14 6 22 15 29 12 36 16 43 12 50 22 58 18 64 22" : "M1 23 8 18 15 21 22 14 29 17 36 15 43 5 50 10 57 7 64 10"} V26 H1Z" fill="url(#trend-${i})"/><path d="${p[3] === -8 ? "M1 6 8 11 14 6 22 15 29 12 36 16 43 12 50 22 58 18 64 22" : "M1 23 8 18 15 21 22 14 29 17 36 15 43 5 50 10 57 7 64 3"}" fill="none" stroke="currentColor" stroke-width="1.1"/></svg><span>${p[3] > 0 ? "+ " : "- "}${Math.abs(p[3])}%</span></div></td><td><span class="badge ${p[4] === "Atenção" ? "attention" : p[4] === "Baixo" ? "low" : ""}"><span class="badge-dot">♦</span>${p[4]}</span></td></tr>`,
+        )
+        .join("");
+      const insights = {
+        geral: [
+          [
+            "up-fill",
+            "",
+            "Vendas em alta",
+            "Seu faturamento cresceu 12,5%<br>no comparativo com o período anterior.",
+          ],
+          [
+            "tag",
+            "purple",
+            "Promoções mais efetivas",
+            "Produtos da categoria Beleza apresentaram<br>32% mais conversão em promoção.",
+          ],
+          [
+            "trophy",
+            "amber",
+            "Oportunidade de preço",
+            "Você pode ser mais competitivo em 12 produtos<br>em relação ao Concorrente B.",
+          ],
+          ["bag", "blue", "Ruptura em queda", "A taxa de ruptura caiu 1,8 p.p. este mês."],
+        ],
+        oportunidades: [
+          [
+            "trophy",
+            "amber",
+            "Oportunidade de preço",
+            "Revise os preços de 12 produtos em relação ao Concorrente B.",
+          ],
+          [
+            "tag",
+            "purple",
+            "Amplie as ofertas de hortifruti",
+            "Potencial de aumento de até 18% no volume da categoria.",
+          ],
+          [
+            "up-fill",
+            "",
+            "Beleza em destaque",
+            "A categoria apresenta 32% mais conversão em promoção.",
+          ],
+        ],
+        riscos: [
+          [
+            "bag",
+            "blue",
+            "Acompanhe a ruptura",
+            "3,2% dos itens estão em ruptura. Priorize a reposição.",
+          ],
+          [
+            "tag",
+            "purple",
+            "Promoção com baixo desempenho",
+            "Fralda Pampers apresenta queda de 8% no desempenho.",
+          ],
+          [
+            "trophy",
+            "amber",
+            "Atenção ao preço",
+            "Leite 1L e Detergente 500ml precisam de revisão.",
+          ],
+        ],
+      };
+      function drawInsights(tab) {
+        const list = document.getElementById("insight-list");
+        list.setAttribute("aria-labelledby", `tab-${tab}`);
+        list.innerHTML = insights[tab]
+          .map(
+            (item) =>
+              `<div class="insight"><span class="insight-symbol ${item[1]}">${icon(item[0])}</span><div class="insight-copy"><h3>${item[2]}</h3><p>${item[3]}</p></div></div>`,
+          )
+          .join("");
+      }
+      drawInsights("geral");
+      document.querySelectorAll("[data-tab]").forEach((button) => {
+        button.addEventListener("click", () => {
+          document.querySelectorAll("[data-tab]").forEach((b) => {
+            b.setAttribute("aria-selected", String(b === button));
+            b.tabIndex = b === button ? 0 : -1;
+          });
+          drawInsights(button.dataset.tab);
+        });
+        button.addEventListener("keydown", (e) => {
+          const tabs = [...document.querySelectorAll("[data-tab]")];
+          if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
+            e.preventDefault();
+            const index =
+              e.key === "Home"
+                ? 0
+                : e.key === "End"
+                  ? tabs.length - 1
+                  : (tabs.indexOf(button) + (e.key === "ArrowRight" ? 1 : -1) + tabs.length) %
+                    tabs.length;
+            tabs[index].click();
+            tabs[index].focus();
+          }
+        });
+      });
+      document
+        .getElementById("search")
+        .addEventListener("input", (e) => drawProducts(e.target.value));
+      document.getElementById("sales-period").addEventListener("change", (e) => {
+        const days = Number(e.target.value);
+        drawSales(days);
+        document.getElementById("sales-total").textContent =
+          days === 30 ? "R$ 125.430" : days === 15 ? "R$ 71.840" : "R$ 38.250";
+      });
+      document
+        .getElementById("promotion-metric")
+        .addEventListener("change", (e) => drawBars(e.target.value === "volume"));
+      const dialogs = {
+        periodo: [
+          "Período do dashboard",
+          "<p>01 de maio de 2024 a 31 de maio de 2024.</p><p>Use o seletor “Últimos 30 dias” no gráfico para explorar períodos desta demonstração.</p>",
+        ],
+        notificacoes: [
+          "Notificações",
+          '<div class="dialog-data">Vendas cresceram 12,5% no período.<br>12 produtos têm oportunidade de ajuste de preço.<br>A promoção de Fralda Pampers precisa de atenção.</div>',
+        ],
+        perfil: [
+          "Ana Silva",
+          "<p>Gerente Comercial</p><p>Perfil demonstrativo do Dashboard Comercial Nebo.</p>",
+        ],
+        meta: [
+          "Meta de Vendas",
+          '<div class="dialog-data">Realizado: <strong>R$ 1.250.430</strong><br>Meta: <strong>R$ 1.600.000</strong><br>Faltam: <strong>R$ 349.570</strong><br>Progresso: <strong>78%</strong></div>',
+        ],
+        precos: [
+          "Comparativo de preços",
+          '<p>Os cinco produtos da referência estão disponíveis na tabela. Use a busca no topo para localizar um produto.</p><div class="dialog-data">Melhor referência: Concorrente B<br>Itens que merecem atenção: Leite 1L e Detergente 500ml</div>',
+        ],
+        promocoes: [
+          "Promoções em Tempo Real",
+          '<div class="dialog-data">Leite Italac 1L: +35%<br>Café Pilão 500g: −12%<br>Detergente Ypê: +28%<br>Sabão Omo 1kg: +62%<br>Fralda Pampers: −8%</div>',
+        ],
+        sugestao: [
+          "Mais oportunidades em hortifruti",
+          '<p>Aumente a cobertura das ofertas da categoria e acompanhe o resultado no comparativo de desempenho.</p><div class="dialog-data">1. Selecione os itens com estoque disponível.<br>2. Revise o preço frente aos concorrentes.<br>3. Prepare as ofertas de hortifruti.<br>4. Compare o volume de vendas no período seguinte.</div><p>Potencial ilustrativo da referência: até 18% de aumento no volume.</p>',
+        ],
+        ofertas: [
+          "Itens em Oferta",
+          '<div class="dialog-data">482 itens em oferta<br>Crescimento de 15,6% sobre o período anterior.</div>',
+        ],
+        estoque: [
+          "Estoque e ruptura",
+          '<div class="dialog-data">Ruptura atual: 3,2%<br>Redução de 1,8 p.p. sobre o período anterior.</div>',
+        ],
+        relatorios: [
+          "Relatórios comerciais",
+          "<p>Esta tela reproduz o relatório visual de maio de 2024. Os gráficos e tabelas exibem os valores demonstrativos da imagem.</p>",
+        ],
+        configuracoes: [
+          "Configurações",
+          "<p>Dashboard visual da marca Nebo, com período de referência em maio de 2024.</p><p>Os dados podem ser editados no código deste HTML.</p>",
+        ],
+      };
+      function openDialog(key) {
+        const data = dialogs[key];
+        if (!data) return;
+        document.getElementById("dialog-title").textContent = data[0];
+        document.getElementById("dialog-content").innerHTML = data[1];
+        document.getElementById("details-dialog").showModal();
+      }
+      document
+        .querySelectorAll("[data-dialog]")
+        .forEach((b) => b.addEventListener("click", () => openDialog(b.dataset.dialog)));
+      const dialog = document.getElementById("details-dialog");
+      dialog.querySelector(".close-dialog").addEventListener("click", () => dialog.close());
+      dialog.addEventListener("click", (e) => {
+        if (e.target === dialog) {
+          const r = dialog.getBoundingClientRect();
+          if (
+            e.clientX < r.left ||
+            e.clientX > r.right ||
+            e.clientY < r.top ||
+            e.clientY > r.bottom
+          )
+            dialog.close();
+        }
+      });
+      function closeMenu() {
+        document.getElementById("sidebar").classList.remove("open");
+        document.getElementById("mobile-overlay").classList.remove("visible");
+        document.querySelector(".mobile-menu").setAttribute("aria-expanded", "false");
+      }
+      document.querySelector(".mobile-menu").addEventListener("click", () => {
+        const opened = document.getElementById("sidebar").classList.toggle("open");
+        document.getElementById("mobile-overlay").classList.toggle("visible", opened);
+        document.querySelector(".mobile-menu").setAttribute("aria-expanded", String(opened));
+      });
+      document.getElementById("mobile-overlay").addEventListener("click", closeMenu);
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeMenu();
+      });
+      document.querySelectorAll(".nav a").forEach((a) =>
+        a.addEventListener("click", (e) => {
+          const name = a.getAttribute("href").slice(1);
+          closeMenu();
+          if (["ofertas", "estoque", "relatorios", "configuracoes"].includes(name)) {
+            e.preventDefault();
+            openDialog(name);
+          } else {
+            document.querySelectorAll(".nav a").forEach((el) => {
+              el.classList.toggle("active", el === a);
+              if (el === a) el.setAttribute("aria-current", "location");
+              else el.removeAttribute("aria-current");
+            });
+          }
+        }),
+      );
+    </script>
+  </body>
+</html>

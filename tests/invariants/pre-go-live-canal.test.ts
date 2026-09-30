@@ -51,9 +51,14 @@ describe("pré-go-live no banco que o self-host instala", () => {
       has_function_privilege('service_role','fn_configurar_pre_go_live_canal(uuid,uuid,text,text[])','execute') as servidor`);
     expect(rows[0]).toEqual({ anon: false, membro: false, servidor: true });
   });
+  it("grava o @ do perfil ao lado do telefone (Instagram e Messenger, migration 0282)", async () => {
+    expect((await configurar("pre_go_live", [telefone, "@minha.loja_1"])).rows[0].n).toBe(1);
+    const { rows } = await pool.query("select metadata from channel_sessions where id=$1", [canal]);
+    expect(rows[0].metadata.ai_test_phone_numbers).toEqual([telefone, "@minha.loja_1"]);
+  });
   it("recusa entradas nulas ou inválidas sem abrir o canal", async () => {
     await configurar("pre_go_live", []);
-    for (const [modo, numeros] of [[null, []], ["invalido", []], ["open", null], ["open", [null]], ["open", ["telefone"]]] as const) {
+    for (const [modo, numeros] of [[null, []], ["invalido", []], ["open", null], ["open", [null]], ["open", ["telefone"]], ["open", ["@Maiuscula"]], ["open", ["@"]]] as const) {
       await expect(configurar(modo, numeros === null ? null : [...numeros])).rejects.toMatchObject({ code: "22023" });
     }
     expect((await decidir())?.permite).toBe(false);

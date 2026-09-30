@@ -114,7 +114,7 @@ export function NovaConexaoDialog({
           <div className="flex flex-col gap-5">
             <Grupo titulo="WhatsApp">
               <Opcao
-                icone={<QrCode size={20} aria-hidden />}
+                icone={<IconeDaPlataforma plataforma="whatsapp" className="size-5" titulo={false} />}
                 nome={t("WhatsApp por QR code")}
                 descricao={t("Escaneie com o celular do número. Rápido, sem aprovação da Meta.")}
                 indisponivel={!wahaConfigured ? t("O serviço de WhatsApp por QR não está configurado nesta instalação.") : null}
@@ -124,14 +124,14 @@ export function NovaConexaoDialog({
                 }}
               />
               <Opcao
-                icone={<ShieldCheck size={20} aria-hidden />}
+                icone={<IconeDaPlataforma plataforma="whatsapp" className="size-5" titulo={false} />}
                 nome={t("WhatsApp API oficial (Meta)")}
                 descricao={t("Número oficial da sua conta na Meta, com modelos aprovados.")}
                 onClick={() => setPainel("oficial")}
               />
               <Opcao
                 icone={<IconeDaPlataforma plataforma="whatsapp" className="size-5" titulo={false} />}
-                nome={`WhatsApp · ${PARTNER_CHANNEL_LABEL}`}
+                nome={`WhatsApp Parceiro`}
                 descricao={t("Número oficial conectado pelo provedor parceiro.")}
                 onClick={() => setPainel("parceiro")}
               />
@@ -148,11 +148,11 @@ export function NovaConexaoDialog({
                       <IconeDaPlataforma plataforma={rede} className="size-5" titulo={false} />
                     )
                   }
-                  nome={rede === "instagram" ? t("Instagram Direct") : t("Facebook Messenger")}
+                  nome={rede === "instagram" ? t("Instagram") : t("Facebook")}
                   descricao={
                     rede === "instagram"
-                      ? t("Mensagens diretas de uma conta profissional do Instagram.")
-                      : t("Mensagens da página do Facebook.")
+                      ? t("Conecte uma conta profissional do Instagram.")
+                      : t("Conecte uma página do Facebook.")
                   }
                   indisponivel={
                     social.isLoading

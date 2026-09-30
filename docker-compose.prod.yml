@@ -119,7 +119,10 @@ services:
     # O teto não impede o pico legítimo; impede que UM serviço leve a máquina
     # inteira. Estourá-lo mata só quem estourou, e o `restart: unless-stopped`
     # o traz de volta — falha isolada em vez de queda geral.
-    mem_limit: 1280m
+    #
+    # WAHA_MEM_LIMIT no .env sobe o teto sem editar este arquivo. Na VPS Nebo
+    # (3,8 GB) é 2g: em 2026-09-29 o WAHA estava em 1,22 GiB de 1,25 (97%).
+    mem_limit: ${WAHA_MEM_LIMIT:-1280m}
     # Core grátis por padrão; troque para devlikeapro/waha-plus via WAHA_IMAGE se
     # precisar de multi-número/retry/S3 (licença paga).
     #

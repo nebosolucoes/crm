@@ -24,8 +24,8 @@ export function ChannelRoutingForm({ initial }: { initial: ChannelRoutingSetting
     } catch { setFeedback(t("Não foi possível salvar. Tente novamente.")); } finally { setBusy(null); }
   }
   return <section className="space-y-4" aria-labelledby="channel-routing-title">
-    <h2 id="channel-routing-title" className="text-lg font-semibold">{t("Responsáveis por número")}</h2>
-    <p className="text-sm text-muted-foreground">{t("A capacidade e o horário de cada pessoa valem para todos os números. A distribuição automática respeita os responsáveis de cada canal.")}</p>
+    <h2 id="channel-routing-title" className="text-lg font-semibold">{t("Responsáveis por Conexão")}</h2>
+    <p className="text-sm text-muted-foreground">{t("A capacidade e o horário de cada pessoa valem para todos as conexões. A distribuição automática respeita os responsáveis de cada canal.")}</p>
     {!channels.length && <Link className="underline" href="/app/connections">{t("Conecte um número para escolher os responsáveis.")}</Link>}
     {channels.map((channel) => <fieldset key={channel.id} className="rounded-lg border p-4 space-y-3" disabled={busy !== null}>
       <legend className="px-2 font-medium">{t(nomeDoCanal(channel))}</legend>

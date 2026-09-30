@@ -47,7 +47,7 @@ test("admin configura testes, remove número, confirma abertura e volta a restri
   await expect(input).toHaveValue("");
   await input.fill("telefone inválido");
   await page.getByRole("button", { name: "Salvar lista de teste" }).click();
-  await expect(page.getByRole("dialog", { name: "Acesso da IA no WhatsApp" }).getByRole("alert")).toContainText("Use um telefone com DDI");
+  await expect(page.getByRole("dialog", { name: "Acesso da IA na Conexão" }).getByRole("alert")).toContainText("Use um telefone com DDI");
   expect((await read()).ai_test_phone_numbers).toEqual([]);
   await input.fill(`${phone}\n+55 (11) 99999-8888\n+14155552671`);
   await page.getByRole("button", { name: "Salvar lista de teste" }).click();
@@ -79,7 +79,7 @@ test("admin configura testes, remove número, confirma abertura e volta a restri
   await page.setViewportSize({ width: 390, height: 844 });
   await openPanel();
   await expect(input).toHaveValue(phone);
-  const sheet = page.getByRole("dialog", { name: "Acesso da IA no WhatsApp" });
+  const sheet = page.getByRole("dialog", { name: "Acesso da IA na Conexão" });
   expect(await sheet.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   await expect(page.getByText("Acesso da IA atualizado.", { exact: true })).not.toBeVisible({ timeout: 10_000 });
   await page.screenshot({ path: testInfo.outputPath("pre-go-live-mobile.png"), fullPage: true });

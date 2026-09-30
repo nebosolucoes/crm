@@ -103,6 +103,21 @@ function ehVisivel(idioma: IdiomaDoRegistro): idioma is IdiomaVisivel {
 /** Os idiomas que aparecem, na ordem do registro — o padrão do produto primeiro. */
 export const IDIOMAS_VISIVEIS: readonly IdiomaVisivel[] = REGISTRO_DE_IDIOMAS.filter(ehVisivel);
 
+/**
+ * Fork Nebo: idiomas prontos que ESTA instalação não oferece. A interface é só
+ * em português — o catálogo espanhol segue no dicionário e o tipo `Idioma`
+ * segue com ele (é o que mantém o fork sem conflito com a main), mas o que é
+ * oferecido, servido e aceito na gravação sai de `IDIOMAS_OFERECIDOS`. Quem
+ * tinha `es` salvo cai no padrão por `normalizarIdioma`. Reativar é esvaziar
+ * esta lista.
+ */
+const IDIOMAS_DESLIGADOS_NA_INSTALACAO: readonly string[] = ["es"];
+
+/** Os idiomas visíveis que esta instalação oferece. Com um só, os seletores somem. */
+export const IDIOMAS_OFERECIDOS: readonly IdiomaVisivel[] = IDIOMAS_VISIVEIS.filter(
+  (idioma) => !IDIOMAS_DESLIGADOS_NA_INSTALACAO.includes(idioma.codigo),
+);
+
 /** Os que ainda não aparecem: citados na mensagem dos gates, para quem contribui saber que não precisa deles. */
 export const IDIOMAS_EM_CONSTRUCAO: readonly IdiomaDoRegistro[] = REGISTRO_DE_IDIOMAS.filter(
   (idioma) => !nivelApareceParaQuemUsa(idioma.nivel),

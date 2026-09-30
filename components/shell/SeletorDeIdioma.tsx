@@ -13,7 +13,7 @@ import {
 import { useT } from "@/hooks/i18n/useT";
 import { useAplicarIdioma, useIdioma } from "@/lib/i18n/IdiomaProvider";
 import { type Idioma } from "@/lib/i18n/idiomas";
-import { IDIOMAS_VISIVEIS, idiomaVisivelPorCodigo } from "@/lib/i18n/registro";
+import { IDIOMAS_OFERECIDOS, idiomaVisivelPorCodigo } from "@/lib/i18n/registro";
 import { Check } from "@/lib/ui/icons";
 
 /**
@@ -79,6 +79,10 @@ export function SeletorDeIdioma() {
     });
   };
 
+  // Com um idioma só não há o que escolher: o botão some em vez de abrir uma
+  // lista de um item. Depois dos hooks, que rodam sempre na mesma ordem.
+  if (IDIOMAS_OFERECIDOS.length < 2) return null;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -95,7 +99,7 @@ export function SeletorDeIdioma() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[180px]">
-        {IDIOMAS_VISIVEIS.map(({ codigo, nomeNativo }) => (
+        {IDIOMAS_OFERECIDOS.map(({ codigo, nomeNativo }) => (
           <DropdownMenuItem
             key={codigo}
             onClick={() => escolher(codigo)}

@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { updateTenant } from "@/app/actions/settings/updateTenant";
 import { useT } from "@/hooks/i18n/useT";
-import { IDIOMAS_VISIVEIS } from "@/lib/i18n/registro";
+import { IDIOMAS_OFERECIDOS } from "@/lib/i18n/registro";
 import { MOEDAS_SERVIDAS, simboloDaMoeda, type MoedaServida } from "@/lib/money";
 import { tenantSchema, type Locale, type TenantInput } from "@/lib/schemas/settings";
 
@@ -117,6 +117,8 @@ export function TenantForm({ initial }: Props) {
               </SelectContent>
             </Select>
           </div>
+          {/* Com um idioma só, o campo não tem o que oferecer e some. */}
+          {IDIOMAS_OFERECIDOS.length > 1 && (
           <div className="space-y-2">
             <Label htmlFor="locale">{t("Idioma")}</Label>
             <Select
@@ -127,7 +129,7 @@ export function TenantForm({ initial }: Props) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {IDIOMAS_VISIVEIS.map(({ codigo, nomeNativo }) => (
+                {IDIOMAS_OFERECIDOS.map(({ codigo, nomeNativo }) => (
                   <SelectItem key={codigo} value={codigo}>
                     {nomeNativo}
                   </SelectItem>
@@ -135,6 +137,7 @@ export function TenantForm({ initial }: Props) {
               </SelectContent>
             </Select>
           </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="currency">{t("Moeda")}</Label>
             <Select
