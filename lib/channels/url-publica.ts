@@ -20,10 +20,30 @@ import { env } from "@/lib/env";
 export function urlPublicaDaInstalacao(req: NextRequest): string {
   const configurada = env.NEXT_PUBLIC_APP_URL;
   const usavel = configurada && !configurada.includes("placeholder.invalid") ? configurada : null;
-  return (usavel ?? req.headers.get("origin") ?? `${req.nextUrl.protocol}//${req.nextUrl.host}`).replace(
-    /\/+$/,
-    "",
-  );
+  const doPedido = origemDaRequisicao(req);
+  // Configurada, mas só alcançável na rede local (`http://192.168.x.x`), e o
+  // pedido chegou por um endereço PÚBLICO (túnel, domínio atrás de proxy): o
+  // público é o único que um provedor externo consegue chamar. Medido em
+  // 30/09 — com o `.env` apontando para a rede local, o operador abria o CRM
+  // pelo túnel e a conexão social era recusada mesmo assim. Com endereço
+  // configurado público (a instalação de verdade), o pedido NUNCA vence: um
+  // `Host` forjado não redireciona webhook de ninguém.
+  if (usavel && !alcancavelPelaInternet(usavel) && alcancavelPelaInternet(doPedido)) {
+    return doPedido.replace(/\/+$/, "");
+  }
+  return (usavel ?? doPedido).replace(/\/+$/, "");
+}
+
+/**
+ * Por onde o navegador chegou. `Origin` num POST; numa navegação (a volta do
+ * OAuth) não há `Origin`, e quem diz é o `Host` repassado pelo proxy/túnel.
+ */
+function origemDaRequisicao(req: NextRequest): string {
+  const origin = req.headers.get("origin");
+  if (origin && origin !== "null") return origin;
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? req.nextUrl.host;
+  const proto = req.headers.get("x-forwarded-proto") ?? req.nextUrl.protocol.replace(/:$/, "");
+  return `${proto.split(",")[0]!.trim()}://${host.split(",")[0]!.trim()}`;
 }
 
 /** Onde um canal por credencial recebe o webhook do provedor. */

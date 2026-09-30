@@ -14,7 +14,9 @@ function devOriginsPermitidas(): string[] {
     // next.config cair antes do diagnóstico aparecer no lugar certo.
   }
 
-  return [...new Set(["192.168.4.158", ...declaradas])];
+  // `*.trycloudflare.com`: túnel de teste para o Instagram/Messenger (a Zernio
+  // precisa alcançar o CRM local pela internet). Só vale no `next dev`.
+  return [...new Set(["192.168.4.158", "*.trycloudflare.com", ...declaradas])];
 }
 
 /** Performance budget (EPIC-12 §S-12.05):
