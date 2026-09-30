@@ -12,7 +12,7 @@ import { instanteParaParede, mesmaHoraOutroDia, paredeParaInstante } from "@/lib
 import { Plus, Trash } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
-import { IconeDoDestino } from "./IconeDoDestino";
+import { ChannelIcon, formatoParaChannelFormat } from "./ChannelIcon";
 import { chaveDoDestino, type ChaveDoDestino } from "./SeletorDeDestinos";
 import { ROTULO_DA_REDE, ROTULO_DO_FORMATO } from "./rotulos";
 
@@ -126,9 +126,9 @@ export function SeletorDeHorarios({
                             data-testid={`horario-${i + 1}-destino-${d.network}-${d.format}`}
                             disabled={disabled}
                             onClick={() => alternarDestino(i, chave)}
-                            className={cn("rounded-full p-px outline-hidden transition-all focus-visible:ring-2 focus-visible:ring-accent", ligado ? "" : "opacity-45 hover:opacity-80")}
+                            className="rounded-full p-px outline-hidden transition-all focus-visible:ring-2 focus-visible:ring-accent"
                           >
-                            <IconeDoDestino rede={d.network} formato={d.format} ligado={ligado} tamanho={26} />
+                            <ChannelIcon channel={d.network} format={formatoParaChannelFormat(d.format)} state={ligado ? "active" : "inactive"} size={26} decorative />
                           </button>
                         </TooltipTrigger>
                         <TooltipContent side="bottom">{ligado ? rotulo : `${rotulo} — ${t("não sai nesta data")}`}</TooltipContent>

@@ -50,6 +50,8 @@ const NAV_ALLOWLIST: Record<string, string> = {
   "/app/disparo/agendar": "redirect legado (uma release) para /app/publicacoes/agendar",
   "/app/disparo/grupos": "redirect legado (uma release) para /app/publicacoes/grupos",
   "/app/disparo/historico": "redirect legado (uma release) para /app/publicacoes/historico",
+  "/app/publicacoes/icones":
+    "página de VALIDAÇÃO VISUAL do ChannelIcon (as 8 combinações rede × formato nos 3 estados), pedida pelo dono para conferir o desenho; não é destino de operação — quem opera vê os ícones dentro de Agendar. Aberta pela URL de propósito",
   "/app/recurso-indisponivel":
     "destino de REDIRECT, não de navegação: é onde exigirRecurso() (lib/entitlements) deixa quem abre uma tela que o plano da organização não inclui — como /account-suspended, só que dentro do shell. Ninguém navega até uma tela que diz 'você não tem isto'; a porta para o que ela explica é /app/settings/billing",
 };

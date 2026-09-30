@@ -9888,6 +9888,12 @@ export const DICIONARIO: Traducoes = {
   "Este destino não está na publicação.": { es: "Este destino no está en la publicación." },
   "Uma das datas aponta para um destino que a publicação não tem.": { es: "Una de las fechas apunta a un destino que la publicación no tiene." },
 
+  // ── Publicações: página de validação dos ícones de canal ──
+  "Ícones de canal": { es: "Iconos de canal" },
+  "As 8 combinações de rede e formato nos 3 estados. Feed é círculo cheio; Stories e Status têm o anel cortado; Reels leva a claquete e o selo da rede.": { es: "Las 8 combinaciones de red y formato en los 3 estados. Feed es un círculo lleno; Stories y Status llevan el anillo cortado; Reels lleva la claqueta y el sello de la red." },
+  "Formato": { es: "Formato" },
+  "Tamanhos": { es: "Tamaños" },
+
 };
 
 /**

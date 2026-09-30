@@ -13,7 +13,7 @@ import type { ContaPublicavel } from "@/lib/publicacoes/servico";
 import { Warning } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
-import { IconeDoDestino } from "./IconeDoDestino";
+import { ChannelIcon, formatoParaChannelFormat } from "./ChannelIcon";
 import { ROTULO_DA_REDE, ROTULO_DO_FORMATO } from "./rotulos";
 
 export type ChaveDoDestino = string;
@@ -109,12 +109,12 @@ export function SeletorDeDestinos({
                         onClick={() => alternar(rede, format)}
                         className={cn(
                           "rounded-full p-0.5 outline-hidden ring-offset-2 ring-offset-card transition-all focus-visible:ring-2 focus-visible:ring-accent",
-                          ligado ? "ring-2 ring-accent" : "opacity-55 hover:opacity-90",
-                          semConta && "cursor-not-allowed opacity-30 hover:opacity-30",
+                          ligado && "ring-2 ring-accent",
+                          semConta && "cursor-not-allowed",
                           comErro && "ring-error-fg",
                         )}
                       >
-                        <IconeDoDestino rede={rede} formato={format} ligado={ligado} tamanho={38} />
+                        <ChannelIcon channel={rede} format={formatoParaChannelFormat(format)} state={semConta ? "disabled" : ligado ? "active" : "inactive"} size={38} decorative />
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom">

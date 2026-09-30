@@ -100,6 +100,7 @@ Prova com recursos reais (doutrina de QA): banco fresco do `baseline.sql` + `boo
 ## 8. Manutenção — onde mexer para…
 
 - **…mudar como uma data escolhe redes:** `lib/publicacoes/schema.ts` (`ocorrenciaDaPublicacaoSchema`, `conferirOcorrencias`), `lib/publicacoes/servico.ts` (`horariosDaEntrada`, `gravarDestinosDasOcorrencias`, `destinosDasOcorrencias`), `lib/publicacoes/worker/expandir.ts` (o filtro), `components/publicacoes/SeletorDeHorarios.tsx` (`HorarioDaTela`, `destinosDaLinha`). Testes: `lib/publicacoes/schema.test.ts`, `expandir.test.ts` ("0284"), e2e `publicacoes-visual.spec.ts` (toggles `horario-N-destino-<rede>-<formato>`).
+- **…mudar ou acrescentar um ícone de rede/formato:** `components/publicacoes/ChannelIcon.tsx` — `CHANNEL_CONFIG` (rede → glifo do simple-icons, pintura, formatos) e `FORMAT_TREATMENT` (formato → cheio / anel / reels). Validação visual em `/app/publicacoes/icones`; exportação para `public/icons/channels/` com `pnpm icones:exportar`. Teste: `ChannelIcon.test.tsx`.
 - **…mudar o enquadramento da prévia:** `components/publicacoes/previa/proporcao.ts` (+ teste) e o `ajuste` de `MidiaVisual` em `Aparelho.tsx`.
 
 | Quero… | Mexo em |
