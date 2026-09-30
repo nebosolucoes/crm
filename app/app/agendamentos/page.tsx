@@ -1,9 +1,6 @@
-import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Agendamentos" };
-
-export default async function AgendamentosPage() {
-  redirect("/app/disparo/lista");
+/** Rota legada (antes do Disparo): hoje é Publicações. Mantida por links salvos. */
+export default function Page() {
+  redirect("/app/publicacoes/lista");
 }

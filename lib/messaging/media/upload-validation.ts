@@ -22,6 +22,15 @@ export function isScheduledMediaPathOwnedBy(path: string, orgId: string): boolea
   return path.startsWith(`${orgId}/scheduled-groups/`);
 }
 
+/**
+ * Mídia de Publicações (0283): `<org>/publications/<publication_id>/…`. O
+ * prefixo do Disparo continua aceito porque a migration copiou as mídias
+ * antigas sem movê-las no bucket.
+ */
+export function isPublicationMediaPathOwnedBy(path: string, orgId: string): boolean {
+  return path.startsWith(`${orgId}/publications/`) || isScheduledMediaPathOwnedBy(path, orgId);
+}
+
 const DOCUMENT_MIMES = new Set([
   "application/pdf",
   "application/msword",

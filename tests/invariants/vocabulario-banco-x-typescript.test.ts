@@ -184,6 +184,69 @@ const PARES: Array<{
     simbolo: "InboxKind",
   },
   {
+    // Publicações (0283). Ciclo de vida do conteúdo; o desfecho mora na ocorrência.
+    tabela: "publications",
+    coluna: "status",
+    arquivo: "lib/publicacoes/schema.ts",
+    simbolo: "STATUS_DA_PUBLICACAO",
+  },
+  {
+    // Publicações (0283). Inclui o vocabulário do Disparo, copiado sem mudar cadência.
+    tabela: "publications",
+    coluna: "recurrence_kind",
+    arquivo: "lib/publicacoes/schema.ts",
+    simbolo: "RECORRENCIAS_DA_PUBLICACAO",
+  },
+  {
+    // Publicações (0283). O mesmo conjunto do envio de mídia.
+    tabela: "publication_media",
+    coluna: "kind",
+    arquivo: "lib/publicacoes/schema.ts",
+    simbolo: "TIPOS_DE_MIDIA_DA_PUBLICACAO",
+  },
+  {
+    // Publicações (0283). Rede, nunca provedor.
+    tabela: "publication_targets",
+    coluna: "network",
+    arquivo: "lib/publicacoes/schema.ts",
+    simbolo: "REDES_DA_PUBLICACAO",
+  },
+  {
+    // Publicações (0283). O par rede×formato válido é o CHECK cruzado, testado à parte.
+    tabela: "publication_targets",
+    coluna: "format",
+    arquivo: "lib/publicacoes/schema.ts",
+    simbolo: "FORMATOS_DA_PUBLICACAO",
+  },
+  {
+    // Publicações (0283). Data escolhida à mão ou gerada pela regra.
+    tabela: "publication_occurrences",
+    coluna: "source",
+    arquivo: "lib/publicacoes/schema.ts",
+    simbolo: "ORIGENS_DA_OCORRENCIA",
+  },
+  {
+    // Publicações (0283). Rollup das execuções.
+    tabela: "publication_occurrences",
+    coluna: "status",
+    arquivo: "lib/publicacoes/schema.ts",
+    simbolo: "STATUS_DA_OCORRENCIA",
+  },
+  {
+    // Publicações (0283). A única linha que fala com o provedor.
+    tabela: "publication_executions",
+    coluna: "status",
+    arquivo: "lib/publicacoes/schema.ts",
+    simbolo: "STATUS_DA_EXECUCAO",
+  },
+  {
+    // Publicações (0283). Decide se o worker tenta de novo.
+    tabela: "publication_executions",
+    coluna: "error_category",
+    arquivo: "lib/publicacoes/schema.ts",
+    simbolo: "CATEGORIAS_DE_ERRO_DA_EXECUCAO",
+  },
+  {
     tabela: "agent_case_events",
     coluna: "kind",
     // lib/agent-engine/agent/human-cases.ts → CaseEventKind.

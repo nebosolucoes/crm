@@ -103,6 +103,9 @@ beforeAll(() => {
       v_version uuid;
       v_group uuid;
       v_scheduled_message uuid;
+      v_pub uuid;
+      v_target uuid;
+      v_occ uuid;
       v_boundary jsonb;
     begin
       foreach v_org in array array['${ORG_A}'::uuid, '${ORG_B}'::uuid] loop
@@ -141,6 +144,42 @@ beforeAll(() => {
              scheduled_for, status)
             values (v_org, v_scheduled_message, v_sess, v_group,
                     now() + interval '1 hour', 'pending');
+        end if;
+
+        -- 0283: Publicações. Conteúdo, destino, grupos do destino, ocorrência e
+        -- execução carregam a legenda e o desfecho de cada organização; as seis
+        -- tabelas ganham uma linha em cada tenant para a cerca ser provada por JWT.
+        select id into v_pub from public.publications
+          where organization_id = v_org and title = 'RLS Invariant Publication';
+        if v_pub is null then
+          insert into public.publications (organization_id, title, body, status)
+            values (v_org, 'RLS Invariant Publication', 'RLS invariant private caption', 'scheduled')
+            returning id into v_pub;
+        end if;
+        if not exists (select 1 from public.publication_media where publication_id = v_pub) then
+          insert into public.publication_media (organization_id, publication_id, position, kind, storage_path, mime, size_bytes)
+            values (v_org, v_pub, 1, 'image', v_org::text || '/publications/' || v_pub::text || '/rls.jpg', 'image/jpeg', 10);
+        end if;
+        select id into v_target from public.publication_targets
+          where publication_id = v_pub and network = 'whatsapp';
+        if v_target is null then
+          insert into public.publication_targets (organization_id, publication_id, channel_session_id, network, format)
+            values (v_org, v_pub, v_sess, 'whatsapp', 'group_message')
+            returning id into v_target;
+        end if;
+        insert into public.publication_target_groups (organization_id, channel_session_id, target_id, group_id)
+          values (v_org, v_sess, v_target, v_group)
+          on conflict do nothing;
+        select id into v_occ from public.publication_occurrences
+          where publication_id = v_pub;
+        if v_occ is null then
+          insert into public.publication_occurrences (organization_id, publication_id, scheduled_at)
+            values (v_org, v_pub, now() + interval '1 hour')
+            returning id into v_occ;
+        end if;
+        if not exists (select 1 from public.publication_executions where occurrence_id = v_occ) then
+          insert into public.publication_executions (organization_id, publication_id, occurrence_id, target_id, group_id)
+            values (v_org, v_pub, v_occ, v_target, v_group);
         end if;
 
         select id into v_contact from public.contacts
@@ -376,6 +415,15 @@ export const TABLES = [
   "scheduled_whatsapp_groups",
   "scheduled_group_messages",
   "scheduled_group_message_runs",
+  // migration 0283 — Publicações: conteúdo, arquivos, destinos, grupos do
+  // destino, ocorrências e execuções. Mesma cerca do Disparo: leitura para
+  // membro, escrita para manager.
+  "publications",
+  "publication_media",
+  "publication_targets",
+  "publication_target_groups",
+  "publication_occurrences",
+  "publication_executions",
   // migration 0207 — as credenciais de IA da organização. A 0150 apagou a policy
   // de leitura por organização sem que nada acusasse, e a 0207 a restaurou; esta
   // linha é o que passa a acusar se ela sumir de novo (issue #545). A leitura é

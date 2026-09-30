@@ -76,6 +76,11 @@ export type InboxKind =
   // prazo ou bloqueado, ou uma execução foi pulada por falta de recurso. Quem
   // escreve: a rota admin de planos e, uma vez por org/mês, o worker.
   | 'entitlement_changed'
+  // (migration 0283) Uma publicação (Publicações) não saiu num destino por
+  // erro PERMANENTE — token expirado, conta desconectada, mídia recusada,
+  // grupo inativo, horário perdido. Erro transitório não avisa: o worker
+  // tenta de novo sozinho. Um aviso por ocorrência, com o destino no corpo.
+  | 'publication_failed'
   | 'other';
 
 export interface InboxItemRow {

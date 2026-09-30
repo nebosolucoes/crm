@@ -662,7 +662,7 @@ jobs:
         # Spec visual do Disparo em grupo (WIP herdado na branch nebo-custom): semeia
         # channel_sessions à mão e ainda não foi validada no stack do CI. Entra em
         # SPECS_PARTE_3 quando o autor a rodar verde aqui.
-        disparo-programado-visual.spec.ts
+        publicacoes-visual.spec.ts
     steps:
       - uses: actions/checkout@v7
 

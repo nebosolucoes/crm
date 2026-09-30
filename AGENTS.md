@@ -84,6 +84,7 @@ disparar. Entrada do turno em `lib/agent-engine/agent/inbound-turn.ts`; diagrama
 | `app/actions/` | Server Actions (auth, onboarding, team, settings) |
 | `lib/agent-engine/`, `lib/ai/` | runtime do agente, guardrails, RAG, dispatcher |
 | `lib/api/wrappers.ts` | `ok()` / `fail()` — **use sempre**, não monte Response na mão |
+| `lib/publicacoes/`, `lib/channels/publicacao/` | Publicações (spec 23): domínio/worker neutros vs. quem entrega por capability `publishing` |
 | `lib/auth/require-role.ts` | `requireRole()` — guard canônico de RBAC |
 | `lib/supabase/{browser,server,admin}.ts` | clients canônicos |
 | `workers/` | workers de `event_log` + crons |

@@ -175,6 +175,17 @@ export const ApiErrorCodes = {
   // 404: o funil de destino não existe (ou não é desta organização).
   pipeline_not_found: "pipeline_not_found",
 
+  // 422, Publicações: o conteúdo não cabe no formato do destino (Reels sem
+  // vídeo, Story com 3 arquivos…) — `details` diz qual destino e qual regra.
+  publication_invalid_for_format: "publication_invalid_for_format",
+  // 422: agendar exige pelo menos um destino.
+  publication_no_targets: "publication_no_targets",
+  // 422: a conta escolhida não existe nesta organização, está arquivada ou não
+  // publica nessa rede.
+  publication_account_unavailable: "publication_account_unavailable",
+  // 409: a ocorrência já saiu (ou está saindo) e não pode ser reagendada/cancelada.
+  publication_occurrence_closed: "publication_occurrence_closed",
+
   // 500 / upstream
   internal_error: "internal_error",
   upstream_unavailable: "upstream_unavailable",

@@ -2549,7 +2549,7 @@ grupo trouxe.
 **A seção "Lote 12 · G2" acima deixa de estar PENDENTE POR EXECUÇÃO**: os três
 casos dela (L12.G2.1, G2.2 e G2.3) estão provados nas linhas acima.
 
-## J28 — Disparo programado em grupo `[P1]`
+## J28 — Disparo programado em grupo `[P1]` — LEGADO desde a 0283 (ver J31)
 
 | # | Caso | Expectativa |
 |---|------|-------------|
@@ -2568,6 +2568,25 @@ Cobertura automática desta entrega: `tests/unit/scheduled-group-worker-query.te
 gates de cron/scheduler já existentes. A spec e2e mocka as rotas de escrita (o que se prova é
 a cadeia da tela e o contrato que ela manda); o envio real por WAHA com vários arquivos ainda
 não foi provado com número pareado.
+
+## J31 — Publicações: um conteúdo, vários destinos, várias datas `[P1]`
+
+Spec: `docs/specs/23-spec-publicacoes.md`. Sucessor de J28 (migration 0283): as tabelas do Disparo foram copiadas para o modelo novo e as telas de `/app/disparo/*` redirecionam para `/app/publicacoes/*`. Prova pela tela: `tests/e2e/publicacoes-visual.spec.ts` (API mockada, como o spec anterior) e a rodada local contra o servidor de desenvolvimento descrita na spec.
+
+| # | Caso | Expectativa |
+|---|------|-------------|
+| J31.1 | Agendar: 3 arquivos, legenda, WhatsApp com 2 grupos, Instagram Feed + Stories, 2 datas | UMA publicação, 2 ocorrências; a Lista mostra as duas por dia ("1 de 2", "2 de 2"), com chips por rede e "2 grupos"; a hora é a do fuso da organização, não a do navegador |
+| J31.2 | Regras por formato antes de agendar | Reels com foto reprova no card; Story com 11 arquivos reprova; Feed do Instagram com 1 vídeo avisa "sai como Reel"; a API confere de novo e devolve `publication_invalid_for_format` com `details.problemas` |
+| J31.3 | Worker: ocorrência vence | vira `processing`, ganha uma execução por grupo e por Story (em ordem de `position`), publica com pausa entre grupos, fecha `sent` com id externo; a ocorrência vira `done`/`partial`/`failed` pelo rollup; a tela muda pelo realtime sem recarregar |
+| J31.4 | Falha transitória × permanente | timeout/5xx/429 tenta de novo em 1, 5 e 15 min (`attempt+1`); conta desconectada, mídia recusada, grupo inativo falham na primeira e abrem `publication_failed` na Central, com link para o Histórico |
+| J31.5 | Envio parcial no WhatsApp | `partial_send` é permanente; o Histórico diz quantos arquivos saíram; só "Reenviar" à mão cria a próxima tentativa |
+| J31.6 | Janela perdida (VPS parada > 30 min) | a ocorrência vira `skipped/missed_window` com aviso; nada sai atrasado em rajada |
+| J31.7 | Calendário | um chip por ocorrência, "+N" acima de 3 no dia, mês anterior/próximo/Hoje, clique abre o Sheet com destinos e ações; a 390 px vira lista por dia sem overflow horizontal |
+| J31.8 | Alterar horário / cancelar / excluir | alterar horário muda SÓ a ocorrência; cancelar esta data não toca nas outras; cancelar todas pede motivo; excluir é soft e preserva o Histórico |
+| J31.9 | Recorrência | "seg, qua, sex às 19:30" materializa até 90 dias/100 pendentes em hora de parede (DST-safe); editar a regra regera só as pendentes |
+| J31.10 | Histórico | só o que saiu do pendente; filtro por situação e rede; "Instagram ✓ · WhatsApp 3/4" com o erro em frase de gente e o id externo/URL |
+
+Cobertura automática: `lib/publicacoes/**/*.test.ts` (recorrência, regras, política, tempo da tela, worker), `lib/channels/publicacao/*.test.ts`, `lib/channels/zernio/posts.test.ts`, `tests/unit/publicacoes-navegacao.test.ts`, `tests/invariants/publicacoes-estao-na-publicacao.test.ts`, a cerca de vocabulário e o isolamento RLS nas seis tabelas. **Não medido nesta entrega:** envio real por WAHA com número pareado e post real em conta social (as contas locais são de cliente; ver "O que NÃO medi" na spec).
 
 ## J29 — Setores de atendimento: quem atende o quê, e a passagem de bastão `[P0]`
 

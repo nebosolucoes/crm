@@ -17,7 +17,7 @@ import type { Role } from "@/lib/auth/types";
 
 export type NavGroupId =
   | "atendimento"
-  | "disparo"
+  | "publicacoes"
   | "crm"
   | "ia"
   | "canais"
@@ -74,7 +74,7 @@ export interface NavMetadata {
  */
 export const NAV_GROUPS: NavGroup[] = [
   { id: "atendimento", label: "Atendimento" },
-  { id: "disparo", label: "Disparo" },
+  { id: "publicacoes", label: "Publicações" },
   { id: "crm", label: "CRM", hub: { href: "/app/crm", label: "Ver tudo em CRM" } },
   { id: "ia", label: "Agente de IA", hub: { href: "/app/ai", label: "Ver tudo em IA" } },
   { id: "canais", label: "Canais" },
@@ -172,40 +172,49 @@ export const NAV_CATALOG = [
     group: "atendimento",
     sidebar: true,
   },
-  // ---- Disparo — envios programados para grupos ----
+  // ---- Publicações — conteúdo agendado em grupos e redes sociais (0283) ----
   {
-    href: "/app/disparo/lista",
+    href: "/app/publicacoes/lista",
     label: "Lista",
-    description: "Todos os envios programados, com pausa, retomada e cancelamento.",
+    description: "O que ainda vai sair, do mais próximo ao mais distante, por dia.",
     icon: "ListChecks",
-    group: "disparo",
+    group: "publicacoes",
     minRole: "manager",
     sidebar: true,
   },
   {
-    href: "/app/disparo/agendar",
+    href: "/app/publicacoes/agendar",
     label: "Agendar",
-    description: "Criar um envio para grupo, com data, mensagem e recorrência.",
+    description: "Criar uma publicação: arquivos, legenda, redes, grupos, datas e repetição.",
     icon: "CalendarDots",
-    group: "disparo",
+    group: "publicacoes",
     minRole: "manager",
     sidebar: true,
   },
   {
-    href: "/app/disparo/grupos",
+    href: "/app/publicacoes/calendario",
+    label: "Calendário",
+    description: "O mês inteiro, com uma publicação por chip e as redes em que sai.",
+    icon: "CalendarBlank",
+    group: "publicacoes",
+    minRole: "manager",
+    sidebar: true,
+  },
+  {
+    href: "/app/publicacoes/grupos",
     label: "Grupos",
-    description: "Grupos salvos que podem receber envios programados.",
+    description: "Grupos de WhatsApp que podem receber publicações.",
     icon: "UsersThree",
-    group: "disparo",
+    group: "publicacoes",
     minRole: "manager",
     sidebar: true,
   },
   {
-    href: "/app/disparo/historico",
+    href: "/app/publicacoes/historico",
     label: "Histórico",
-    description: "Execuções que já aconteceram, com entrega, falha e motivo.",
+    description: "O que já saiu ou deixou de sair, com o resultado por destino e o motivo.",
     icon: "ClockCounterClockwise",
-    group: "disparo",
+    group: "publicacoes",
     minRole: "manager",
     sidebar: true,
   },

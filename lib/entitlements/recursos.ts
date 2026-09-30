@@ -93,7 +93,7 @@ export function sempreLigado(recurso: Recurso): boolean {
  */
 export const GRUPO_PARA_RECURSO: Record<NavGroupId, Recurso | null> = {
   atendimento: "inbox",
-  disparo: "broadcast",
+  publicacoes: "broadcast",
   crm: "crm",
   ia: "ai_agents",
   canais: "channels",
@@ -164,7 +164,7 @@ export function recursoDoDestino(pathname: string): Recurso | null | undefined {
 export const ROTULO_DO_RECURSO: Record<Recurso, string> = {
   channels: "Canais",
   inbox: "Atendimento",
-  broadcast: "Disparo",
+  broadcast: "Publicações",
   crm: "CRM",
   ai_agents: "Agentes de IA",
   analytics: "Análises",

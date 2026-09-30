@@ -32,7 +32,7 @@ describe("recusaPorRecurso", () => {
     const body = await r!.json();
     expect(body.error.code).toBe("feature_not_entitled");
     expect(body.error.details).toEqual({ feature: "broadcast" });
-    expect(body.error.message).toMatch(/Disparo/);
+    expect(body.error.message).toMatch(/Publicações/);
     expect(audit).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "authz.denied",

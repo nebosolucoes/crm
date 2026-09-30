@@ -31,6 +31,7 @@ export const CHANNEL_CAPABILITIES: Record<ProviderDeMensagem, ChannelCapabilitie
     groups: "full",
     costPerMessage: false,
     humanAgentWindowHours: null,
+    publishing: "groups",
   },
   // Hetero-restrição: não me banem, mas a Meta me proíbe e me cobra.
   meta_cloud: {
@@ -45,6 +46,7 @@ export const CHANNEL_CAPABILITIES: Record<ProviderDeMensagem, ChannelCapabilitie
     groups: "limited",
     costPerMessage: true,
     humanAgentWindowHours: null,
+    publishing: "none",
   },
   // Mesma hetero-restrição do canal oficial, por baixo: é um BSP: a WABA é da
   // Meta, os templates são aprovados pela Meta e a janela de 24h é da Meta. O
@@ -79,6 +81,7 @@ export const CHANNEL_CAPABILITIES: Record<ProviderDeMensagem, ChannelCapabilitie
     groups: "limited",
     costPerMessage: true,
     humanAgentWindowHours: null,
+    publishing: "none",
   },
 };
 
@@ -107,6 +110,8 @@ export const CAPACIDADES_DE_DM_SOCIAL: ChannelCapabilities = {
   groups: "none",
   costPerMessage: false,
   humanAgentWindowHours: 168,
+  // Feed, Stories e Reels pela API de posts do intermediário (Publicações, 0283).
+  publishing: "social",
 };
 
 /**

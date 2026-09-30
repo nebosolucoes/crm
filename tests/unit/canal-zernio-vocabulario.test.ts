@@ -35,6 +35,7 @@ describe("capabilities do canal intermediado", () => {
       groups: "limited",
       costPerMessage: true,
       humanAgentWindowHours: null,
+      publishing: "none",
     });
   });
 

@@ -77,6 +77,9 @@ export const KIND_LABEL = {
   // O que a organização pode usar mudou — plano trocado, recurso liberado com
   // prazo, ou algo deixou de rodar por não estar no plano. O corpo diz qual.
   entitlement_changed: "Seu plano ou seus recursos mudaram",
+  // Diz o que não aconteceu, não o que o worker registrou: quem agendou a
+  // oferta quer saber que ela não saiu e onde. O destino e o motivo vão no corpo.
+  publication_failed: "Uma publicação não saiu em um dos destinos",
   other: "Aviso do assistente",
 } as const satisfies Record<InboxKind, string>;
 

@@ -65,7 +65,7 @@ describe("as projeções", () => {
     expect(hrefs).not.toContain("/app/ai/agents");
     expect(hrefs).not.toContain("/app/kanban");
     expect(hrefs).not.toContain("/app/metrics");
-    expect(hrefs).not.toContain("/app/disparo/lista");
+    expect(hrefs).not.toContain("/app/publicacoes/lista");
   });
 
   it("hub do CRM fica vazio no Starter e cheio com tudo", () => {

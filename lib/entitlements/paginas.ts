@@ -23,8 +23,9 @@ export const RECURSO_POR_PAGINA_FORA_DO_CATALOGO: Readonly<Record<string, Recurs
   // Telas de detalhe: alcançadas de dentro da lista do grupo.
   "/app/leads": "crm",
   "/app/pipelines": "crm",
-  // Redirect legado para /app/disparo/lista; o destino real é quem gateia.
+  // Redirects legados para /app/publicacoes/*; o destino real é quem gateia.
   "/app/agendamentos": null,
+  "/app/disparo": null,
   // Onde o gate deixa quem não tem o recurso — gateá-la seria um laço.
   "/app/recurso-indisponivel": null,
 };

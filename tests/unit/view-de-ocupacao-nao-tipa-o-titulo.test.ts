@@ -29,8 +29,11 @@ describe("o tipo da view de ocupação do Google", () => {
   });
 
   it("segue com a ocupação que a tela lê (controle: o tipo não virou vazio)", () => {
-    expectTypeOf<LinhaDaView>().toHaveProperty("starts_at").toEqualTypeOf<string>();
-    expectTypeOf<LinhaDaView>().toHaveProperty("ends_at").toEqualTypeOf<string>();
+    // `supabase gen types` tipa toda coluna de VIEW como anulável (o Postgres
+    // não declara NOT NULL em view); o controle aqui é a presença da coluna com
+    // o tipo base string, não a nulidade — regenerado da fonte fiel em 30/09/2026.
+    expectTypeOf<LinhaDaView>().toHaveProperty("starts_at").toEqualTypeOf<string | null>();
+    expectTypeOf<LinhaDaView>().toHaveProperty("ends_at").toEqualTypeOf<string | null>();
     expectTypeOf<LinhaDaView>().toHaveProperty("status");
     expectTypeOf<LinhaDaView>().toHaveProperty("transparency");
     expectTypeOf<LinhaDaView>().toHaveProperty("connection_id");

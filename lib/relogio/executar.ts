@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { recoverStuckMessages } from "@/app/api/v1/cron/recover-stuck-messages/route";
 import { idsDoContatoEGemeos } from "@/lib/channels/contato-por-telefone";
 import { drainEventLog } from "@/lib/event-log/drain";
@@ -15,6 +17,7 @@ import { enviarTextoFixoPendente } from "@/lib/followup/enviar-texto-fixo";
 import type { EnrollmentRow } from "@/lib/followup/node-handlers";
 import { createSupabaseSilenceSweepDb, runSilenceSweep } from "@/lib/followup/silence-sweep";
 import { logger } from "@/lib/logger";
+import { executarWorkerDePublicacoes } from "@/lib/publicacoes/worker";
 import { runRoutingWorker } from "@/lib/routing/worker";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -148,6 +151,11 @@ export async function executarTickDoRelogio(): Promise<{
   await uma("routing-worker", async () => {
     const summary = await runRoutingWorker();
     return summary;
+  });
+
+  await uma("publications-worker", async () => {
+    const r = await executarWorkerDePublicacoes(createAdminClient(), new Date(), randomUUID(), { orcamentoMs: 20_000 });
+    return `${r.sent} publicadas, ${r.failed} falhas, ${r.skipped} puladas`;
   });
 
   await uma("recover-stuck-messages", async () => {

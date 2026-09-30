@@ -101,6 +101,12 @@ correspondentes localizados no repo):
 - **Webhooks & automação** — captação + regras QUANDO/SE/ENTÃO + gatilhos externos.
 - **Operação visível** — transparência do motivo de retenção anti-ban, central de avisos,
   knobs de proteção de envio, propostas do flywheel com gate humano.
+- **Publicações** (fork, migration 0283, 30/09/2026) — o Disparo virou planejador de conteúdo:
+  uma publicação, vários destinos (grupos do WhatsApp; Feed/Stories/Reels do Instagram e do
+  Facebook pelo intermediário), várias datas e recorrência em hora de parede, Lista por dia,
+  Calendário mensal, Histórico por destino com reenvio manual, worker com claim por destino,
+  retry classificado e aviso na Central. Spec `docs/specs/23-spec-publicacoes.md`; jornada J31.
+  **Não medido ainda:** envio real por WAHA e post real em conta social (ver a spec, §7).
 
 ### Épico de Governança de Atendimento (G1–G6) — COMPLETO
 

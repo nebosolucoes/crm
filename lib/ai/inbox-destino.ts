@@ -23,6 +23,9 @@ export const REFERENCIAS_DE_AVISO = {
   channel_session: { tabela: "channel_sessions", papel: "admin", rotulo: "Revisar conexão", href: () => "/app/connections", ativo: true },
   ai_knowledge_source: { tabela: "ai_knowledge_sources", papel: "manager", rotulo: "Abrir base de conhecimento", href: () => "/app/ai/knowledge/sources" },
   agent_case: { tabela: "agent_cases", papel: "agent", rotulo: "Abrir atendimento", href: (id: string) => `/app/ai/cases?caso=${id}` },
+  // Publicações (0283): o aviso aponta para a OCORRÊNCIA no Histórico, que é
+  // onde o desfecho por destino aparece com o erro e o botão de reenviar.
+  publication_occurrence: { tabela: "publication_occurrences", papel: "viewer", rotulo: "Ver o que aconteceu", href: (id: string) => `/app/publicacoes/historico?ocorrencia=${id}` },
 } satisfies Record<string, Alvo>;
 
 export type InboxRefKind = keyof typeof REFERENCIAS_DE_AVISO | "organization" | "ai_budget" | "job_queue" | "cron_jobs";
@@ -71,6 +74,7 @@ export const POLITICAS_DE_AVISO = {
   // aviso, escrito pelo worker.
   voice_call_missed: { refs: ["contact"], orientacao: "Retorne a ligação quando puder — quem ligou não foi atendido." },
   entitlement_changed: { refs: [], orientacao: "Veja em Configurações › Billing o plano atual, os recursos liberados e até quando valem.", geral: { papel: "admin", href: "/app/settings/billing", rotulo: "Ver plano e recursos" } },
+  publication_failed: { refs: ["publication_occurrence"], orientacao: "Abra o Histórico de Publicações: o destino que falhou mostra o motivo e permite reenviar quando fizer sentido." },
   other: { refs: ["lead", "channel_session", "appointment", "ai_agent"], orientacao: "Confira a situação descrita neste aviso com a pessoa responsável." },
 } satisfies Record<InboxKind, Politica>;
 

@@ -1,0 +1,6 @@
+---
+impacto: capacidade_nova
+secao: adicionado
+titulo: Publicações — um conteúdo, vários destinos, várias datas, com calendário e histórico por destino
+---
+O Disparo virou **Publicações**: você cria o conteúdo uma vez (arquivos em ordem, legenda) e escolhe onde ele sai — grupos do WhatsApp e, quando houver conta conectada, Feed, Stories e Reels do Instagram e do Facebook —, em quantas datas quiser, com repetição por dia, dias da semana, semana ou mês. A Lista mostra só o que ainda vai sair, por dia; o Calendário mostra o mês com um chip por publicação; o Histórico mostra o que saiu ou não em cada destino, conta e grupo, com o motivo e o botão de reenviar. Toda hora é no fuso da organização. As telas antigas de Disparo redirecionam para as novas, e o que já estava agendado foi levado junto. Nada para configurar na VPS: o relógio passa a chamar `publications-worker` no lugar do cron antigo na próxima atualização.

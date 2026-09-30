@@ -216,6 +216,7 @@ DeskcommCRM é um sistema operacional de vendas open source com agentes de IA na
 | `docs/prd/01-prd-platform-base.md` | Auth, tenancy, RBAC, LGPD framework |
 | `docs/prd/02-...06-` | Customer 360, WhatsApp, Pipeline, IA-RAG, Nuvemshop |
 | `docs/specs/` | Specs técnicas detalhadas (schema SQL, payloads exatos) |
+| `lib/publicacoes/` + `lib/channels/publicacao/` | **Publicações** (spec 23, migration 0283): domínio, worker e regras neutras em `lib/publicacoes/`; quem entrega (grupos, redes sociais) em `lib/channels/publicacao/`, escolhido pela capability `publishing` — nunca por nome de provider |
 | `docs/business-rules/` | Regras de negócio fora do código |
 | `docs/research/reference-synthesis.md` | Arquitetura herdada do curso WAHA |
 | `tasks/todo.md` | Workflow de construção atual |

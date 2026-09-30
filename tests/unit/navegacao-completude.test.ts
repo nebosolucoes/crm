@@ -45,7 +45,11 @@ const NAV_ALLOWLIST: Record<string, string> = {
   "/app/settings/marca":
     "rota legada bloqueada para tenant: marca visual é configuração global exclusiva de /admin/marca, e o app herda a marca da instalação",
   "/app/agendamentos":
-    "redirect legado para /app/disparo/lista — Disparo agora é o grupo do menu, com Lista, Agendar, Grupos e Histórico como portas reais",
+    "redirect legado para /app/publicacoes/lista — Publicações é o grupo do menu, com Lista, Agendar, Calendário, Grupos e Histórico como portas reais",
+  "/app/disparo/lista": "redirect legado (uma release) para /app/publicacoes/lista — o Disparo virou Publicações na migration 0283",
+  "/app/disparo/agendar": "redirect legado (uma release) para /app/publicacoes/agendar",
+  "/app/disparo/grupos": "redirect legado (uma release) para /app/publicacoes/grupos",
+  "/app/disparo/historico": "redirect legado (uma release) para /app/publicacoes/historico",
   "/app/recurso-indisponivel":
     "destino de REDIRECT, não de navegação: é onde exigirRecurso() (lib/entitlements) deixa quem abre uma tela que o plano da organização não inclui — como /account-suspended, só que dentro do shell. Ninguém navega até uma tela que diz 'você não tem isto'; a porta para o que ela explica é /app/settings/billing",
 };

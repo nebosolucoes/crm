@@ -27,8 +27,9 @@ import type { Recurso } from "./recursos";
 
 /** Prefixos relativos a `app/api/v1/`, sem barra inicial. */
 export const RECURSO_POR_ROTA: ReadonlyArray<readonly [prefixo: string, recurso: Recurso | null]> = [
-  // ── Disparo ──
+  // ── Publicações (o Disparo, agora multi-rede) ──
   ["agendamentos", "broadcast"],
+  ["publicacoes", "broadcast"],
 
   // ── Agentes de IA — tudo, menos a Central ──
   ["ai", "ai_agents"],

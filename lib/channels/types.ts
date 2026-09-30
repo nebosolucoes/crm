@@ -64,6 +64,14 @@ export interface ChannelCapabilities {
    * composer liberado entre 24h e 7 dias e o que faz o envio levar a tag.
    */
   humanAgentWindowHours: number | null;
+  /**
+   * Publicações (0283): o canal PUBLICA conteúdo agendado? `groups` = manda a
+   * mesma mensagem para grupos (WhatsApp); `social` = cria posts no feed,
+   * stories e reels de uma rede social; `none` = só conversa. Consumido pelo
+   * worker de Publicações (`lib/publicacoes/worker`) e pelo seletor de contas
+   * (`contasPublicaveis`) — nenhum dos dois pergunta QUAL canal é.
+   */
+  publishing: "none" | "groups" | "social";
 }
 
 /**

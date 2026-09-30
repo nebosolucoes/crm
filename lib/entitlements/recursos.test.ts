@@ -81,7 +81,7 @@ describe("grupo da navegação → recurso", () => {
 describe("recursoDoDestino", () => {
   it("destino exato do catálogo devolve o recurso do grupo", () => {
     expect(recursoDoDestino("/app/kanban")).toBe("crm");
-    expect(recursoDoDestino("/app/disparo/lista")).toBe("broadcast");
+    expect(recursoDoDestino("/app/publicacoes/lista")).toBe("broadcast");
     expect(recursoDoDestino("/app/ai/agents")).toBe("ai_agents");
     expect(recursoDoDestino("/app/metrics")).toBe("analytics");
     expect(recursoDoDestino("/app/inbox")).toBe("inbox");

@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Publicações — do conteúdo ao desfecho por destino",
+    "subtitle": "Uma publicação, vários destinos, várias datas; a verdade mora na execução e fecha na Central",
+    "output": "publicacoes.html",
+    "quality_profile": "standard"
+  },
+  "lanes": [
+    { "id": "operacao", "label": "Operação" },
+    { "id": "api", "label": "API e relógio" },
+    { "id": "dados", "label": "Dados" },
+    { "id": "canal", "label": "Canal" }
+  ],
+  "mainPath": ["tela-agendar", "api-publicacoes", "publicacao", "ocorrencia", "scheduler", "worker", "execucao", "publicador"],
+  "nodes": [
+    { "id": "tela-agendar", "lane": "operacao", "col": 0, "type": "ui", "label": "Agendar — arquivos em ordem, legenda, destinos por rede, grupos, datas e repetição (fuso da organização)" },
+    { "id": "tela-lista", "lane": "operacao", "col": 5, "type": "ui", "label": "Lista e Calendário — só o pendente, por dia; um chip por ocorrência; Sheet com destinos e ações" },
+    { "id": "tela-historico", "lane": "operacao", "col": 6, "type": "ui", "label": "Histórico — o que saiu ou não, por destino, conta e grupo; erro em frase de gente; reenviar à mão" },
+    { "id": "central", "lane": "operacao", "col": 7, "type": "ui", "label": "Central de avisos — publication_failed aponta para a ocorrência" },
+    { "id": "api-publicacoes", "lane": "api", "col": 1, "type": "service", "label": "REST /api/v1/publicacoes — escopo da organização, Idempotency-Key, regras por formato conferidas de novo" },
+    { "id": "upload", "lane": "api", "col": 2, "type": "service", "label": "Upload de mídia — um arquivo por chamada, posse por prefixo <org>/publications/" },
+    { "id": "scheduler", "lane": "api", "col": 3, "type": "service", "label": "Scheduler da VPS (e relógio HTTP) — tick a cada minuto" },
+    { "id": "worker", "lane": "api", "col": 4, "type": "service", "label": "Worker — materializa recorrência, expande ocorrências, claim por (ocorrência, destino), reconcilia" },
+    { "id": "webhook", "lane": "api", "col": 5, "type": "service", "label": "Webhook do canal — post.platform.* fecha a execução aceita" },
+    { "id": "publicacao", "lane": "dados", "col": 2, "type": "database", "label": "publications + publication_media + publication_targets (+ grupos)" },
+    { "id": "ocorrencia", "lane": "dados", "col": 3, "type": "database", "label": "publication_occurrences — cada data; status é rollup" },
+    { "id": "execucao", "lane": "dados", "col": 4, "type": "database", "label": "publication_executions — por destino × grupo | arquivo; id externo, tentativa, erro classificado" },
+    { "id": "midia", "lane": "dados", "col": 4, "type": "database", "label": "whatsapp-media privado — URL assinada só na hora de publicar" },
+    { "id": "avisos", "lane": "dados", "col": 6, "type": "database", "label": "agent_inbox_items kind publication_failed — um por ocorrência" },
+    { "id": "realtime", "lane": "dados", "col": 5, "type": "database", "label": "supabase_realtime — ocorrências e execuções publicam; a tela muda sozinha" },
+    { "id": "publicador", "lane": "canal", "col": 5, "type": "external", "label": "getPublisher(capability publishing) — grupos: uma mensagem por arquivo com pausa; social: um post por execução com publishNow e Idempotency-Key" }
+  ],
+  "edges": [
+    { "id": "tela-cria", "from": "tela-agendar", "to": "api-publicacoes", "label": "cria e edita; a tela pré-checa as mesmas regras por formato" },
+    { "id": "tela-sobe", "from": "tela-agendar", "to": "upload", "label": "sobe cada arquivo com dicas de dimensão e duração" },
+    { "id": "upload-guarda", "from": "upload", "to": "midia", "label": "grava no bucket privado sob o prefixo da organização" },
+    { "id": "api-grava", "from": "api-publicacoes", "to": "publicacao", "label": "conteúdo, mídias em ordem, destinos e grupos (FK tripla)" },
+    { "id": "api-datas", "from": "api-publicacoes", "to": "ocorrencia", "label": "datas escolhidas + recorrência materializada até o horizonte" },
+    { "id": "scheduler-tick", "from": "scheduler", "to": "worker", "label": "GET /api/v1/cron/publications-worker" },
+    { "id": "worker-expande", "from": "worker", "to": "ocorrencia", "label": "vencida vira processing; janela perdida vira skipped" },
+    { "id": "worker-executa", "from": "worker", "to": "execucao", "label": "claim com lease; sending antes da chamada; sent/failed depois, com guarda" },
+    { "id": "worker-assina", "from": "worker", "to": "midia", "label": "assina URL curta por arquivo" },
+    { "id": "worker-publica", "from": "worker", "to": "publicador", "label": "pedido neutro: rede, formato, conta, mídia, legenda, chave" },
+    { "id": "publicador-volta", "from": "publicador", "to": "execucao", "label": "sent, accepted ou failed classificado (transitório tenta; permanente avisa)" },
+    { "id": "webhook-fecha", "from": "webhook", "to": "execucao", "label": "published/failed do provedor fecha o que ficou aceito" },
+    { "id": "execucao-rollup", "from": "execucao", "to": "ocorrencia", "label": "fn_rollup_publication_occurrence: done, partial, failed" },
+    { "id": "ocorrencia-fecha", "from": "ocorrencia", "to": "publicacao", "label": "sem pendente e recorrência encerrada → completed" },
+    { "id": "worker-avisa", "from": "worker", "to": "avisos", "label": "falha permanente ou horário perdido abre um aviso por ocorrência" },
+    { "id": "avisos-central", "from": "avisos", "to": "central", "label": "aviso com link para o Histórico" },
+    { "id": "central-historico", "from": "central", "to": "tela-historico", "label": "?ocorrencia= abre o painel" },
+    { "id": "realtime-tela", "from": "realtime", "to": "tela-lista", "label": "postgres_changes → invalidação do cache" },
+    { "id": "execucao-realtime", "from": "execucao", "to": "realtime", "label": "toda mudança de status" },
+    { "id": "ocorrencia-realtime", "from": "ocorrencia", "to": "realtime", "label": "toda mudança de status" },
+    { "id": "lista-le", "from": "tela-lista", "to": "api-publicacoes", "label": "ocorrências num intervalo de instantes; reagendar e cancelar" },
+    { "id": "historico-le", "from": "tela-historico", "to": "api-publicacoes", "label": "histórico com cursor; detalhe da ocorrência; reenviar" },
+    { "id": "historico-reenvia", "from": "tela-historico", "to": "execucao", "label": "reenviar cria attempt+1 pendente" }
+  ]
+}

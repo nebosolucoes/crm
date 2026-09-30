@@ -528,6 +528,19 @@ export const AUDIT_ACTIONS = [
   "scheduled_group.media_uploaded",
   "scheduled_group.worker_run",
 
+  // Publicações (migration 0283): o conteúdo que sai em várias redes. A
+  // auditoria cobre a intenção humana (criar, editar, reagendar, cancelar,
+  // excluir, subir mídia, reenviar à mão) e a rodada do worker QUE FEZ ALGO.
+  "publication.created",
+  "publication.updated",
+  "publication.cancelled",
+  "publication.deleted",
+  "publication.media_uploaded",
+  "publication.occurrence_rescheduled",
+  "publication.occurrence_cancelled",
+  "publication.execution_resent",
+  "publication.worker_run",
+
   // ── O compromisso em si (frentes 1 e 5 do Calendário Vivo) ──────────────
   // Marcar, remarcar e cancelar são mutações de um compromisso com hora e
   // pessoa. Cancelar em especial: é a única das três que alguém pode querer
