@@ -7,6 +7,8 @@ import type { Conversation } from "@/lib/types/messaging";
 interface CloseArgs {
   conversation_id: string;
   expected_revision?: number;
+  /** Spec 22: por que um comentário fecha sem resposta. */
+  motivo?: "sem_resposta_necessaria" | "spam" | "ocultado";
 }
 
 export function useCloseConversation() {
@@ -16,7 +18,7 @@ export function useCloseConversation() {
     mutationFn: async (args: CloseArgs) =>
       apiClient.post<{ data: Conversation }>(
         `/api/v1/conversations/${args.conversation_id}/close`,
-        { expected_revision: args.expected_revision },
+        { expected_revision: args.expected_revision, ...(args.motivo ? { motivo: args.motivo } : {}) },
       ),
     onError: (err, args) => {
       qc.invalidateQueries({ queryKey: ["conversations"] });
@@ -67,6 +69,26 @@ export function useReopenConversation() {
     ),
     onError: showApiError,
     onSettled: (_data, _error, args) => {
+      qc.invalidateQueries({ queryKey: ["conversations"] });
+      qc.invalidateQueries({ queryKey: ["conversation", args.conversation_id] });
+    },
+  });
+}
+
+/**
+ * Oculta o comentário na rede e fecha o atendimento (spec 22 §5.1). Sem
+ * `message_id`, oculta o comentário principal do fio.
+ */
+export function useHideComment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: { conversation_id: string; message_id?: string }) =>
+      apiClient.post<{ data: { hidden: boolean } }>(
+        `/api/v1/conversations/${args.conversation_id}/hide-comment`,
+        args.message_id ? { message_id: args.message_id } : {},
+      ),
+    onError: (err) => showApiError(err),
+    onSettled: (_d, _e, args) => {
       qc.invalidateQueries({ queryKey: ["conversations"] });
       qc.invalidateQueries({ queryKey: ["conversation", args.conversation_id] });
     },

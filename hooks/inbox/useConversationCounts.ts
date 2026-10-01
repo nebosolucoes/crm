@@ -27,6 +27,8 @@ export interface FiltrosDaContagem {
   tag?: string;
   channel_session_id?: string;
   sector_id?: string;
+  /** Spec 22: `direct` ou `comment`. */
+  kind?: string;
 }
 
 /**
@@ -42,6 +44,7 @@ export function useConversationCounts(
   if (filtros.tag) qs.set("tag", filtros.tag);
   if (filtros.channel_session_id) qs.set("channel_session_id", filtros.channel_session_id);
   if (filtros.sector_id) qs.set("sector_id", filtros.sector_id);
+  if (filtros.kind) qs.set("kind", filtros.kind);
   const sufixo = qs.toString();
 
   return useQuery({

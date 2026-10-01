@@ -16,6 +16,8 @@ import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
 import { plataformaDe } from "@/lib/channels/plataformas";
 import { IconeDaPlataforma } from "@/components/channels/IconeDaPlataforma";
+import { lerContextoDoComentario } from "@/lib/channels/comentarios/contexto";
+import { CONVERSA_COMENTARIO, tipoDeConversa } from "@/lib/channels/comentarios/vocabulario";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -134,6 +136,12 @@ export function ConversationListItem({
   // Messenger (spec 21; pedido do dono, 29/09: "o ícone do WhatsApp igual tem
   // no Instagram"). Conversa sem `channel` (cache antigo) é WhatsApp.
   const rede = plataformaDe(conversation.channel);
+  // Spec 22: comentário é a mesma rede por outra porta — ícone de balão, e o
+  // selo da conta aparece SEMPRE (com 3 ou 4 Instagrams, "de qual conta veio"
+  // é a primeira pergunta de quem responde em público).
+  const ehComentario = tipoDeConversa(conversation.kind) === CONVERSA_COMENTARIO;
+  const origem = ehComentario ? "comentario" : "direct";
+  const legendaDoPost = ehComentario ? lerContextoDoComentario(conversation.metadata).textoDoPost : null;
   const tags = c?.tags ?? [];
   const visibleTags = tags.slice(0, 2);
   const overflow = tags.length - visibleTags.length;
@@ -194,7 +202,7 @@ export function ConversationListItem({
   const temSelos =
     visibleTags.length > 0 ||
     (mostrarAtendente && comando.quem === "humano") ||
-    (mostrarCanal && rotuloCanal != null) ||
+    ((mostrarCanal || ehComentario) && rotuloCanal != null) ||
     Boolean(nomeDoSetor) ||
     Boolean(c?.is_blocked) ||
     Boolean(c?.is_anonymized);
@@ -262,7 +270,7 @@ export function ConversationListItem({
               c?.is_anonymized && "font-normal italic text-text-muted",
             )}
           >
-            <IconeDaPlataforma plataforma={rede} className="mr-1 inline size-3.5 align-[-2px]" />
+            <IconeDaPlataforma plataforma={rede} origem={origem} className="mr-1 inline size-3.5 align-[-2px]" />
             {displayName}
           </span>
           <span
@@ -308,14 +316,20 @@ export function ConversationListItem({
             {mostrarAtendente && comando.quem === "humano" && (
               <OwnerBadge ownerKind="user" ownerName={comando.nome ?? t("Atendente")} compacto />
             )}
-            {mostrarCanal && rotuloCanal && (
+            {(mostrarCanal || ehComentario) && rotuloCanal && (
               <Badge
                 variant="outline"
-                className="h-4 gap-1 px-1.5 text-[10px] font-normal text-text-muted"
-                title={`${t("Entrou por")} ${rotuloCanal}`}
+                className="h-4 max-w-full gap-1 px-1.5 text-[10px] font-normal text-text-muted"
+                title={
+                  ehComentario
+                    ? `${t("Comentário em")} ${rotuloCanal}${legendaDoPost ? ` · ${legendaDoPost.slice(0, 80)}` : ""}`
+                    : `${t("Entrou por")} ${rotuloCanal}`
+                }
+                data-testid="selo-da-conta"
+                data-origem={origem}
               >
-                <IconeDaPlataforma plataforma={rede} titulo={false} className="size-2.5" />
-                {rotuloCanal}
+                <IconeDaPlataforma plataforma={rede} origem={origem} titulo={false} className="size-2.5 shrink-0" />
+                <span className="truncate">{rotuloCanal}</span>
               </Badge>
             )}
             {nomeDoSetor && (

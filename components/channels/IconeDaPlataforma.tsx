@@ -19,18 +19,34 @@ const COR: Record<Plataforma, string> = {
   messenger: "#0084FF",
 };
 
+/**
+ * Comentário (spec 22) é a mesma rede por outra PORTA: o desenho troca para um
+ * balão de comentário na cor da rede, para o atendente distinguir de relance o
+ * que é Direct do que é público. No Facebook a porta é a página, não o
+ * Messenger — por isso o nome muda.
+ */
+const NOME_DO_COMENTARIO: Record<Plataforma, string> = {
+  whatsapp: "Comentário",
+  instagram: "Comentário no Instagram",
+  messenger: "Comentário no Facebook",
+};
+
 export function IconeDaPlataforma({
   plataforma,
   className,
   titulo = true,
+  origem = "direct",
 }: {
   plataforma: unknown;
   className?: string;
   /** `false` quando o nome já está escrito ao lado — evita leitura dupla. */
   titulo?: boolean;
+  /** `comentario` desenha o balão de comentário (spec 22). */
+  origem?: "direct" | "comentario";
 }) {
   const p = plataformaDe(plataforma);
-  const nome = ROTULO_DA_PLATAFORMA[p];
+  const comentario = origem === "comentario" && p !== "whatsapp";
+  const nome = comentario ? NOME_DO_COMENTARIO[p] : ROTULO_DA_PLATAFORMA[p];
   return (
     <svg
       viewBox="0 0 24 24"
@@ -38,9 +54,20 @@ export function IconeDaPlataforma({
       role="img"
       aria-label={nome}
       data-plataforma={p}
+      data-origem={comentario ? "comentario" : "direct"}
     >
       {titulo ? <title>{nome}</title> : null}
-      {p === "instagram" ? (
+      {comentario ? (
+        <g>
+          <path
+            d="M4 3.5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-9.2L6 21.2v-3.7H4a2 2 0 0 1-2-2v-10a2 2 0 0 1 2-2Z"
+            fill={COR[p]}
+          />
+          <circle cx="7.5" cy="10.5" r="1.3" fill="#fff" />
+          <circle cx="12" cy="10.5" r="1.3" fill="#fff" />
+          <circle cx="16.5" cy="10.5" r="1.3" fill="#fff" />
+        </g>
+      ) : p === "instagram" ? (
         <g fill="none" stroke={COR.instagram} strokeWidth="2">
           <rect x="3" y="3" width="18" height="18" rx="5" />
           <circle cx="12" cy="12" r="4" />

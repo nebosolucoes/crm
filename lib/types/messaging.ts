@@ -9,6 +9,8 @@ export interface Conversation {
   contact_id: string;
   channel_session_id: string;
   channel: string;
+  /** `direct` (mensagens) ou `comment` (um comentário principal) — spec 22. Ausente = Direct. */
+  kind?: string | null;
   status: string;
   status_changed_at: string;
   service_revision?: number;

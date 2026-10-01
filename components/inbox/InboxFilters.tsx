@@ -60,6 +60,8 @@ export interface InboxFiltersValue {
   tag?: string;
   /** Setor da conversa (spec 20). */
   sector_id?: string;
+  /** Spec 22: só mensagens (`direct`) ou só comentários (`comment`). */
+  kind?: "direct" | "comment";
 }
 
 interface Props {
@@ -107,6 +109,7 @@ export function InboxFilters({ value, onChange }: Props) {
     tag: value.tag,
     channel_session_id: value.channel_session_id,
     sector_id: value.sector_id,
+    kind: value.kind,
   });
   // Setores (spec 20): o seletor só aparece quando a organização tem setor ativo.
   const setores = useSetoresAtivos();
@@ -134,6 +137,9 @@ export function InboxFilters({ value, onChange }: Props) {
   // canal) deixa o inbox mostrando um subconjunto — às vezes vazio — sem nada na
   // tela dizendo que há filtro. O número some do dropdown junto com o canal, e o
   // alternador inteiro sumiria com ele se sobrasse menos de dois.
+  // Spec 22: o seletor de tipo só existe quando alguma conexão entrega
+  // comentários — sem isso, "Só comentários" seria uma lista sempre vazia.
+  const mostrarSeletorDeTipo = (channels ?? []).some((c) => c.inbox_comments === true) || value.kind != null;
   const filtroForaDaLista =
     value.channel_session_id != null &&
     channels != null &&
@@ -230,7 +236,7 @@ export function InboxFilters({ value, onChange }: Props) {
           </button>
         </div>
 
-        {(showChannelSwitch || mostrarSeletorDeTag || mostrarSeletorDeSetor) && (
+        {(showChannelSwitch || mostrarSeletorDeTag || mostrarSeletorDeSetor || mostrarSeletorDeTipo) && (
           <div className="flex gap-2">
             {mostrarSeletorDeSetor && (
               <Select
@@ -256,6 +262,30 @@ export function InboxFilters({ value, onChange }: Props) {
                       {s.name}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            )}
+            {mostrarSeletorDeTipo && (
+              <Select
+                value={value.kind ?? "all"}
+                onValueChange={(v) =>
+                  onChange({ ...value, kind: v === "direct" || v === "comment" ? v : undefined })
+                }
+              >
+                <SelectTrigger
+                  className={cn(
+                    "h-8 min-w-0 flex-1 rounded-full border-transparent bg-surface-elevated px-3 text-xs shadow-none",
+                    value.kind != null && "border-accent bg-accent-soft text-accent",
+                  )}
+                  aria-label={t("Filtrar por tipo de atendimento")}
+                  data-testid="filtro-tipo"
+                >
+                  <SelectValue placeholder={t("Mensagens e comentários")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("Mensagens e comentários")}</SelectItem>
+                  <SelectItem value="direct">{t("Só mensagens")}</SelectItem>
+                  <SelectItem value="comment">{t("Só comentários")}</SelectItem>
                 </SelectContent>
               </Select>
             )}

@@ -6,6 +6,7 @@
  * (quando o payload entra na pipeline pós-verificação HMAC).
  */
 import { z } from "zod";
+import { TIPOS_DE_CONVERSA } from "@/lib/channels/comentarios/vocabulario";
 import { COMANDOS_DO_BANCO, type ComandoDoBanco } from "@/lib/inbox/comando-da-conversa";
 import { PISO_DA_BUSCA, buscaValeConsulta } from "@/lib/inbox/termo-de-busca";
 
@@ -331,6 +332,8 @@ export const listConversationsQuerySchema = z.object({
   channel_session_id: z.string().uuid().optional(),
   /** Setor da conversa (spec 20). */
   sector_id: z.string().uuid().optional(),
+  /** Mensagens (`direct`) ou comentários (`comment`) — spec 22 §7. */
+  kind: z.enum(TIPOS_DE_CONVERSA).optional(),
   tag: conversationTagSchema.optional(),
   /**
    * Só as que têm mensagem não lida para o dono.

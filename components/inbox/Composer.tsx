@@ -58,6 +58,11 @@ interface Props {
   contactName?: string | null;
   /** Contato da conversa — excluído do seletor de cartão compartilhado. */
   currentContactId?: string | null;
+  /**
+   * Atendimento de COMENTÁRIO (spec 22 §5.1): responde no post (público) ou no
+   * Direct de quem comentou. Só texto — sem anexo, áudio nem modelo.
+   */
+  comentario?: { diretoDisponivel: boolean } | null;
 }
 
 export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
@@ -70,6 +75,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
     currentContactId,
     respondendo,
     onCancelarResposta,
+    comentario = null,
   },
   ref,
 ) {
@@ -79,13 +85,15 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
   const [contactPickerOpen, setContactPickerOpen] = useState(false);
   const [menuDismissed, setMenuDismissed] = useState(false);
   const [mode, setMode] = useState<"reply" | "note">("reply");
+  const [ondeResponder, setOndeResponder] = useState<"public" | "private">("public");
+  const noDirect = comentario !== null && ondeResponder === "private" && comentario.diretoDisponivel;
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const send = useSendMessage();
   const upload = useUploadMedia();
   const createNote = useCreateNote();
   const templates = useMessageTemplates();
   const slash = resolveSlash(text);
-  const menuOpen = mode === "reply" && slash.open && !menuDismissed;
+  const menuOpen = mode === "reply" && comentario === null && slash.open && !menuDismissed;
 
   useImperativeHandle(ref, () => ({
     focus: () => taRef.current?.focus(),
@@ -128,6 +136,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
         body,
         type: "text",
         ...(respondendo ? { reply_to_message_id: respondendo.id } : {}),
+        ...(comentario ? { comment_reply_mode: noDirect ? ("private" as const) : ("public" as const) } : {}),
       },
       {
         onSuccess: () => {
@@ -239,7 +248,46 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
           >
             {t("Nota interna")}
           </button>
+          {comentario && mode === "reply" && (
+            <div className="ml-auto flex gap-1" role="group" aria-label={t("Onde responder")} data-testid="onde-responder">
+              <button
+                type="button"
+                onClick={() => setOndeResponder("public")}
+                className={cn(
+                  "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                  !noDirect ? "bg-surface-elevated text-text ring-1 ring-border" : "text-muted-foreground hover:bg-muted",
+                )}
+                aria-pressed={!noDirect}
+              >
+                {t("No post")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setOndeResponder("private")}
+                disabled={!comentario.diretoDisponivel}
+                title={
+                  comentario.diretoDisponivel
+                    ? t("Uma mensagem privada para quem comentou — a Meta permite uma por comentário.")
+                    : t("Passou de 7 dias desde o comentário: a Meta não aceita mais resposta no Direct.")
+                }
+                className={cn(
+                  "rounded-full px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                  noDirect ? "bg-surface-elevated text-text ring-1 ring-border" : "text-muted-foreground hover:bg-muted",
+                )}
+                aria-pressed={noDirect}
+              >
+                {t("No Direct")}
+              </button>
+            </div>
+          )}
         </div>
+        {comentario && mode === "reply" && (
+          <p className="mb-1 text-[11px] text-muted-foreground" data-testid="aviso-de-resposta">
+            {noDirect
+              ? t("Vai como mensagem privada. A Meta permite só uma por comentário.")
+              : t("Resposta pública: aparece no post para todo mundo.")}
+          </p>
+        )}
         {/*
           A FAIXA DA CITAÇÃO — o que o atendente escolheu responder.
 
@@ -271,7 +319,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
           </div>
         )}
         <div className="flex items-end gap-2">
-          {mode === "reply" && (
+          {mode === "reply" && comentario === null && (
             <AttachMenu
               disabled={respostaBarrada}
               onPick={setPendingFile}
@@ -321,7 +369,11 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             placeholder={
               mode === "note"
                 ? t("Escreva uma nota interna… (só o time vê)")
-                : t("Escreva uma mensagem…")
+                : comentario
+                  ? noDirect
+                    ? t("Escreva a mensagem privada…")
+                    : t("Escreva a resposta pública…")
+                  : t("Escreva uma mensagem…")
             }
             title={
               mode === "note"
@@ -335,7 +387,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             disabled={mode === "note" ? isDisabled : respostaBarrada}
             aria-label={t("Mensagem")}
           />
-          {text.trim() || mode === "note" ? (
+          {text.trim() || mode === "note" || comentario ? (
             <Button
               type="button"
               size="icon"

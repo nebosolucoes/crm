@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { Message } from "@/lib/types/messaging";
 import { CitationButton } from "@/components/ai/CitationButton";
 import { MediaRenderer } from "@/components/inbox/media/MediaRenderer";
+import { lerComentarioDaMensagem } from "@/lib/channels/comentarios/contexto";
 import { ContactCard } from "@/components/inbox/media/ContactCard";
 import {
   extractCitations,
@@ -72,6 +73,18 @@ export function MessageBubble({
   const editada = Boolean(message.edited_at) && !apagada;
   const aiGenerated = isAiGeneratedMessage(message.metadata);
   const citations = extractCitations(message.metadata);
+  // Spec 22: numa resposta a comentário, ONDE ela foi — no post (público), no
+  // Direct, ou pelo app do celular. Não é "quem" (isso é o senderLabel): é a
+  // diferença entre algo que todo mundo vê e algo privado.
+  const comentario = isOutbound ? lerComentarioDaMensagem(message.metadata) : null;
+  const ondeFoi =
+    comentario?.origem === "app"
+      ? "respondido pelo app"
+      : comentario?.modo === "privado"
+        ? "no Direct"
+        : comentario?.modo === "publico"
+          ? "no post"
+          : null;
   const showCitationButton =
     isOutbound && aiGenerated && (debugCitations ?? false);
   // De quem saiu esta linha. `external_device` é a resposta pelo CELULAR — o
@@ -246,6 +259,7 @@ export function MessageBubble({
             // divergência só aparece quando alguém cobra o que não foi.
             <span title={t("O autor editou esta mensagem")}>{t("editada")}</span>
           )}
+          {ondeFoi && <span data-testid="onde-foi-a-resposta">{t(ondeFoi)} ·</span>}
           <span>{time}</span>
           {showCitationButton && (
             <CitationButton citations={citations} messageId={message.id} />

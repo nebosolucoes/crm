@@ -101,6 +101,8 @@ export interface ConversationsFilters {
   channel_session_id?: string;
   /** Setor da conversa (spec 20). */
   sector_id?: string;
+  /** Spec 22: `direct` (mensagens) ou `comment` (comentários). */
+  kind?: string;
   tag?: string;
 }
 
@@ -139,6 +141,7 @@ export function useConversationsRealtime(
       if (filters.unread) qs.set("unread", "true");
       if (filters.channel_session_id) qs.set("channel_session_id", filters.channel_session_id);
       if (filters.sector_id) qs.set("sector_id", filters.sector_id);
+      if (filters.kind) qs.set("kind", filters.kind);
       if (filters.tag) qs.set("tag", filters.tag);
       if (pageParam) qs.set("cursor", pageParam);
       qs.set("limit", "50");

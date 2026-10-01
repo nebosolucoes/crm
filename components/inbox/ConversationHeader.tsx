@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { JanelaSelo } from "@/components/inbox/JanelaSelo";
 import { IconeDaPlataforma } from "@/components/channels/IconeDaPlataforma";
+import { CONVERSA_COMENTARIO, tipoDeConversa } from "@/lib/channels/comentarios/vocabulario";
+import { AcoesDoComentario, ContextoDoComentario } from "./ComentarioNoCabecalho";
 import { ehPlataformaSocial, plataformaDe, ROTULO_DA_PLATAFORMA } from "@/lib/channels/plataformas";
 import { Phone, ArrowRight } from "@/lib/ui/icons";
 import { useAuth } from "@/hooks/auth/AuthProvider";
@@ -80,6 +82,11 @@ export function ConversationHeader({ conversation }: Props) {
   const redeSocial = ehPlataformaSocial(conversation.channel) ? conversation.channel : null;
   // O selo da rede aparece em toda conversa, WhatsApp inclusive (pedido do dono, 29/09).
   const rede = plataformaDe(conversation.channel);
+  // Spec 22: atendimento de comentário — outra porta da mesma rede.
+  const ehComentario = tipoDeConversa(conversation.kind) === CONVERSA_COMENTARIO;
+  const comentarioRespondido =
+    conversation.last_outbound_at != null &&
+    (conversation.last_inbound_at == null || conversation.last_outbound_at >= conversation.last_inbound_at);
   const usuarioSocial =
     c?.contact_platform_identities?.find((i) => i.platform === conversation.channel && i.username)?.username ?? null;
   const status = conversation.status;
@@ -158,7 +165,7 @@ export function ConversationHeader({ conversation }: Props) {
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background px-4 py-3">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <IconeDaPlataforma plataforma={rede} />
+          <IconeDaPlataforma plataforma={rede} origem={ehComentario ? "comentario" : "direct"} />
           <h2 className="truncate text-sm font-semibold">{displayName}</h2>
           <Badge variant="outline" className="h-4 px-1.5 text-[10px]">
             {t(STATUS_LABEL[status] ?? status)}
@@ -166,11 +173,14 @@ export function ConversationHeader({ conversation }: Props) {
           {/* Ao lado do estado, não escondido num painel: a pergunta "dá para
               escrever agora?" se faz ANTES de digitar, não depois de receber um
               `failed` com um código de cinco dígitos. */}
-          <JanelaSelo
-            provider={conversation.channel_sessions?.provider ?? null}
-            plataforma={conversation.channel}
-            lastInboundAt={conversation.last_inbound_at}
-          />
+          {/* Comentário não tem janela de 24h: responder no post vale sempre. */}
+          {!ehComentario && (
+            <JanelaSelo
+              provider={conversation.channel_sessions?.provider ?? null}
+              plataforma={conversation.channel}
+              lastInboundAt={conversation.last_inbound_at}
+            />
+          )}
           {/* Sem esta marca, a conversa em que o robô está calado tem exatamente
               a mesma cara de uma conversa normal — e ninguém entende por que as
               respostas automáticas pararam.
@@ -215,6 +225,12 @@ export function ConversationHeader({ conversation }: Props) {
             {ROTULO_DA_PLATAFORMA[redeSocial]}
             {usuarioSocial ? ` · @${usuarioSocial}` : ""}
           </p>
+        )}
+        {ehComentario && (
+          <ContextoDoComentario
+            metadata={conversation.metadata}
+            conta={conversation.channel_sessions?.display_name ?? null}
+          />
         )}
       </div>
 
@@ -312,7 +328,14 @@ export function ConversationHeader({ conversation }: Props) {
             snoozeUntil={conversation.snooze_until ?? null}
           />
         )}
-        {!encerrada && (
+        {!encerrada && ehComentario && (
+          <AcoesDoComentario
+            conversationId={conversation.id}
+            revisao={conversation.service_revision}
+            respondido={comentarioRespondido}
+          />
+        )}
+        {!encerrada && !ehComentario && (
           <Button
             size="sm"
             variant="outline"

@@ -7,6 +7,7 @@
  * garantia do listing. Head count (count:'exact', head:true) não devolve linhas.
  */
 import { randomUUID } from "node:crypto";
+import { TIPOS_DE_CONVERSA } from "@/lib/channels/comentarios/vocabulario";
 
 import type { NextRequest } from "next/server";
 
@@ -55,6 +56,10 @@ export function filtrosAuxiliaresDaContagem(
   if (tag) filtros.push(["tag", tag]);
   const setor = sp.get("sector_id");
   if (setor) filtros.push(["sector_id", setor]);
+  // Spec 22: mensagens ou comentários. Só o vocabulário — valor livre na
+  // query viraria filtro que nunca casa e uma contagem zerada sem motivo.
+  const tipo = sp.get("kind");
+  if (tipo && (TIPOS_DE_CONVERSA as readonly string[]).includes(tipo)) filtros.push(["kind", tipo]);
   return filtros;
 }
 

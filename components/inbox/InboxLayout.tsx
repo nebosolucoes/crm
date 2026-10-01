@@ -1,5 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { JANELA_DA_RESPOSTA_PRIVADA_MS } from "@/lib/channels/comentarios/contexto";
+import { CONVERSA_COMENTARIO, tipoDeConversa } from "@/lib/channels/comentarios/vocabulario";
 import { useT } from "@/hooks/i18n/useT";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/auth/AuthProvider";
@@ -207,6 +209,7 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
         : undefined,
       channel_session_id: filterValue.channel_session_id,
       sector_id: filterValue.sector_id,
+      kind: filterValue.kind,
       tag: filterValue.tag,
       unread: filterValue.onlyUnread || undefined,
     }),
@@ -216,6 +219,7 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
       filterValue.search,
       filterValue.channel_session_id,
       filterValue.sector_id,
+      filterValue.kind,
       filterValue.tag,
       filterValue.onlyUnread,
     ],
@@ -336,8 +340,10 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
   const redeSemModelo =
     fonteDeTemplates(selectedConversation?.channel_sessions?.provider ?? null, selectedConversation?.channel ?? null) ===
       null && ehPlataformaSocial(selectedConversation?.channel);
+  // Spec 22: comentário não tem janela de 24h — responder no post vale sempre.
+  const ehComentario = tipoDeConversa(selectedConversation?.kind) === CONVERSA_COMENTARIO;
   const motivoDaJanela =
-    janela.tipo === "fechada"
+    !ehComentario && janela.tipo === "fechada"
       ? redeSemModelo
         ? t("Passou o prazo para responder nesta rede (7 dias desde a última mensagem do cliente). Só dá para escrever de novo quando ele mandar mensagem.")
         : janela.fechadaHaMs === null
@@ -532,6 +538,17 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
               respondendo={respondendo}
               onCancelarResposta={() => setRespondendo(null)}
               currentContactId={selectedConversation.contact_id}
+              comentario={
+                ehComentario
+                  ? {
+                      // A Meta aceita a resposta no Direct até 7 dias depois do comentário;
+                      // "já usada" só o servidor sabe, e recusa com a frase certa.
+                      diretoDisponivel:
+                        selectedConversation.last_inbound_at != null &&
+                        agoraJanela.getTime() - Date.parse(selectedConversation.last_inbound_at) < JANELA_DA_RESPOSTA_PRIVADA_MS,
+                    }
+                  : null
+              }
             />
           </>
         ) : selectionNotFound ? (
