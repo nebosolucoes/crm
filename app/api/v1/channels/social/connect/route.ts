@@ -27,7 +27,14 @@ import { cookieSecure } from "@/lib/supabase/cookie-secure";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const corpoSchema = z.object({ platform: z.enum(PLATAFORMAS_SOCIAIS) });
+const corpoSchema = z
+  .object({
+    platform: z.enum(PLATAFORMAS_SOCIAIS),
+    // O que a conexão entrega para a inbox (spec 22 §4). Ausente = as duas.
+    inbox_direct: z.boolean().default(true),
+    inbox_comments: z.boolean().default(true),
+  })
+  .refine((c) => c.inbox_direct || c.inbox_comments, { message: "nada_a_entregar" });
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const supportDenied = await requireSupportWrite();
@@ -39,7 +46,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
 
   const lido = corpoSchema.safeParse(await req.json().catch(() => null));
-  if (!lido.success) return fail("invalid_request", t("Escolha Instagram ou Messenger."), 422, { requestId });
+  if (!lido.success) {
+    const nada = lido.error.issues.some((i) => i.message === "nada_a_entregar");
+    return fail(
+      "invalid_request",
+      nada ? t("Escolha pelo menos uma: mensagens diretas ou comentários.") : t("Escolha Instagram ou Messenger."),
+      422,
+      { requestId },
+    );
+  }
 
   // O provedor entrega as mensagens pela INTERNET, no WEBHOOK. Com o webhook
   // num endereço que ela não alcança, a conexão pareceria feita e nenhuma DM
@@ -74,6 +89,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     userId: authz.user.id,
     authSessionId: await authenticatedSessionId(),
     plataforma: lido.data.platform,
+    entrega: { direct: lido.data.inbox_direct, comentarios: lido.data.inbox_comments },
     callbackUrl: `${urlPublicaDaInstalacao(req)}${CAMINHO_DO_CALLBACK_SOCIAL}`,
   });
   if (!r.ok) return fail("invalid_request", t(r.motivo), 422, { requestId });

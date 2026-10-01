@@ -26,6 +26,9 @@ export interface ChannelSession {
   provider?: string | null;
   /** A rede (spec 21): `whatsapp` | `instagram` | `messenger`. Ausente = WhatsApp. */
   platform?: string | null;
+  /** Spec 22: o que a conexão social entrega para a inbox. Ausente = só Direct. */
+  inbox_direct?: boolean | null;
+  inbox_comments?: boolean | null;
 }
 
 export type ConnectionHealth = "connected" | "connecting" | "down" | "none" | "unknown";

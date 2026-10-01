@@ -29,8 +29,10 @@ import { PLATAFORMAS_SOCIAIS, type PlataformaSocial, ROTULO_DA_PLATAFORMA } from
 import { emitirEstadoSocial, type EstadoSocial } from "./social-state";
 import { zernioApiKeyDaInstalacao } from "./zernio/credentials";
 import {
+  atualizarEventosDoWebhook,
   contaDoProfile,
   criarProfile,
+  type EntregaDaConexao,
   nomeDoProfile,
   registrarWebhook,
   removerConta,
@@ -113,6 +115,8 @@ export interface ConexaoSocial {
   avatarUrl: string | null;
   status: string | null;
   criadaEm: string;
+  /** O que a conexão entrega para a inbox (spec 22). */
+  entrega: EntregaDaConexao;
 }
 
 export async function listarConexoesSociais(
@@ -121,7 +125,7 @@ export async function listarConexoesSociais(
 ): Promise<ConexaoSocial[]> {
   const { data } = await admin
     .from("channel_sessions")
-    .select("id, platform, display_name, status, metadata, created_at")
+    .select("id, platform, display_name, status, metadata, created_at, inbox_direct, inbox_comments")
     .eq("organization_id", organizationId)
     .eq("provider", PROVIDER)
     .in("platform", [...PLATAFORMAS_SOCIAIS])
@@ -141,6 +145,7 @@ export async function listarConexoesSociais(
       avatarUrl: texto(meta.social_avatar_url),
       status: (row.status as string | null) ?? null,
       criadaEm: row.created_at as string,
+      entrega: { direct: row.inbox_direct !== false, comentarios: row.inbox_comments === true },
     };
   });
 }
@@ -156,6 +161,8 @@ export async function iniciarConexaoSocial(input: {
   userId: string;
   authSessionId: string;
   plataforma: PlataformaSocial;
+  /** O que a conexão entrega para a inbox (spec 22 §4). */
+  entrega: EntregaDaConexao;
   /** Nosso callback, SEM o `state` — ele é acrescentado aqui. */
   callbackUrl: string;
 }): Promise<ResultadoSocial<{ authUrl: string; nonce: string }>> {
@@ -176,6 +183,7 @@ export async function iniciarConexaoSocial(input: {
     authSessionId: input.authSessionId,
     plataforma: input.plataforma,
     profileId: profile.valor.profileId,
+    entrega: input.entrega,
   });
   const retorno = new URL(input.callbackUrl);
   retorno.searchParams.set("state", state);
@@ -241,6 +249,7 @@ export async function concluirConexaoSocial(
     url: input.urlDoWebhook(token),
     segredo,
     accountId: input.accountId,
+    entrega: estado.entrega,
   });
   if (!webhook.ok) return { ok: false, motivo: `Não foi possível registrar o webhook: ${webhook.motivo}` };
 
@@ -266,6 +275,8 @@ export async function concluirConexaoSocial(
     display_name: conta.valor.displayName ?? (conta.valor.username ? `@${conta.valor.username}` : rotulo),
     status: conta.valor.ativa ? "WORKING" : "FAILED",
     created_by: estado.userId,
+    inbox_direct: estado.entrega.direct,
+    inbox_comments: estado.entrega.comentarios,
     metadata,
     archived_at: null,
   };
@@ -287,6 +298,73 @@ export async function concluirConexaoSocial(
   }
 
   return { ok: true, valor: { sessionId: gravacao.data.id as string, plataforma: estado.plataforma } };
+}
+
+/**
+ * Muda o que a conexão entrega para a inbox (spec 22 §4): grava as colunas e
+ * troca os eventos do webhook no provedor.
+ *
+ * A ordem depende da direção, e é para a tela nunca mentir:
+ *   - LIGAR uma porta exige o provedor primeiro. Se ele recusou, nada é
+ *     gravado — a tela diria "comentários ligados" e nenhum comentário
+ *     chegaria nunca.
+ *   - DESLIGAR grava primeiro e tenta o provedor depois. A entrada confere as
+ *     colunas (`lib/channels/inbound.ts`), então o que o provedor ainda mandar
+ *     é recusado aqui; falha remota vira log, não bloqueio.
+ */
+export async function mudarEntregaDaConexao(
+  admin: SupabaseClient,
+  input: { organizationId: string; sessionId: string; entrega: EntregaDaConexao },
+): Promise<ResultadoSocial<{ antes: EntregaDaConexao; provedorAtualizado: boolean }>> {
+  if (!input.entrega.direct && !input.entrega.comentarios) {
+    return { ok: false, motivo: "Escolha pelo menos uma: mensagens diretas ou comentários." };
+  }
+  const { data } = await admin
+    .from("channel_sessions")
+    .select("provider, platform, metadata, inbox_direct, inbox_comments")
+    .eq("organization_id", input.organizationId)
+    .eq("id", input.sessionId)
+    .is("archived_at", null)
+    .maybeSingle();
+  if (!data) return { ok: false, motivo: "Conexão não encontrada." };
+  if (data.provider !== PROVIDER || !(PLATAFORMAS_SOCIAIS as readonly unknown[]).includes(data.platform)) {
+    return { ok: false, motivo: "Só conexões de Instagram e Facebook escolhem o que entra na inbox." };
+  }
+
+  const antes: EntregaDaConexao = { direct: data.inbox_direct !== false, comentarios: data.inbox_comments === true };
+  const liga = (input.entrega.direct && !antes.direct) || (input.entrega.comentarios && !antes.comentarios);
+  const meta = (data.metadata ?? {}) as Record<string, unknown>;
+  const webhookId = typeof meta.zernio_webhook_id === "string" ? meta.zernio_webhook_id : null;
+  const apiKey = zernioApiKeyDaInstalacao();
+
+  const noProvedor = async (): Promise<ResultadoSocial> => {
+    if (!apiKey) return semChave();
+    if (!webhookId) return { ok: false, motivo: "Esta conexão não tem webhook registrado. Reconecte a conta." };
+    const r = await atualizarEventosDoWebhook(apiKey, { webhookId, entrega: input.entrega });
+    return r.ok ? { ok: true, valor: null } : { ok: false, motivo: r.motivo };
+  };
+
+  let provedorAtualizado = false;
+  if (liga) {
+    const r = await noProvedor();
+    if (!r.ok) return r;
+    provedorAtualizado = true;
+  }
+
+  const { error } = await admin
+    .from("channel_sessions")
+    .update({ inbox_direct: input.entrega.direct, inbox_comments: input.entrega.comentarios })
+    .eq("organization_id", input.organizationId)
+    .eq("id", input.sessionId);
+  if (error) return { ok: false, motivo: "Não foi possível salvar a escolha." };
+
+  if (!liga) {
+    const r = await noProvedor();
+    provedorAtualizado = r.ok;
+    if (!r.ok) logger.warn("[social] eventos do webhook não atualizados no provedor", { sessionId: input.sessionId, detail: r.motivo });
+  }
+
+  return { ok: true, valor: { antes, provedorAtualizado } };
 }
 
 /**

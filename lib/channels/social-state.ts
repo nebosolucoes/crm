@@ -14,6 +14,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 import { PLATAFORMAS_SOCIAIS, type PlataformaSocial } from "./plataformas";
+import type { EntregaDaConexao } from "./zernio/social";
 
 const TTL_MS = 10 * 60 * 1000;
 const FINALIDADE = "conexao-social-v1";
@@ -48,8 +49,17 @@ export interface EstadoSocial {
    * vítima autorizar o Instagram DELA na organização de quem atacou.
    */
   nonce: string;
+  /**
+   * O que a conexão vai entregar para a inbox (spec 22 §4), escolhido na tela
+   * ANTES de ir para a Meta. Viaja assinado para o callback não confiar na
+   * query de volta.
+   */
+  entrega: EntregaDaConexao;
   exp: number;
 }
+
+/** Conexão nova, sem escolha explícita: as duas portas abertas. */
+export const ENTREGA_PADRAO_DE_CONEXAO_NOVA: EntregaDaConexao = { direct: true, comentarios: true };
 
 function assinar(corpo: string): string {
   return createHmac("sha256", chave()).update(`${FINALIDADE}.${corpo}`, "utf8").digest("hex");
@@ -82,11 +92,29 @@ export function conferirEstadoSocial(token: string | null | undefined, agora = D
     return null;
   }
 
-  const { orgId, userId, authSessionId, plataforma, profileId, nonce, exp } = dado;
+  const { orgId, userId, authSessionId, plataforma, profileId, nonce, exp, entrega } = dado;
   if (typeof orgId !== "string" || typeof userId !== "string" || typeof profileId !== "string") return null;
   if (typeof authSessionId !== "string" || typeof nonce !== "string") return null;
   if (typeof exp !== "number" || agora > exp) return null;
   if (!(PLATAFORMAS_SOCIAIS as readonly unknown[]).includes(plataforma)) return null;
 
-  return { orgId, userId, authSessionId, plataforma: plataforma as PlataformaSocial, profileId, nonce, exp };
+  return {
+    orgId,
+    userId,
+    authSessionId,
+    plataforma: plataforma as PlataformaSocial,
+    profileId,
+    nonce,
+    entrega: lerEntrega(entrega),
+    exp,
+  };
+}
+
+/** `state` emitido antes da spec 22 não traz a escolha: vale o padrão de conexão nova. */
+function lerEntrega(valor: unknown): EntregaDaConexao {
+  if (!valor || typeof valor !== "object") return ENTREGA_PADRAO_DE_CONEXAO_NOVA;
+  const v = valor as Record<string, unknown>;
+  const direct = v.direct !== false;
+  const comentarios = v.comentarios !== false;
+  return direct || comentarios ? { direct, comentarios } : ENTREGA_PADRAO_DE_CONEXAO_NOVA;
 }

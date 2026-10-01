@@ -43,17 +43,37 @@ export function plataformaDoProvedor(valor: unknown): PlataformaSocial | null {
  *
  * `message.failed` não entra: a doc diz que ele nunca dispara para Instagram
  * nem Messenger — a recusa da Meta chega síncrona, na resposta do envio.
+ *
+ * Quais entram depende do que a conexão entrega para a inbox (spec 22 §2.3):
+ * mensagens diretas, comentários, ou os dois. `account.*` vai sempre — é a
+ * saúde da conexão, que vale para qualquer escolha.
  */
-export const EVENTOS_DA_CONEXAO_SOCIAL = [
+const EVENTOS_DE_MENSAGEM_DIRETA = [
   "message.received",
   "message.sent",
   "message.read",
   "message.delivered",
   "message.edited",
   "message.deleted",
-  "account.connected",
-  "account.disconnected",
 ] as const;
+
+const EVENTOS_DE_COMENTARIO = ["comment.received"] as const;
+
+const EVENTOS_DA_CONTA = ["account.connected", "account.disconnected"] as const;
+
+/** O que a conexão entrega para a inbox — espelho de `inbox_direct`/`inbox_comments`. */
+export interface EntregaDaConexao {
+  direct: boolean;
+  comentarios: boolean;
+}
+
+export function eventosDaConexao(entrega: EntregaDaConexao): string[] {
+  return [
+    ...(entrega.direct ? EVENTOS_DE_MENSAGEM_DIRETA : []),
+    ...(entrega.comentarios ? EVENTOS_DE_COMENTARIO : []),
+    ...EVENTOS_DA_CONTA,
+  ];
+}
 
 type Json = Record<string, unknown>;
 
@@ -204,13 +224,13 @@ export async function contaDoProfile(
  */
 export async function registrarWebhook(
   apiKey: string,
-  input: { nome: string; url: string; segredo: string; accountId: string },
+  input: { nome: string; url: string; segredo: string; accountId: string; entrega: EntregaDaConexao },
 ): Promise<Resultado<{ webhookId: string }>> {
   const r = await chamar(apiKey, "POST", "/v1/webhooks/settings", {
     name: input.nome.slice(0, 50),
     url: input.url,
     secret: input.segredo,
-    events: [...EVENTOS_DA_CONEXAO_SOCIAL],
+    events: eventosDaConexao(input.entrega),
     isActive: true,
     accountIds: [input.accountId],
   });
@@ -219,6 +239,24 @@ export async function registrarWebhook(
   const id = (r.json?.webhook as Json | undefined)?._id;
   if (typeof id !== "string") return { ok: false, motivo: "Provedor não devolveu o webhook criado." };
   return { ok: true, valor: { webhookId: id } };
+}
+
+/**
+ * Troca os eventos que o webhook já registrado assina — o admin mudou o que a
+ * conexão entrega para a inbox. Só `events` vai no corpo: a doc atualiza só os
+ * campos enviados, então segredo, URL e filtro de conta continuam os mesmos.
+ */
+export async function atualizarEventosDoWebhook(
+  apiKey: string,
+  input: { webhookId: string; entrega: EntregaDaConexao },
+): Promise<Resultado<null>> {
+  const r = await chamar(apiKey, "PUT", "/v1/webhooks/settings", {
+    webhookId: input.webhookId,
+    events: eventosDaConexao(input.entrega),
+  });
+  if (r.status === 0) return { ok: false, motivo: SEM_REDE };
+  if (r.status < 200 || r.status >= 300) return { ok: false, motivo: explicar(r.status, r.json), status: r.status };
+  return { ok: true, valor: null };
 }
 
 /** Remove o webhook. O id vai na QUERY — a doc recusa no corpo. */

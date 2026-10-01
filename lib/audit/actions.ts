@@ -210,6 +210,8 @@ export const AUDIT_ACTIONS = [
   // do OAuth sem conectar. O sucesso usa `channel.connected`, como os outros.
   "channel.connect_failed",
   "channel.ai_access_updated",
+  // Spec 22: o que a conexão social entrega para a inbox (Direct, comentários).
+  "channel.inbox_scope_changed",
   "channel.reconnected",
   // Duas ações distintas de propósito: `deleted` apagou a linha (canal virgem),
   // `archived` só a escondeu porque conversas/mensagens ainda a referenciam.

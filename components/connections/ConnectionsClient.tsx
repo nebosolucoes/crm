@@ -20,6 +20,7 @@ import {
 import { usePacingKnobs } from "@/hooks/channels/usePacingKnobs";
 import { AntiBanSheet } from "./AntiBanSheet";
 import { ChannelAiAccess } from "./ChannelAiAccess";
+import { EntregaNaLista } from "./EntregaNaLista";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -416,6 +417,9 @@ export function ConnectionsClient({
                     : t("Ainda não verificado")}
                 </p>
                 <ChannelAiAccess channelId={c.id} />
+                {tipo.via === "social" && (tipo.rede === "instagram" || tipo.rede === "messenger") && (
+                  <EntregaNaLista canal={c} plataforma={tipo.rede} onSalvo={invalidate} />
+                )}
                 <p className="text-xs text-muted-foreground">{t(!policy ? "Consulte os responsáveis em Atendimento." : policy.mode === "legacy_unconfigured" ? "Usa todos os atendentes elegíveis da organização." : policy.mode === "restricted_empty" ? "Ninguém configurado — as conversas ficarão na fila." : "Somente as pessoas selecionadas recebem este número.")}</p>
                 <div className="mt-auto flex flex-wrap gap-2">
                   {/* Some no canal oficial em vez de aparecer desabilitado: não é

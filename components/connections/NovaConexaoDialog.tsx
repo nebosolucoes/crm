@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { CanalOficialClient } from "./CanalOficialClient";
 import { CanalParceiroClient } from "./CanalParceiroClient";
 import { CanalVozClient } from "./CanalVozClient";
+import { EscolhaDaEntrega, type Entrega } from "./EscolhaDaEntrega";
 
 /**
  * "Adicionar conexão" — o único ponto de entrada para conectar qualquer canal.
@@ -29,7 +30,7 @@ import { CanalVozClient } from "./CanalVozClient";
  * divergir do primeiro. As que não têm (QR, Instagram, Messenger) partem direto:
  * o QR abre o diálogo de pareamento; Instagram e Messenger vão para a Meta.
  */
-export type PainelDeConexao = "escolher" | "oficial" | "parceiro" | "voz";
+export type PainelDeConexao = "escolher" | "oficial" | "parceiro" | "voz" | "social";
 
 interface EstadoSocial {
   configured: boolean;
@@ -55,6 +56,9 @@ export function NovaConexaoDialog({
   const t = useT();
   const [painel, setPainel] = useState<PainelDeConexao>(painelInicial);
   const [indoPara, setIndoPara] = useState<PlataformaSocial | null>(null);
+  // Spec 22 §4: antes de ir para a Meta, o que a conexão vai entregar.
+  const [redeEscolhida, setRedeEscolhida] = useState<PlataformaSocial>("instagram");
+  const [entrega, setEntrega] = useState<Entrega>({ direct: true, comentarios: true });
 
   // Reabrir o popup volta ao painel pedido (um link `?aba=oficial` abre direto
   // no formulário da API oficial; o botão abre na escolha).
@@ -69,10 +73,20 @@ export function NovaConexaoDialog({
   });
   const socialPronto = social.data?.configured ?? false;
 
+  const escolherRede = (plataforma: PlataformaSocial) => {
+    setRedeEscolhida(plataforma);
+    setEntrega({ direct: true, comentarios: true });
+    setPainel("social");
+  };
+
   const conectarSocial = async (plataforma: PlataformaSocial) => {
     setIndoPara(plataforma);
     try {
-      const r = await apiClient.post<{ data: { auth_url: string } }>("/api/v1/channels/social/connect", { platform: plataforma });
+      const r = await apiClient.post<{ data: { auth_url: string } }>("/api/v1/channels/social/connect", {
+        platform: plataforma,
+        inbox_direct: entrega.direct,
+        inbox_comments: entrega.comentarios,
+      });
       // Navegação de verdade: a tela seguinte é a da Meta.
       window.location.assign(r.data.auth_url);
     } catch (e) {
@@ -88,7 +102,11 @@ export function NovaConexaoDialog({
         ? `WhatsApp · ${PARTNER_CHANNEL_LABEL}`
         : painel === "voz"
           ? t("Chamada de voz")
-          : t("Adicionar conexão");
+          : painel === "social"
+            ? redeEscolhida === "instagram"
+              ? t("Instagram")
+              : t("Facebook")
+            : t("Adicionar conexão");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -162,7 +180,7 @@ export function NovaConexaoDialog({
                         : null
                   }
                   ocupado={indoPara !== null}
-                  onClick={() => void conectarSocial(rede)}
+                  onClick={() => escolherRede(rede)}
                 />
               ))}
             </Grupo>
@@ -181,6 +199,20 @@ export function NovaConexaoDialog({
         {painel === "oficial" && <CanalOficialClient />}
         {painel === "parceiro" && <CanalParceiroClient />}
         {painel === "voz" && <CanalVozClient wacallsConfigured={wacallsConfigured} />}
+        {painel === "social" && (
+          <div className="flex flex-col gap-4" data-testid="painel-social">
+            <p className="text-sm text-muted-foreground">
+              {t("O que desta conta deve entrar na sua caixa de atendimento? Dá para mudar depois, na lista de conexões.")}
+            </p>
+            <EscolhaDaEntrega plataforma={redeEscolhida} valor={entrega} onChange={setEntrega} desabilitado={indoPara !== null} />
+            <div className="flex justify-end">
+              <Button onClick={() => void conectarSocial(redeEscolhida)} disabled={indoPara !== null} data-testid="continuar-para-a-meta">
+                {indoPara !== null && <CircleNotch size={16} className="animate-spin" aria-hidden />}
+                {redeEscolhida === "instagram" ? t("Continuar para o Instagram") : t("Continuar para o Facebook")}
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

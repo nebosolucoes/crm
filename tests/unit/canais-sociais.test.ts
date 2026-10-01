@@ -124,7 +124,14 @@ describe("parser — as três redes", () => {
 });
 
 describe("state do OAuth", () => {
-  const base = { orgId: "org-1", userId: "user-1", authSessionId: "sess-1", plataforma: "instagram" as const, profileId: "prof-1" };
+  const base = {
+    orgId: "org-1",
+    userId: "user-1",
+    authSessionId: "sess-1",
+    plataforma: "instagram" as const,
+    profileId: "prof-1",
+    entrega: { direct: false, comentarios: true },
+  };
 
   it("ida e volta preservam quem, onde e qual tentativa", () => {
     const { state, nonce } = emitirEstadoSocial(base);
@@ -137,6 +144,28 @@ describe("state do OAuth", () => {
     const dado = JSON.parse(Buffer.from(corpo, "base64url").toString("utf8"));
     const forjado = Buffer.from(JSON.stringify({ ...dado, orgId: "org-vizinha" }), "utf8").toString("base64url");
     expect(conferirEstadoSocial(`${forjado}.${assinatura}`)).toBeNull();
+  });
+
+  it("a escolha do que entra na inbox viaja assinada (spec 22)", () => {
+    const { state } = emitirEstadoSocial(base);
+    expect(conferirEstadoSocial(state)?.entrega).toEqual({ direct: false, comentarios: true });
+  });
+
+  it("state antigo, sem a escolha, vale as duas portas abertas", async () => {
+    const { createHmac } = await import("node:crypto");
+    const segredo = "segredo-de-teste-com-mais-de-16";
+    vi.stubEnv("INTERNAL_SECRET", segredo);
+    try {
+      const { state } = emitirEstadoSocial(base);
+      const [corpo] = state.split(".") as [string, string];
+      const dado = JSON.parse(Buffer.from(corpo, "base64url").toString("utf8"));
+      delete dado.entrega;
+      const semEscolha = Buffer.from(JSON.stringify(dado), "utf8").toString("base64url");
+      const assinatura = createHmac("sha256", segredo).update(`conexao-social-v1.${semEscolha}`, "utf8").digest("hex");
+      expect(conferirEstadoSocial(`${semEscolha}.${assinatura}`)?.entrega).toEqual({ direct: true, comentarios: true });
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("recusa depois de 10 minutos", () => {
