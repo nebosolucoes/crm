@@ -1,6 +1,6 @@
 # Spec 22 — Comentários de Instagram e Facebook na inbox (via Zernio)
 
-> Plano de implementação. Estado (2026-09-30): **plano, nada implementado.** Destino **só o fork
+> Plano de implementação. Estado (2026-09-30): **plano com decisões do dono fechadas (§10), nada implementado.** Destino **só o fork
 > Nebo**, a partir da `feat/canais-meta-zernio` (spec 21 já entregue: conexão OAuth, Direct e
 > Messenger na inbox, `channel_sessions.platform`, `contact_platform_identities`).
 > Lei que este plano obedece: `CLAUDE.md`, `docs/doctrine/restricao-de-canal.md`,
@@ -33,9 +33,12 @@
 | Fechar = `fn_service_status(p_status: 'closed')` | `app/api/v1/conversations/[id]/close/route.ts` | Reaproveitável para o fechamento automático (§5). |
 | Selo "Entrou por" com ícone da rede | `components/inbox/ConversationListItem.tsx:~310`, `ConversationHeader.tsx:161`, `components/channels/IconeDaPlataforma.tsx` | Estender, não criar outro selo. |
 
-## 2. Modelo de dados — migration `0283` (tripla: arquivo + apêndice do baseline + MANIFEST)
+## 2. Modelo de dados — migration nova (tripla: arquivo + apêndice do baseline + MANIFEST)
 
-Conferir o número antes: `ls supabase/migrations/ | grep -oE '_[0-9]{4}_' | tr -d _ | sort -n | tail -1`.
+Número = o próximo livre **no momento de criar o arquivo**, nunca o desta spec (a 0283 e a 0284 já
+foram tomadas pela spec 23, Publicações, enquanto este plano era escrito):
+`ls supabase/migrations/ | grep -oE '_[0-9]{4}_' | tr -d _ | sort -n | tail -1`, mais um. Se a
+branch de Publicações ainda não estiver na base, conferir também nela para não colidir.
 
 ### 2.1 Tipo de conversa
 
@@ -205,7 +208,7 @@ regras de setor). Comentário novo em **outro** post ou fora do fio = conversa n
 
 | Fase | Entrega | Prova |
 |---|---|---|
-| 1 | Migration 0283 (§2) + auditoria de chamadores do 1:1 + vocabulário + tipos regenerados | `pnpm test:db` (install + update + update com dados); invariante: 2 conversas (direct + comment) do mesmo contato na mesma conexão; isolamento de 2 orgs na função nova |
+| 1 | Migration nova (§2) + auditoria de chamadores do 1:1 + vocabulário + tipos regenerados | `pnpm test:db` (install + update + update com dados); invariante: 2 conversas (direct + comment) do mesmo contato na mesma conexão; isolamento de 2 orgs na função nova |
 | 2 | Escolha na conexão + webhook com eventos por escolha + rota PATCH (§4) | unit com dublê da Zernio (POST e PUT de webhook); tela: conectar com "só comentários" |
 | 3 | Entrada (§3): parser, despacho, fio, eco, fechamento pelo app | unit com payloads IG e FB reais (raiz, resposta, própria conta, anúncio, sticker FB); ingestão contra Postgres |
 | 4 | Saída (§5): resposta pública, Direct privado, ocultar, fechar com motivo, capacidades | matriz de capacidades por `kind`; envio com dublê; `privateReplyConsumed` não retenta |
@@ -216,15 +219,16 @@ regras de setor). Comentário novo em **outro** post ou fora do fio = conversa n
 Destino (DoD 18): **núcleo** — toca conversa, identidade, envio e fila. Com zero conexões sociais (ou
 comentários desligados) a operação é idêntica à de hoje.
 
-## 10. Decisões para o dono (antes da fase 1)
+## 10. Decisões do dono (fechadas em 30/09/2026)
 
-1. **Unidade do atendimento:** um por comentário raiz (recomendado) ou um por post + pessoa?
-2. **Fechar sozinho ao responder pelo CRM?** Recomendado sim, com opção de desligar.
-3. **Conexões antigas:** comentários começam desligados (recomendado) ou ligados?
-4. **Prazo do aviso** de comentário sem resposta: 4 h?
-5. **Comentários da mesma pessoa em posts diferentes** viram atendimentos separados (recomendado) ou um só?
-6. Contar comentários no limite/uso do plano (`fn_org_entitlements`)? Recomendado: não — o recurso é o
-   canal, já contado.
+| # | Tema | Decisão | Onde se aplica |
+|---|---|---|---|
+| 1 | Unidade do atendimento | **um atendimento por comentário principal**; respostas e tréplicas no mesmo fio | §2.1 (índice por `provider_conversation_id` = comentário raiz), §3.4 |
+| 2 | Responder pelo CRM fecha? | **sim, fecha sozinho**, com opção de desligar em Configurações › Atendimento | §5.2 |
+| 3 | Conexões já existentes | **comentários começam desligados**; conexão nova nasce com os dois ligados | §2.3 (`inbox_comments default false`), §4 |
+| 4 | Prazo do aviso de comentário sem resposta | **4 horas** (default do knob por organização) | §8 |
+| 5 | Mesma pessoa em posts diferentes | **atendimentos separados** | §5.3 |
+| 6 | Conta no limite do plano? | **não** — o recurso cobrado é a conexão, já contada | — |
 
 ## 11. Não medido (confirmar com conta real)
 
