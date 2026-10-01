@@ -29,7 +29,7 @@ export function ListaClient({ podeEditar, fuso, agoraIso }: { podeEditar: boolea
   const abrir = (o: OcorrenciaResumida) => setAberta(o.id);
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 sm:p-6">
+    <div className="flex h-full flex-col gap-6 p-6">
       <CabecalhoDePublicacoes titulo={t("Publicações")} descricao={t("O que ainda vai sair, do mais próximo ao mais distante. O que já saiu está no Histórico.")} podeEditar={podeEditar} />
       <ListaDePendentes
         ocorrencias={data}

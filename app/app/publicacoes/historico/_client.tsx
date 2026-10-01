@@ -18,7 +18,7 @@ export function HistoricoClient({ podeEditar, fuso }: { podeEditar: boolean; fus
   useRealtimeDePublicacoes();
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 sm:p-6">
+    <div className="flex h-full flex-col gap-6 p-6">
       <CabecalhoDePublicacoes titulo={t("Histórico")} descricao={t("Tudo que já saiu ou deixou de sair, com o resultado em cada destino, conta e grupo — e o motivo quando falhou.")} podeEditar={podeEditar} />
       <HistoricoDeOcorrencias fuso={fuso} selecionadaId={aberta} onAbrir={(o) => setAberta(o.id)} />
       <SheetDaOcorrencia ocorrenciaId={aberta} fuso={fuso} podeEditar={podeEditar} onFechar={() => setAberta(null)} />

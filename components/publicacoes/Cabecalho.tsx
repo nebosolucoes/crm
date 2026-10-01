@@ -10,10 +10,12 @@ import { Plus } from "@/lib/ui/icons";
 export function CabecalhoDePublicacoes({ titulo, descricao, podeEditar, acao }: { titulo: string; descricao: string; podeEditar: boolean; acao?: React.ReactNode }) {
   const t = useT();
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    // O mesmo cabeçalho das outras telas (Casos, Conexões): título, a frase
+    // de apoio embaixo e, à direita, as ações da tela.
+    <header className="flex flex-wrap items-start justify-between gap-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{titulo}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{descricao}</p>
+        <p className="text-sm text-muted-foreground">{descricao}</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {acao}
@@ -26,6 +28,6 @@ export function CabecalhoDePublicacoes({ titulo, descricao, podeEditar, acao }: 
           </Button>
         ) : null}
       </div>
-    </div>
+    </header>
   );
 }
