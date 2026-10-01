@@ -291,6 +291,28 @@ test("Calendário e Histórico: um chip por destino com a cor do estado, abas e 
   await page.getByTestId("filtro-de-conexao").click();
   await page.getByRole("option", { name: "Todas as conexões" }).click();
 
+  // Até quatro chips por dia; o resto vai para o "+N ⌄", que abre o dia num popup.
+  const MAIS_UMA = "02830000-0000-4000-8000-000000000034";
+  await page.route("**/api/v1/publicacoes/ocorrencias?*", async (route) => {
+    const extra = { ...ocorrencia(MAIS_UMA, new Date(amanha.getTime() + 60_000), "pending"), title: "Oferta Guaraná" };
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ data: [...PENDENTES, extra, FEITA] }) });
+  });
+  await page.reload();
+  const diaDaPendente = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(amanha);
+  const celula = page.getByTestId(`celula-${diaDaPendente}`);
+  await expect(celula.locator(`[data-testid^="chip-"]`)).toHaveCount(4);
+  await expect(page.getByTestId(`mais-${diaDaPendente}`)).toHaveText(/\+ 2/);
+  await page.getByTestId(`mais-${diaDaPendente}`).click();
+  const popup = page.getByTestId(`popup-do-dia-${diaDaPendente}`);
+  await expect(popup.locator(`[data-testid^="chip-"]`)).toHaveCount(6);
+  await page.screenshot({ path: ".superpowers/evidence/publicacoes/calendario-popup-do-dia.png" });
+  await popup.locator(`[data-testid="chip-${OCC_1}"]`).first().click();
+  await expect(popup).toBeHidden();
+  await expect(page.getByTestId("sheet-da-ocorrencia")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.unroute("**/api/v1/publicacoes/ocorrencias?*");
+  await page.reload();
+
   await chipsDaPendente.first().click();
   await expect(page.getByTestId("sheet-da-ocorrencia")).toContainText("Oferta Coca-Cola");
   await page.keyboard.press("Escape");

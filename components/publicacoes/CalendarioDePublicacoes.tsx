@@ -1,20 +1,22 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { useT } from "@/hooks/i18n/useT";
 import type { EstadoDoDestino } from "@/lib/publicacoes/estado-do-destino";
 import type { OcorrenciaResumida, ResumoDeDestino } from "@/lib/publicacoes/servico";
 import { diaLocal, diasDaGradeDoMes, horaLocal } from "@/lib/publicacoes/tempo-da-tela";
-import { CaretLeft, CaretRight } from "@/lib/ui/icons";
+import { CaretDown, CaretLeft, CaretRight } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
 import { ChannelIcon, formatoParaChannelFormat } from "./ChannelIcon";
 import { ROTULO_DA_REDE } from "./rotulos";
 
-const POR_DIA_VISIVEIS = 3;
+/** Quantos chips cabem na célula antes do "+N" — o resto abre no popup do dia. */
+const POR_DIA_VISIVEIS = 4;
 
 /** Um chip do calendário: UM destino de UMA data — o Instagram e o Facebook da mesma publicação são dois chips. */
 export interface ItemDoCalendario {
@@ -50,8 +52,9 @@ function nomeDaConexao(d: ResumoDeDestino): string {
 
 /**
  * O mês, como a vista Mês da Agenda de atendimento: seis semanas sempre (a
- * grade não pula ao virar o mês), dias de fora esmaecidos, hoje em destaque,
- * "+N" quando o dia passa de três chips. Cada chip é um DESTINO numa data:
+ * grade não pula ao virar o mês), dias de fora esmaecidos, hoje em destaque.
+ * Até quatro chips por dia; passou disso, um chip fininho "+N ⌄" abre o dia
+ * inteiro num popup, e cada chip dali abre o painel da publicação. Cada chip é um DESTINO numa data:
  * o ícone da rede e formato à esquerda (o mesmo do Agendar), a conexão, o
  * título e a hora, com a cor do estado daquele destino.
  *
@@ -83,6 +86,8 @@ export function CalendarioDePublicacoes({
   const t = useT();
   const tag = useTagDeIdioma();
   const hoje = diaLocal(new Date(), fuso);
+  // O dia cujo popup "+N" está aberto (um por vez).
+  const [diaAberto, setDiaAberto] = useState<string | null>(null);
 
   // Seis semanas sempre, começando no domingo: os buracos de `diasDaGradeDoMes`
   // viram os dias do mês anterior e do seguinte, esmaecidos.
@@ -116,7 +121,8 @@ export function CalendarioDePublicacoes({
   const cabecalhos = Array.from({ length: 7 }, (_, i) => diaDaSemana.format(new Date(Date.UTC(2026, 2, 1 + i))).replace(".", ""));
   const diaLongo = new Intl.DateTimeFormat(tag, { weekday: "long", day: "2-digit", timeZone: "UTC" });
 
-  const chip = (it: ItemDoCalendario) => {
+  /** `aoAbrir` roda DEPOIS de abrir o painel — o popup do dia fecha por ele (ver o comentário no popup). */
+  const chip = (it: ItemDoCalendario, aoAbrir?: () => void) => {
     const titulo = it.ocorrencia.title?.trim() || t("Sem título");
     const hora = horaLocal(it.ocorrencia.scheduled_at, fuso);
     const conexao = nomeDaConexao(it.destino);
@@ -131,6 +137,7 @@ export function CalendarioDePublicacoes({
         onClick={(e) => {
           e.stopPropagation();
           onAbrir(it.ocorrencia);
+          aoAbrir?.();
         }}
         className={cn(
           "flex w-full min-w-0 items-stretch gap-1.5 rounded-md border p-1 text-left transition-shadow hover:shadow-sm",
@@ -194,7 +201,7 @@ export function CalendarioDePublicacoes({
                 )}
                 onClick={onNovaNoDia ? () => onNovaNoDia(celula.chave) : undefined}
               >
-                <div className="flex items-center justify-between px-0.5">
+                <div className="flex items-center px-0.5">
                   <span
                     className={cn(
                       "flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] tabular-nums",
@@ -203,20 +210,44 @@ export function CalendarioDePublicacoes({
                   >
                     {celula.dia}
                   </span>
-                  {excedente > 0 ? (
-                    <button
-                      type="button"
-                      className="text-[10px] font-semibold tabular-nums text-text-subtle hover:underline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onAbrir(doDia[POR_DIA_VISIVEIS]!.ocorrencia);
-                      }}
-                    >
-                      +{excedente}
-                    </button>
-                  ) : null}
                 </div>
-                {doDia.slice(0, POR_DIA_VISIVEIS).map(chip)}
+                {doDia.slice(0, POR_DIA_VISIVEIS).map((it) => chip(it))}
+                {excedente > 0 ? (
+                  <Popover open={diaAberto === celula.chave} onOpenChange={(aberto) => setDiaAberto(aberto ? celula.chave : null)}>
+                    <PopoverTrigger asChild>
+                      {/* O chip fininho do "+N": abre o dia inteiro num popup, sem sair do mês. */}
+                      <button
+                        type="button"
+                        data-testid={`mais-${celula.chave}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex h-5 w-full items-center justify-center gap-1 rounded-md border border-dashed border-border bg-surface text-[10px] font-semibold tabular-nums text-text-muted transition-colors hover:bg-surface-elevated hover:text-text"
+                      >
+                        + {excedente}
+                        <CaretDown size={10} weight="bold" aria-hidden />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="start"
+                      className="w-72 p-2"
+                      data-testid={`popup-do-dia-${celula.chave}`}
+                      onClick={(e) => e.stopPropagation()}
+                      // Ao fechar, o Radix devolveria o foco ao "+N" — que fica FORA do
+                      // painel que o clique no chip acabou de abrir, e o painel leria
+                      // isso como "clicou fora" e se fecharia na mesma hora.
+                      onCloseAutoFocus={(e) => e.preventDefault()}
+                    >
+                      <p className="mb-2 px-1 text-xs font-semibold first-letter:uppercase">
+                        {diaLongo.format(new Date(`${celula.chave}T12:00:00Z`))} · {doDia.length} {doDia.length === 1 ? t("publicação") : t("publicações")}
+                      </p>
+                      <div className="flex max-h-80 flex-col gap-1 overflow-y-auto pr-0.5">
+                        {/* Fecha DENTRO do clique do chip, nunca na captura: o React aplicaria o
+                            fechamento entre a captura e a bolha, desmontaria o popup, e o clique
+                            do chip nunca chegaria — o painel não abria (medido no Playwright). */}
+                        {doDia.map((it) => chip(it, () => setDiaAberto(null)))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                ) : null}
               </div>
             );
           })}
@@ -235,7 +266,7 @@ export function CalendarioDePublicacoes({
                 <span className={cn("text-xs font-semibold first-letter:uppercase", celula.chave === hoje ? "text-accent" : "text-muted-foreground")}>
                   {diaLongo.format(new Date(`${celula.chave}T12:00:00Z`))}
                 </span>
-                {doDia.map(chip)}
+                {doDia.map((it) => chip(it))}
               </div>
             );
           })}
