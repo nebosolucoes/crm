@@ -1,9 +1,10 @@
 /**
  * Enquadra uma IMAGEM no formato que a rede exige, sem distorcer nem cortar
  * a original: a imagem inteira, na proporção dela, centrada; as faixas que
- * sobram são pintadas com a COR DA BORDA vizinha da imagem — a de cima na
- * faixa de cima, a de baixo na de baixo (ou esquerda/direita, no Feed) —, com
- * degradê entre elas. É o que o aplicativo do Instagram faz ao postar uma foto
+ * sobram são pintadas em DEGRADÊ: encostada na foto, a cor exata da borda
+ * vizinha (a de cima na faixa de cima, a de baixo na de baixo, ou esquerda e
+ * direita no Feed); na beirada da tela, um tom deslocado da mesma cor
+ * (`lib/imagem/degrade.ts`). É o que o aplicativo do Instagram faz ao postar uma foto
  * fora do formato: a faixa encosta na foto com a mesma cor e parece que a
  * imagem continua. (Pedido do dono em 01/10/2026; a primeira versão, com a
  * própria foto desfocada e escurecida no fundo, não tinha essa continuidade.)
@@ -23,6 +24,8 @@
  * não sair nada é pior ainda.
  */
 import type SharpDoModulo from "sharp";
+
+import { cssRgb, misturar, pontaDoDegrade, type Rgb } from "@/lib/imagem/degrade";
 
 export const LARGURA_DO_STORY = 1080;
 export const ALTURA_DO_STORY = 1920;
@@ -154,27 +157,34 @@ export async function enquadrarImagem(bytes: ArrayBuffer | Buffer, mime: string,
     .composite([{ input: frente.data, raw: { width: fw, height: fh, channels: 3 }, left, top }])
     .jpeg({ quality: 92, mozjpeg: true })
     .toBuffer();
-  return { bytes: saida, mime: "image/jpeg", original: { width, height }, quadro, cores: [rgb(corA), rgb(corB)] };
+  return { bytes: saida, mime: "image/jpeg", original: { width, height }, quadro, cores: [cssRgb(corA), cssRgb(corB)] };
 }
 
-type Cor = readonly [number, number, number];
-const rgb = (c: Cor) => `rgb(${Math.round(c[0])}, ${Math.round(c[1])}, ${Math.round(c[2])})`;
+type Cor = Rgb;
 
 /**
- * O fundo em pixels crus (RGB): a cor A até onde a foto começa, a cor B a
- * partir de onde ela termina, e o degradê entre as duas no trecho que a foto
- * cobre (escondido atrás dela — só garante que não há emenda dura).
+ * O fundo em pixels crus (RGB). Faixa A (antes da foto): da ponta deslocada de
+ * A, na beirada da tela, até A exata, encostada na foto. Faixa B (depois da
+ * foto): de B exata até a ponta deslocada de B. Atrás da foto, A vira B (não
+ * aparece; só evita emenda dura se a foto tiver transparência ou borda).
  */
 function fundoEmDegrade(quadro: Quadro, vertical: boolean, a: Cor, b: Cor, inicio: number, fim: number): Buffer {
   const { largura, altura } = quadro;
   const buf = Buffer.alloc(largura * altura * 3);
   const total = vertical ? altura : largura;
+  const pontaA = pontaDoDegrade(a);
+  const pontaB = pontaDoDegrade(b);
   const linha = new Uint8Array(total * 3);
   for (let i = 0; i < total; i++) {
-    const t = i <= inicio ? 0 : i >= fim ? 1 : (i - inicio) / Math.max(1, fim - inicio);
-    linha[i * 3] = Math.round(a[0] + (b[0] - a[0]) * t);
-    linha[i * 3 + 1] = Math.round(a[1] + (b[1] - a[1]) * t);
-    linha[i * 3 + 2] = Math.round(a[2] + (b[2] - a[2]) * t);
+    const c =
+      i < inicio
+        ? misturar(pontaA, a, inicio <= 1 ? 1 : i / (inicio - 1))
+        : i >= fim
+          ? misturar(b, pontaB, total - fim <= 1 ? 0 : (i - fim) / (total - fim - 1))
+          : misturar(a, b, (i - inicio) / Math.max(1, fim - inicio));
+    linha[i * 3] = Math.round(c[0]);
+    linha[i * 3 + 1] = Math.round(c[1]);
+    linha[i * 3 + 2] = Math.round(c[2]);
   }
   for (let y = 0; y < altura; y++) {
     for (let x = 0; x < largura; x++) {

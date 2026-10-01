@@ -38,17 +38,32 @@ describe("Story — a original inteira num quadro 9:16, sem esticar", () => {
 
   it("as faixas continuam a imagem: a de cima tem a cor da borda de cima (vermelho), a de baixo a da borda de baixo (azul)", async () => {
     const r = await enquadrarImagemDeStory(await imagem(2045, 3000), "image/jpeg");
-    const [rt, gt, bt] = await pixel(r!.bytes, 540, 20);
+    // Medido ENCOSTADO na foto: ali a faixa tem a cor exata da borda (na beirada da tela é o tom deslocado do degradê).
+    const topo = Math.round((ALTURA_DO_STORY - Math.round((LARGURA_DO_STORY * 3000) / 2045)) / 2);
+    const [rt, gt, bt] = await pixel(r!.bytes, 540, topo - 3);
     expect(rt).toBeGreaterThan(220);
     expect(gt).toBeLessThan(40);
     expect(bt).toBeLessThan(40);
-    const [rb, , bb] = await pixel(r!.bytes, 540, ALTURA_DO_STORY - 20);
+    const [rb, , bb] = await pixel(r!.bytes, 540, ALTURA_DO_STORY - topo + 2);
     expect(bb).toBeGreaterThan(220);
     expect(rb).toBeLessThan(40);
-    // Faixa lisa, sem textura de foto: canto e centro da faixa têm a mesma cor.
-    const [rc] = await pixel(r!.bytes, 5, 20);
+    // Sem textura de foto: na mesma altura, o canto e o centro da faixa têm a mesma cor.
+    const [rc] = await pixel(r!.bytes, 5, topo - 3);
     expect(Math.abs(rc - rt)).toBeLessThan(6);
     expect(r!.cores[0]).toMatch(/^rgb\(2[2-5]\d, \d{1,2}, \d{1,2}\)$/);
+  });
+
+  it("a faixa é um DEGRADÊ: encostada na foto tem a cor da borda; na beirada da tela, um tom deslocado dela", async () => {
+    // Borda escura (marrom, como o encarte medido): a beirada clareia.
+    const marrom = await sharp({ create: { width: 2045, height: 3000, channels: 3, background: { r: 92, g: 42, b: 24 } } }).jpeg().toBuffer();
+    const r = await enquadrarImagemDeStory(marrom, "image/jpeg");
+    const topoDaFrente = Math.round((ALTURA_DO_STORY - Math.round((LARGURA_DO_STORY * 3000) / 2045)) / 2);
+    const [rPerto] = await pixel(r!.bytes, 540, topoDaFrente - 3);
+    const [rBeirada] = await pixel(r!.bytes, 540, 2);
+    expect(Math.abs(rPerto - 92)).toBeLessThan(10); // emenda: a cor da borda
+    expect(rBeirada).toBeGreaterThan(rPerto + 30); // degradê visível até a beirada
+    const [rFundo] = await pixel(r!.bytes, 540, ALTURA_DO_STORY - 3);
+    expect(rFundo).toBeGreaterThan(rPerto + 30); // embaixo também
   });
 
   it("imagem que já é 9:16, GIF e vídeo não são tocados", async () => {
@@ -85,7 +100,8 @@ describe("Feed — a foto inteira no quadro que a rede aceita, em vez do corte",
     const [, , b2] = await pixel(r!.bytes, 540, 1340);
     expect(b2).toBeGreaterThan(200);
     // A borda esquerda da foto é meio vermelha, meio azul: a faixa lateral é a média — roxo.
-    const [rl, gl, bl] = await pixel(r!.bytes, 10, 675);
+    // Encostado na foto (que ocupa ~920 px no meio, a partir de x≈80).
+    const [rl, gl, bl] = await pixel(r!.bytes, 76, 675);
     expect(rl).toBeGreaterThan(90);
     expect(bl).toBeGreaterThan(90);
     expect(gl).toBeLessThan(40);

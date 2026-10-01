@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { cssRgb, pontaDoDegrade, type Rgb } from "@/lib/imagem/degrade";
 import { cn } from "@/lib/utils";
 
 /**
@@ -131,10 +132,10 @@ export function MidiaVisual({ midia, className, poster = false, ajuste = "cobrir
 interface CoresDaBorda {
   url: string;
   proporcao: number;
-  cima: string;
-  baixo: string;
-  esquerda: string;
-  direita: string;
+  cima: Rgb;
+  baixo: Rgb;
+  esquerda: Rgb;
+  direita: Rgb;
 }
 
 /**
@@ -160,7 +161,7 @@ function useCoresDaBorda(url: string | null): CoresDaBorda | null {
         const ctx = canvas.getContext("2d", { willReadFrequently: true });
         if (!ctx) return;
         ctx.drawImage(img, 0, 0, largura, altura);
-        const media = (x: number, y: number, w: number, h: number) => {
+        const media = (x: number, y: number, w: number, h: number): Rgb => {
           const d = ctx.getImageData(x, y, w, h).data;
           let r = 0;
           let g = 0;
@@ -171,7 +172,7 @@ function useCoresDaBorda(url: string | null): CoresDaBorda | null {
             g += d[i + 1]!;
             b += d[i + 2]!;
           }
-          return `rgb(${Math.round(r / n)}, ${Math.round(g / n)}, ${Math.round(b / n)})`;
+          return [r / n, g / n, b / n];
         };
         const fx = Math.max(1, Math.round(largura * 0.02));
         const fy = Math.max(1, Math.round(altura * 0.02));
@@ -198,9 +199,9 @@ function useCoresDaBorda(url: string | null): CoresDaBorda | null {
 
 /**
  * A mídia como o ENVIO a encaixa (`lib/channels/publicacao/enquadrar-story.ts`):
- * inteira, na proporção dela, e as faixas que sobram na COR DA BORDA vizinha —
- * a de cima em cima, a de baixo embaixo (ou as laterais) —, como o Instagram
- * faz: parece que a foto continua. `proporcaoDoQuadro` (largura/altura) diz
+ * inteira, na proporção dela, e as faixas que sobram em degradê — a cor da
+ * borda vizinha encostada na foto, um tom deslocado dela na beirada —, como o
+ * Instagram faz: parece que a foto continua. `proporcaoDoQuadro` (largura/altura) diz
  * se as faixas são em cima e embaixo ou nas laterais. Sem as cores (CORS), a
  * própria imagem com desfoque leve; vídeo fica inteiro sobre preto, como a rede.
  */
@@ -223,11 +224,15 @@ export function MidiaEncaixada({
   // embaixo; mais ESTREITA, encosta em cima e embaixo e sobra nas laterais. (Medido no
   // Playwright: com a comparação invertida o Story pintava as laterais.)
   const vertical = cores ? cores.proporcao > proporcaoDoQuadro : true;
-  const fundo = cores
-    ? vertical
-      ? `linear-gradient(to bottom, ${cores.cima} 0%, ${cores.cima} 50%, ${cores.baixo} 50%, ${cores.baixo} 100%)`
-      : `linear-gradient(to right, ${cores.esquerda} 0%, ${cores.esquerda} 50%, ${cores.direita} 50%, ${cores.direita} 100%)`
-    : undefined;
+  let fundo: string | undefined;
+  if (cores) {
+    // A fração do quadro que a foto ocupa no eixo das faixas, e onde cada faixa termina.
+    const ocupa = vertical ? proporcaoDoQuadro / cores.proporcao : cores.proporcao / proporcaoDoQuadro;
+    const faixa = Math.max(0, Math.min(50, ((1 - ocupa) / 2) * 100));
+    const [a, b] = vertical ? [cores.cima, cores.baixo] : [cores.esquerda, cores.direita];
+    // O mesmo degradê do envio (`lib/imagem/degrade.ts`): ponta deslocada na beirada, a cor da borda encostada na foto.
+    fundo = `linear-gradient(${vertical ? "to bottom" : "to right"}, ${cssRgb(pontaDoDegrade(a))} 0%, ${cssRgb(a)} ${faixa.toFixed(2)}%, ${cssRgb(b)} ${(100 - faixa).toFixed(2)}%, ${cssRgb(pontaDoDegrade(b))} 100%)`;
+  }
   return (
     <div className={cn("relative overflow-hidden bg-black", className)} style={fundo ? { background: fundo } : undefined} data-testid={testId} data-fundo={cores ? "cores-da-borda" : imagem ? "desfoque" : "preto"}>
       {imagem && !cores ? (
