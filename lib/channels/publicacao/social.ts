@@ -18,7 +18,15 @@
  *    pelo presign do provedor; mídia em URL pública vai como está.
  *  - Um vídeo único no Feed do Instagram sai como Reel — é a regra da rede, e
  *    a tela avisa antes.
+ *  - IMAGEM fora do quadro da rede é encaixada antes (`enquadrar-story.ts`):
+ *    no Story a rede esticaria a foto para 1080 × 1920, no Feed do Instagram
+ *    cortaria para 4:5–1.91:1 (e o carrossel para o quadro da primeira). Aqui
+ *    ela vai inteira, na proporção original, sobre ela mesma com um desfoque
+ *    gaussiano leve — como o app da rede faz quando se posta pelo celular. O
+ *    arquivo encaixado é re-hospedado no provedor (não está no Storage).
  */
+import { logger } from "@/lib/logger";
+
 import { alcancavelPelaInternet } from "../url-publica";
 import {
   apiKeyDePublicacao,
@@ -36,6 +44,7 @@ import type {
   PublishingAdapter,
   ResultadoDePublicacao,
 } from "./contrato";
+import { ALTURA_DO_STORY, LARGURA_DO_STORY, enquadrarImagem, medirImagem, quadroDoFeed, type Quadro } from "./enquadrar-story";
 
 export const TIMEOUT_DE_PUBLICACAO_MS = 60_000;
 
@@ -66,6 +75,99 @@ async function urlAlcancavel(
   }
   const r = await reHospedarMidia(apiKey, { filename: m.filename ?? `midia.${m.mime.split("/")[1] ?? "bin"}`, contentType: m.mime, bytes });
   return r.ok ? { ok: true, url: r.publicUrl } : r;
+}
+
+type UrlOuFalha = { ok: true; url: string } | { ok: false; codigo: string; categoria: "transitorio" | "permanente"; mensagem: string };
+
+async function baixar(m: MidiaDoPedido): Promise<{ ok: true; bytes: ArrayBuffer } | Extract<UrlOuFalha, { ok: false }>> {
+  try {
+    const res = await fetch(m.url, { signal: AbortSignal.timeout(60_000), cache: "no-store" });
+    if (!res.ok) return { ok: false, codigo: "media_unreadable", categoria: "permanente", mensagem: `Não foi possível ler a mídia (${res.status}).` };
+    return { ok: true, bytes: await res.arrayBuffer() };
+  } catch {
+    return { ok: false, codigo: "media_unreadable", categoria: "transitorio", mensagem: "Não foi possível ler a mídia para enviar ao provedor." };
+  }
+}
+
+/**
+ * Qual quadro cada imagem do pedido precisa — `null` = vai como está.
+ *
+ *  - Story: 9:16, cada imagem.
+ *  - Feed do Instagram: o quadro da PRIMEIRA foto (presa a 4:5–1.91:1); o
+ *    carrossel inteiro sai nele, como a rede faz. Primeira mídia em vídeo = a
+ *    rede decide (não há foto que dite o quadro).
+ *  - Feed do Facebook: só a foto ÚNICA (presa a 1:2–1.91:1). Várias fotos
+ *    viram grade e abrem inteiras ao toque — encaixar só poria fundo à toa.
+ *  - Reels e o resto: nada.
+ */
+async function quadrosDoPedido(
+  pedido: PedidoDePublicacao,
+  platform: "instagram" | "facebook",
+  bytesDe: (m: MidiaDoPedido) => Promise<ArrayBuffer | null>,
+): Promise<Map<MidiaDoPedido, Quadro>> {
+  const quadros = new Map<MidiaDoPedido, Quadro>();
+  const imagens = pedido.media.filter((m) => m.kind === "image");
+  if (pedido.format === "story") {
+    for (const m of imagens) quadros.set(m, { largura: LARGURA_DO_STORY, altura: ALTURA_DO_STORY });
+    return quadros;
+  }
+  if (pedido.format !== "feed") return quadros;
+  const visuais = pedido.media.filter((m) => m.kind === "image" || m.kind === "video");
+  if (platform === "facebook" && !(visuais.length === 1 && visuais[0]!.kind === "image")) return quadros;
+  const primeira = visuais[0];
+  if (!primeira || primeira.kind !== "image") return quadros;
+  const bytes = await bytesDe(primeira);
+  const dim = bytes ? await medirImagem(bytes, primeira.mime).catch(() => null) : null;
+  if (!dim) return quadros;
+  const quadro = quadroDoFeed(platform, dim.width, dim.height);
+  for (const m of imagens) quadros.set(m, quadro);
+  return quadros;
+}
+
+/**
+ * As URLs de todas as mídias do pedido. Imagem que precisa de quadro é
+ * baixada, encaixada (`enquadrar-story.ts`) e re-hospedada no provedor — é
+ * um arquivo novo, que não está no Storage. O resto segue o caminho comum.
+ */
+async function prepararMidias(apiKey: string, pedido: PedidoDePublicacao, platform: "instagram" | "facebook"): Promise<Map<MidiaDoPedido, UrlOuFalha>> {
+  const cache = new Map<MidiaDoPedido, Promise<Awaited<ReturnType<typeof baixar>>>>();
+  const obter = (m: MidiaDoPedido) => {
+    if (!cache.has(m)) cache.set(m, baixar(m));
+    return cache.get(m)!;
+  };
+  const quadros = await quadrosDoPedido(pedido, platform, async (m) => {
+    const r = await obter(m);
+    return r.ok ? r.bytes : null;
+  });
+  const saida = new Map<MidiaDoPedido, UrlOuFalha>();
+  for (const m of pedido.media) {
+    const quadro = quadros.get(m);
+    if (!quadro) {
+      saida.set(m, await urlAlcancavel(apiKey, m));
+      continue;
+    }
+    const baixada = await obter(m);
+    if (!baixada.ok) {
+      saida.set(m, baixada);
+      continue;
+    }
+    let enquadrada: Awaited<ReturnType<typeof enquadrarImagem>> = null;
+    try {
+      enquadrada = await enquadrarImagem(baixada.bytes, m.mime, quadro);
+    } catch (err) {
+      // Imagem que o `sharp` não lê: vai como está, e a rede decide.
+      logger.warn("[publicacao] não foi possível enquadrar a imagem — segue a original", { referencia: pedido.referencia, error: err instanceof Error ? err.message : String(err) });
+    }
+    if (!enquadrada) {
+      saida.set(m, await urlAlcancavel(apiKey, m));
+      continue;
+    }
+    logger.info("[publicacao] imagem enquadrada no formato da rede", { referencia: pedido.referencia, formato: pedido.format, original: enquadrada.original, quadro: enquadrada.quadro });
+    const base = (m.filename ?? "imagem").replace(/\.[a-z0-9]+$/i, "");
+    const r = await reHospedarMidia(apiKey, { filename: `${base}-${quadro.largura}x${quadro.altura}.jpg`, contentType: enquadrada.mime, bytes: new Uint8Array(enquadrada.bytes).buffer });
+    saida.set(m, r.ok ? { ok: true, url: r.publicUrl } : r);
+  }
+  return saida;
 }
 
 /** O corpo do `POST /v1/posts` para um pedido — exportado para teste. */
@@ -130,8 +232,10 @@ export const publicadorSocial: PublishingAdapter = {
 
     let corpo: Json;
     try {
+      const preparadas = await prepararMidias(apiKey, pedido, platform);
       corpo = await montarCorpoDoPost(pedido, async (m) => {
-        const r = await urlAlcancavel(apiKey, m);
+        // A capa do Reel não está no mapa (é montada na hora): caminho comum.
+        const r = preparadas.get(m) ?? (await urlAlcancavel(apiKey, m));
         if (!r.ok) throw Object.assign(new Error(r.mensagem), { codigo: r.codigo, categoria: r.categoria });
         return r.url;
       });

@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { cn } from "@/lib/utils";
 
 /**
@@ -123,4 +125,116 @@ export function MidiaVisual({ midia, className, poster = false, ajuste = "cobrir
   }
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={midia.url} alt="" className={cn(encaixe, className)} />;
+}
+
+/** As cores das quatro bordas de uma imagem (média de uma faixa fina de cada lado). */
+interface CoresDaBorda {
+  url: string;
+  proporcao: number;
+  cima: string;
+  baixo: string;
+  esquerda: string;
+  direita: string;
+}
+
+/**
+ * Lê as cores das bordas no navegador — a mesma conta do envio
+ * (`lib/channels/publicacao/enquadrar-story.ts`), numa cópia pequena da imagem.
+ * Se o navegador não deixar ler os pixels (imagem de outra origem sem CORS),
+ * devolve `null` e quem chama mostra o desfoque leve no lugar.
+ */
+function useCoresDaBorda(url: string | null): CoresDaBorda | null {
+  const [cores, setCores] = useState<CoresDaBorda | null>(null);
+  useEffect(() => {
+    if (!url) return;
+    let vivo = true;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const largura = 64;
+        const altura = Math.max(2, Math.round((largura * img.naturalHeight) / Math.max(1, img.naturalWidth)));
+        const canvas = document.createElement("canvas");
+        canvas.width = largura;
+        canvas.height = altura;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, largura, altura);
+        const media = (x: number, y: number, w: number, h: number) => {
+          const d = ctx.getImageData(x, y, w, h).data;
+          let r = 0;
+          let g = 0;
+          let b = 0;
+          const n = d.length / 4;
+          for (let i = 0; i < d.length; i += 4) {
+            r += d[i]!;
+            g += d[i + 1]!;
+            b += d[i + 2]!;
+          }
+          return `rgb(${Math.round(r / n)}, ${Math.round(g / n)}, ${Math.round(b / n)})`;
+        };
+        const fx = Math.max(1, Math.round(largura * 0.02));
+        const fy = Math.max(1, Math.round(altura * 0.02));
+        const resultado: CoresDaBorda = {
+          url,
+          proporcao: img.naturalWidth / Math.max(1, img.naturalHeight),
+          cima: media(0, 0, largura, fy),
+          baixo: media(0, altura - fy, largura, fy),
+          esquerda: media(0, 0, fx, altura),
+          direita: media(largura - fx, 0, fx, altura),
+        };
+        if (vivo) setCores(resultado);
+      } catch {
+        // Canvas "contaminado" (sem CORS): fica o desfoque de reserva.
+      }
+    };
+    img.src = url;
+    return () => {
+      vivo = false;
+    };
+  }, [url]);
+  return cores && cores.url === url ? cores : null;
+}
+
+/**
+ * A mídia como o ENVIO a encaixa (`lib/channels/publicacao/enquadrar-story.ts`):
+ * inteira, na proporção dela, e as faixas que sobram na COR DA BORDA vizinha —
+ * a de cima em cima, a de baixo embaixo (ou as laterais) —, como o Instagram
+ * faz: parece que a foto continua. `proporcaoDoQuadro` (largura/altura) diz
+ * se as faixas são em cima e embaixo ou nas laterais. Sem as cores (CORS), a
+ * própria imagem com desfoque leve; vídeo fica inteiro sobre preto, como a rede.
+ */
+export function MidiaEncaixada({
+  midia,
+  proporcaoDoQuadro,
+  className,
+  poster = false,
+  testId,
+}: {
+  midia: MidiaDaPrevia | null;
+  proporcaoDoQuadro: number;
+  className?: string;
+  poster?: boolean;
+  testId?: string;
+}) {
+  const imagem = midia?.kind === "image" && midia.url ? midia.url : null;
+  const cores = useCoresDaBorda(imagem);
+  // Foto mais LARGA que o quadro (proporção maior) encosta nas laterais e sobra em cima e
+  // embaixo; mais ESTREITA, encosta em cima e embaixo e sobra nas laterais. (Medido no
+  // Playwright: com a comparação invertida o Story pintava as laterais.)
+  const vertical = cores ? cores.proporcao > proporcaoDoQuadro : true;
+  const fundo = cores
+    ? vertical
+      ? `linear-gradient(to bottom, ${cores.cima} 0%, ${cores.cima} 50%, ${cores.baixo} 50%, ${cores.baixo} 100%)`
+      : `linear-gradient(to right, ${cores.esquerda} 0%, ${cores.esquerda} 50%, ${cores.direita} 50%, ${cores.direita} 100%)`
+    : undefined;
+  return (
+    <div className={cn("relative overflow-hidden bg-black", className)} style={fundo ? { background: fundo } : undefined} data-testid={testId} data-fundo={cores ? "cores-da-borda" : imagem ? "desfoque" : "preto"}>
+      {imagem && !cores ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={imagem} alt="" aria-hidden className="absolute inset-0 h-full w-full scale-110 object-cover blur-xs" />
+      ) : null}
+      <MidiaVisual midia={midia} className="relative h-full w-full" poster={poster} ajuste="conter" />
+    </div>
+  );
 }

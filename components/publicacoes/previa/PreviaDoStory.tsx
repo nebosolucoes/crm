@@ -6,7 +6,7 @@ import { useT } from "@/hooks/i18n/useT";
 import { DotsThree, Heart, PaperPlaneTilt, X } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
-import { Aparelho, AvatarDaConta, MidiaVisual, nomeDaConta, type ContaDaPrevia, type MidiaDaPrevia } from "./Aparelho";
+import { Aparelho, AvatarDaConta, MidiaEncaixada, nomeDaConta, type ContaDaPrevia, type MidiaDaPrevia } from "./Aparelho";
 
 interface Props {
   rede: "instagram" | "facebook";
@@ -21,7 +21,8 @@ interface Props {
  * o coração e o avião embaixo. Tocar na metade esquerda/direita troca o Story,
  * como no aparelho. Não há legenda: a rede não mostra. A mídia aparece
  * INTEIRA no 9:16 — o que não tem essa proporção ganha faixas pretas, como
- * na rede, e nunca zoom.
+ * na rede, e nunca zoom. As faixas da imagem levam a cor da borda vizinha,
+ * como o envio enquadra e o Instagram faz (vídeo continua com faixas pretas).
  */
 export function PreviaDoStory({ rede, conta, midias, hora }: Props) {
   const t = useT();
@@ -35,8 +36,9 @@ export function PreviaDoStory({ rede, conta, midias, hora }: Props) {
   return (
     <Aparelho hora={hora} tema="escuro" rotulo={rotulo}>
       <div className="relative flex h-full flex-col bg-black text-white">
-        <div className="absolute inset-0">
-          <MidiaVisual midia={atual} className="h-full w-full" ajuste="conter" />
+        <div className="absolute inset-0 overflow-hidden">
+          {/* O mesmo encaixe que o envio faz: imagem fora de 9:16 vai inteira, e as faixas na cor das bordas. */}
+          <MidiaEncaixada midia={atual} proporcaoDoQuadro={9 / 16} className="h-full w-full" testId="fundo-do-story" />
           <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/60 to-transparent" aria-hidden />
           <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/60 to-transparent" aria-hidden />
         </div>
