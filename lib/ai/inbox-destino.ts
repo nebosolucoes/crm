@@ -75,6 +75,7 @@ export const POLITICAS_DE_AVISO = {
   voice_call_missed: { refs: ["contact"], orientacao: "Retorne a ligação quando puder — quem ligou não foi atendido." },
   entitlement_changed: { refs: [], orientacao: "Veja em Configurações › Billing o plano atual, os recursos liberados e até quando valem.", geral: { papel: "admin", href: "/app/settings/billing", rotulo: "Ver plano e recursos" } },
   publication_failed: { refs: ["publication_occurrence"], orientacao: "Abra o Histórico de Publicações: o destino que falhou mostra o motivo e permite reenviar quando fizer sentido." },
+  comment_unanswered: { refs: ["conversation"], orientacao: "Abra o atendimento e responda o comentário — no post ou no Direct. Se não precisar de resposta, feche com o motivo." },
   other: { refs: ["lead", "channel_session", "appointment", "ai_agent"], orientacao: "Confira a situação descrita neste aviso com a pessoa responsável." },
 } satisfies Record<InboxKind, Politica>;
 

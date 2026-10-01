@@ -3238,6 +3238,8 @@ export type Database = {
           display_name: string | null
           engine: string
           id: string
+          inbox_comments: boolean
+          inbox_direct: boolean
           is_warmup_complete: boolean | null
           last_health_check_at: string | null
           last_status_change_at: string
@@ -3272,6 +3274,8 @@ export type Database = {
           display_name?: string | null
           engine?: string
           id?: string
+          inbox_comments?: boolean
+          inbox_direct?: boolean
           is_warmup_complete?: boolean | null
           last_health_check_at?: string | null
           last_status_change_at?: string
@@ -3306,6 +3310,8 @@ export type Database = {
           display_name?: string | null
           engine?: string
           id?: string
+          inbox_comments?: boolean
+          inbox_direct?: boolean
           is_warmup_complete?: boolean | null
           last_health_check_at?: string | null
           last_status_change_at?: string
@@ -3775,6 +3781,7 @@ export type Database = {
           handover_started_at: string | null
           id: string
           is_group: boolean
+          kind: string
           last_handoff_at: string | null
           last_handoff_reason: string | null
           last_inbound_at: string | null
@@ -3821,6 +3828,7 @@ export type Database = {
           handover_started_at?: string | null
           id?: string
           is_group?: boolean
+          kind?: string
           last_handoff_at?: string | null
           last_handoff_reason?: string | null
           last_inbound_at?: string | null
@@ -3867,6 +3875,7 @@ export type Database = {
           handover_started_at?: string | null
           id?: string
           is_group?: boolean
+          kind?: string
           last_handoff_at?: string | null
           last_handoff_reason?: string | null
           last_inbound_at?: string | null
@@ -11321,6 +11330,16 @@ export type Database = {
           p_notify: string
           p_org: string
           p_phone: string
+        }
+        Returns: string
+      }
+      fn_upsert_comment_conversation: {
+        Args: {
+          p_contact: string
+          p_contexto?: Json
+          p_org: string
+          p_root_comment_id: string
+          p_session: string
         }
         Returns: string
       }

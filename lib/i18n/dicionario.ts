@@ -9838,6 +9838,31 @@ export const DICIONARIO: Traducoes = {
   "Abra o Histórico de Publicações: o destino que falhou mostra o motivo e permite reenviar quando fizer sentido.": { es: "Abre el Historial de Publicaciones: el destino que falló muestra el motivo y permite reenviar cuando tenga sentido." },
   "Uma publicação não saiu em um dos destinos": { es: "Una publicación no salió en uno de los destinos" },
 
+  // ── Comentários na inbox: o que a conexão entrega (spec 22 §4) ──
+  "Mensagens e comentários": { es: "Mensajes y comentarios" },
+  "Só comentários": { es: "Solo comentarios" },
+  "Só mensagens": { es: "Solo mensajes" },
+  "Pronto — a caixa de atendimento já recebe o que você escolheu.": { es: "Listo — la bandeja de atención ya recibe lo que elegiste." },
+  "Salvo. O provedor não confirmou a mudança, mas o que foi desligado já não entra na caixa.": { es: "Guardado. El proveedor no confirmó el cambio, pero lo que desactivaste ya no entra en la bandeja." },
+  "Não foi possível salvar a escolha.": { es: "No fue posible guardar la elección." },
+  "Entra na inbox:": { es: "Entra en la bandeja:" },
+  "Mensagens do Direct": { es: "Mensajes del Direct" },
+  "Mensagens do Messenger": { es: "Mensajes de Messenger" },
+  "Conversas privadas com quem escreve para a conta.": { es: "Conversaciones privadas con quien le escribe a la cuenta." },
+  "Comentários nas publicações": { es: "Comentarios en las publicaciones" },
+  "Cada comentário em post ou anúncio vira um atendimento, até ser respondido ou fechado.": { es: "Cada comentario en una publicación o anuncio se convierte en una atención, hasta que se responda o se cierre." },
+  "O que desta conta deve entrar na sua caixa de atendimento? Dá para mudar depois, na lista de conexões.": { es: "¿Qué de esta cuenta debe entrar en tu bandeja de atención? Puedes cambiarlo después, en la lista de conexiones." },
+  "Continuar para o Instagram": { es: "Continuar a Instagram" },
+  "Continuar para o Facebook": { es: "Continuar a Facebook" },
+  "Escolha pelo menos uma: mensagens diretas ou comentários.": { es: "Elige al menos una: mensajes directos o comentarios." },
+  "Só conexões de Instagram e Facebook escolhem o que entra na inbox.": { es: "Solo las conexiones de Instagram y Facebook eligen qué entra en la bandeja." },
+  "Esta conexão não tem webhook registrado. Reconecte a conta.": { es: "Esta conexión no tiene webhook registrado. Vuelve a conectar la cuenta." },
+  "Conexão não encontrada.": { es: "Conexión no encontrada." },
+
+  // ── Central: aviso comment_unanswered (0285, spec 22) ──
+  "Comentário sem resposta": { es: "Comentario sin respuesta" },
+  "Abra o atendimento e responda o comentário — no post ou no Direct. Se não precisar de resposta, feche com o motivo.": { es: "Abre la atención y responde el comentario — en la publicación o por Direct. Si no necesita respuesta, ciérrala con el motivo." },
+
   // ── Publicações: prévia realista por destino (Feed, Stories, Reels) ──
   "(sem legenda)": { es: "(sin texto)" },
   "Anexe um vídeo vertical para ver o Reel.": { es: "Adjunta un video vertical para ver el Reel." },

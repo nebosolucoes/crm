@@ -81,6 +81,10 @@ export type InboxKind =
   // grupo inativo, horário perdido. Erro transitório não avisa: o worker
   // tenta de novo sozinho. Um aviso por ocorrência, com o destino no corpo.
   | 'publication_failed'
+  // (migration 0285, spec 22) Comentário de post/anúncio aberto há mais do
+  // prazo da organização (default 4 h) sem resposta. Quem escreve: o cron de
+  // comentários; fecha sozinho quando o atendimento fecha.
+  | 'comment_unanswered'
   | 'other';
 
 export interface InboxItemRow {

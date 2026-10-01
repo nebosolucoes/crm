@@ -63,6 +63,14 @@ const PARES: Array<{
     simbolo: "PLATAFORMAS",
   },
   {
+    // Comentários na inbox (0285, spec 22): Direct (1 por contato e conexão)
+    // ou o fio de um comentário principal.
+    tabela: "conversations",
+    coluna: "kind",
+    arquivo: "lib/channels/comentarios/vocabulario.ts",
+    simbolo: "TIPOS_DE_CONVERSA",
+  },
+  {
     tabela: "contact_platform_identities",
     coluna: "platform",
     arquivo: "lib/channels/plataformas.ts",

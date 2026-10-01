@@ -80,6 +80,8 @@ export const KIND_LABEL = {
   // Diz o que não aconteceu, não o que o worker registrou: quem agendou a
   // oferta quer saber que ela não saiu e onde. O destino e o motivo vão no corpo.
   publication_failed: "Uma publicação não saiu em um dos destinos",
+  // Diz o que falta fazer: alguém comentou e ninguém respondeu ainda.
+  comment_unanswered: "Comentário sem resposta",
   other: "Aviso do assistente",
 } as const satisfies Record<InboxKind, string>;
 
