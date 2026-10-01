@@ -15,6 +15,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Conversation } from "@/lib/types/messaging";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { fecharAtendimentoDeComentario } from "@/lib/channels/comentarios/fechar";
+import {
+  CONVERSA_COMENTARIO,
+  MOTIVOS_DE_FECHAR_SEM_RESPOSTA,
+  tipoDeConversa,
+} from "@/lib/channels/comentarios/vocabulario";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +36,13 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   let body: unknown = {};
   const text = await req.text();
   try { body = text ? JSON.parse(text) : {}; } catch { return fail("validation_failed", "Corpo inválido.", 422, { requestId }); }
-  const parsed = z.object({ expected_revision: z.number().int().positive().optional() }).safeParse(body);
+  const parsed = z
+    .object({
+      expected_revision: z.number().int().positive().optional(),
+      // Spec 22 §5.2: fechar comentário SEM resposta exige o porquê.
+      motivo: z.enum(MOTIVOS_DE_FECHAR_SEM_RESPOSTA).optional(),
+    })
+    .safeParse(body);
   if (!parsed.success) return fail("validation_failed", "Revisão inválida.", 422, { requestId });
   const { id } = await ctx.params;
   const supabase = await createClient();
@@ -42,10 +54,40 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const user = authz.user;
 
   const { data: visible, error: readError } = await supabase.from("conversations")
-    .select("id, organization_id, service_revision").eq("id", id)
+    .select("id, organization_id, service_revision, kind").eq("id", id)
     .eq("organization_id", authz.org.orgId).maybeSingle();
   if (readError) return fail("internal_error", readError.message, 500, { requestId });
   if (!visible) return fail("not_found", t("Conversa não encontrada."), 404, { requestId });
+
+  // ─── Comentário: fecha com motivo (spec 22 §5.2) ──────────────────────────
+  if (tipoDeConversa(visible.kind) === CONVERSA_COMENTARIO) {
+    const admin = createAdminClient();
+    const { data: ultima } = await admin.from("messages").select("direction")
+      .eq("organization_id", visible.organization_id).eq("conversation_id", id)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const respondido = ultima?.direction === "outbound";
+    if (!respondido && !parsed.data.motivo) {
+      return fail("validation_failed", t("Diga por que este comentário fecha sem resposta."), 422, { requestId });
+    }
+    try {
+      await fecharAtendimentoDeComentario(admin, {
+        organizationId: visible.organization_id,
+        conversationId: id,
+        motivo: respondido ? "respondido_no_crm" : (parsed.data.motivo ?? "sem_resposta_necessaria"),
+        actorUserId: authz.user.id,
+        requestId,
+        revisaoEsperada: parsed.data.expected_revision ?? visible.service_revision,
+      });
+    } catch (err) {
+      const stale = (err as { code?: string }).code === "40001";
+      return fail(stale ? "conflict" : "internal_error",
+        stale ? t("O atendimento mudou. Atualize e tente novamente.") : (err as Error).message,
+        stale ? 409 : 500, { requestId });
+    }
+    const { data: fechada } = await admin.from("conversations").select("*")
+      .eq("organization_id", visible.organization_id).eq("id", id).single();
+    return ok(fechada as unknown as Conversation, { requestId });
+  }
   const { data, error } = await createAdminClient().rpc("fn_service_status", {
     p_org: visible.organization_id, p_conversation: id, p_status: "closed",
     p_expected: parsed.data.expected_revision ?? visible.service_revision,

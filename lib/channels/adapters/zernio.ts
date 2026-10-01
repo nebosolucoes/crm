@@ -186,6 +186,11 @@ export const zernioAdapter: ChannelAdapter = {
       );
     }
 
+    if (envelope.comentario) {
+      await envelope.beforeSend?.();
+      return responderComentario(creds, envelope.comentario, envelope.body ?? "");
+    }
+
     // Sem thread conhecida não há envio livre. Falhar aqui, com mensagem que
     // nomeia o motivo, é melhor que montar uma URL com `undefined` e receber um
     // 404 que ninguém consegue interpretar seis meses depois.
@@ -511,3 +516,56 @@ export const zernioAdapter: ChannelAdapter = {
     unknownError: "zernio_unknown",
   },
 };
+
+/**
+ * Resposta a comentário (spec 22 §5.1). Dois endpoints, um por modo:
+ *
+ *   publico → POST /v1/inbox/comments/{postId}             { accountId, message, commentId }
+ *   privado → POST /v1/inbox/comments/{postId}/{commentId}/private-reply   { accountId, message }
+ *
+ * O id devolvido vira o `external_id` da linha — é o que casa o eco do
+ * `comment.received` da própria conta e impede o atendimento de fechar como
+ * "respondido pelo app". A resposta privada que falhou com
+ * `privateReplyConsumed` NUNCA é repetida (doc da Zernio): o erro carrega o
+ * marcador para o handler gravar "usada".
+ */
+async function responderComentario(
+  creds: { baseUrl: string; apiKey: string; accountId: string },
+  alvo: NonNullable<OutboundEnvelope["comentario"]>,
+  texto: string,
+): Promise<{ externalId: string | null }> {
+  const post = encodeURIComponent(alvo.platformPostId);
+  const url =
+    alvo.modo === "privado"
+      ? `${creds.baseUrl}/v1/inbox/comments/${post}/${encodeURIComponent(alvo.commentId)}/private-reply`
+      : `${creds.baseUrl}/v1/inbox/comments/${post}`;
+  const corpo =
+    alvo.modo === "privado"
+      ? { accountId: creds.accountId, message: texto }
+      : { accountId: creds.accountId, message: texto, commentId: alvo.commentId };
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${creds.apiKey}`,
+      "Content-Type": "application/json",
+      "Idempotency-Key": alvo.idempotencyKey,
+    },
+    body: JSON.stringify(corpo),
+  });
+  const json = (await res.json().catch(() => null)) as {
+    success?: boolean;
+    data?: { commentId?: string };
+    messageId?: string;
+    error?: string;
+    code?: string;
+    details?: { privateReplyConsumed?: boolean };
+  } | null;
+
+  if (!res.ok || json?.success === false) {
+    const consumida = json?.details?.privateReplyConsumed === true ? " [private_reply_consumed]" : "";
+    const detalhe = json?.code ? `${json.code}: ${json.error ?? ""}` : (json?.error ?? res.statusText);
+    throw new Error(`zernio_send_failed: ${res.status} ${detalhe}${consumida}`.trim());
+  }
+  return { externalId: alvo.modo === "privado" ? (json?.messageId ?? null) : (json?.data?.commentId ?? null) };
+}

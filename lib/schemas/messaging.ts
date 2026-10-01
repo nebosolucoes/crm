@@ -96,6 +96,11 @@ export const sendMessageSchema = z
      * o vocabulário do canal, que é justamente o que o seam existe para evitar.
      */
     reply_to_message_id: z.string().uuid().optional(),
+    /**
+     * Só em conversa de COMENTÁRIO (spec 22 §5.1): responder no post
+     * (`public`, padrão) ou no Direct de quem comentou (`private`).
+     */
+    comment_reply_mode: z.enum(["public", "private"]).optional(),
   })
   .refine(
     (d) => {

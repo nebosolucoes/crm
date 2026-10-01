@@ -187,6 +187,19 @@ export interface OutboundEnvelope extends ChannelTenantScope {
    * plataforma. Spec 21 §5.
    */
   humanAgentTag?: boolean;
+  /**
+   * Resposta a um COMENTÁRIO de post/anúncio (spec 22 §5.1), em vez de mensagem
+   * numa thread. Decidido pelo handler (a conversa é `kind = 'comment'`); o
+   * adapter só escolhe o endpoint. `publico` responde no post; `privado`
+   * manda a única mensagem de Direct que a Meta permite por comentário.
+   */
+  comentario?: {
+    platformPostId: string;
+    commentId: string;
+    modo: "publico" | "privado";
+    /** Id da NOSSA linha — torna a retentativa segura no provedor. */
+    idempotencyKey: string;
+  };
 }
 
 /**

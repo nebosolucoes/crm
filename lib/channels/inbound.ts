@@ -26,6 +26,7 @@ import {
   registrarAviso,
   saudeDoEvento,
 } from "./zernio/avisos";
+import { ingerirComentario } from "./comentarios/ingest";
 import { aplicarEdicaoZernio, ingestZernioInbound } from "./zernio/ingest";
 import { lerEnvelopeZernio } from "./zernio/envelope";
 import { parseZernioEdicao, verifyZernioSignature } from "./zernio/webhook";
@@ -41,16 +42,17 @@ import type { ChannelProvider } from "./types";
 async function redeEContaDaSessao(
   admin: SupabaseClient,
   session: { id: string; organization_id: string },
-): Promise<{ plataforma: Plataforma; accountId: string | null }> {
+): Promise<{ plataforma: Plataforma; accountId: string | null; recebeComentarios: boolean }> {
   const { data } = await admin
     .from("channel_sessions")
-    .select("platform, zernio_account_id")
+    .select("platform, zernio_account_id, inbox_comments")
     .eq("organization_id", session.organization_id)
     .eq("id", session.id)
     .maybeSingle();
   return {
     plataforma: plataformaDe(data?.platform),
     accountId: (data?.zernio_account_id as string | null | undefined) ?? null,
+    recebeComentarios: data?.inbox_comments === true,
   };
 }
 
@@ -205,6 +207,20 @@ async function zernioInbound(
   // Vêm ANTES da ingestão, como os avisos: são correções de linha que já
   // existe, não mensagens novas. Deixá-los cair no `ingest` faria uma edição
   // criar uma conversa do nada, com um texto sem nada antes dele.
+  // ─── Comentário de post ou anúncio (spec 22) ─────────────────────────────
+  //
+  // Antes da ingestão de mensagem: não tem `message`, e cair lá devolveria
+  // `evento_sem_interesse` — o comentário sumiria com 200.
+  if (payload.event === "comment.received") {
+    const r = await ingerirComentario(admin, {
+      organizationId: input.session.organization_id,
+      channelSessionId: input.session.id,
+      payload,
+      sessao: await redeEContaDaSessao(admin, input.session),
+    });
+    return { ok: true, body: { ...r } };
+  }
+
   const edicao = parseZernioEdicao(payload);
   if (edicao) {
     const desfecho = await aplicarEdicaoZernio(admin, input.session.organization_id, edicao);

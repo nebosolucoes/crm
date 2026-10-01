@@ -89,6 +89,24 @@ export const zernioEnvelopeSchema = z.looseObject({
     })
     .nullish(),
   message: zernioMessageSchema.nullish(),
+  /**
+   * `comment.received` (spec 22). Os ids e o texto ganham tipo: o leitor
+   * (`./comentarios.ts`) os usa como chave do fio e do dedupe — um id que
+   * chegasse número viraria `null` e o comentário sumiria com 200.
+   */
+  comment: z
+    .looseObject({
+      id: texto,
+      postId: texto,
+      platformPostId: texto,
+      platform: texto,
+      text: texto,
+      createdAt: texto,
+      parentCommentId: texto,
+      author: z.looseObject({ id: texto, username: texto, name: texto, picture: texto }).nullish(),
+    })
+    .nullish(),
+  post: z.looseObject({ id: texto, platformPostId: texto, content: texto, imageUrl: texto, permalink: texto }).nullish(),
 });
 
 export type ZernioEnvelope = z.infer<typeof zernioEnvelopeSchema>;

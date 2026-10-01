@@ -48,6 +48,7 @@ import type { ListMessagesQuery, SendMessageInput } from "@/lib/schemas";
 import { sendTemplateForSession } from "@/lib/channels/meta/send-template-for-session";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { depoisDaRespostaDeComentario, prepararRespostaDeComentario } from "@/lib/channels/comentarios/resposta";
 import type { Message } from "@/lib/types/messaging";
 
 type SB = SupabaseClient;
@@ -311,7 +312,7 @@ export async function sendMessageHandler(
   // envio com 42703. Sem a coluna, nada está arquivado — e a consulta sem ela é a
   // consulta certa (ver lib/channels/archived).
   const convSelect = (comArchived: boolean) =>
-    `id, organization_id, contact_id, channel_session_id, is_group, group_chat_id, bot_silenced_until, provider_conversation_id, last_inbound_at, channel, contacts:contact_id(phone_number, wa_identity, wa_lid, is_blocked), channel_sessions:channel_session_id(${CHANNEL_SESSION_REF_COLUMNS}, status${comArchived ? `, ${ARCHIVED_AT}` : ""})`;
+    `id, organization_id, contact_id, channel_session_id, is_group, group_chat_id, bot_silenced_until, provider_conversation_id, last_inbound_at, channel, kind, metadata, contacts:contact_id(phone_number, wa_identity, wa_lid, is_blocked), channel_sessions:channel_session_id(${CHANNEL_SESSION_REF_COLUMNS}, status${comArchived ? `, ${ARCHIVED_AT}` : ""})`;
   //
   // O filtro por `organization_id` NÃO é redundância com a RLS — é a única
   // proteção que existe na metade dos chamadores. Este handler é a porta de
@@ -372,6 +373,9 @@ export async function sendMessageHandler(
     last_inbound_at: string | null;
     /** A rede da conversa (0280, spec 21). */
     channel: string | null;
+    /** `direct` ou `comment` (0285, spec 22). Ausente em banco antigo = Direct. */
+    kind?: string | null;
+    metadata?: unknown;
     contacts: {
       phone_number: string | null;
       wa_identity: string | null;
@@ -534,6 +538,12 @@ export async function sendMessageHandler(
     citada = alvo as { id: string; external_id: string | null };
   }
 
+  // ─── Resposta a COMENTÁRIO (spec 22 §5.1) ──────────────────────────────────
+  //
+  // Validado ANTES de a linha nascer: pedido impossível (mídia, IA, Direct já
+  // gasto) é 422 para quem pediu, não uma mensagem `failed` no histórico.
+  const comentario = await prepararRespostaDeComentario(supabase, ctx, c, input, citada);
+
   const insertRow = {
     ...(ctx.internalMessageId ? { id: ctx.internalMessageId } : {}),
     organization_id: c.organization_id,
@@ -557,6 +567,9 @@ export async function sendMessageHandler(
     metadata: {
       ...(input.metadata ?? {}),
       ...(ctx.actor.type === "ai_agent" ? { ai_actor_id: ctx.actor.id } : {}),
+      ...(comentario
+        ? { comentario: { origem: "crm", modo: comentario.modo, reply_to_comment_id: comentario.commentId } }
+        : {}),
     },
   };
 
@@ -614,6 +627,7 @@ export async function sendMessageHandler(
   // guardrail dela veta antes —, e a tag é declaração à Meta de que há uma
   // pessoa respondendo: não pode ser posta num envio automático.
   const humanAgentTag =
+    !comentario &&
     ctx.actor.type === "user" &&
     precisaDaTagDeAtendimentoHumano(
       c.channel_sessions?.provider ?? null,
@@ -842,6 +856,16 @@ export async function sendMessageHandler(
           body: input.body ?? "",
           replyToExternalId: citada?.external_id ?? null,
           humanAgentTag,
+          ...(comentario
+            ? {
+                comentario: {
+                  platformPostId: comentario.platformPostId,
+                  commentId: comentario.commentId,
+                  modo: comentario.modo,
+                  idempotencyKey: message.id,
+                },
+              }
+            : {}),
         }));
       }
 
@@ -881,6 +905,7 @@ export async function sendMessageHandler(
         .select(MSG_COLS)
         .maybeSingle();
       if (updated) message = updated as unknown as Message;
+      if (comentario) await depoisDaRespostaDeComentario(ctx, c.id, comentario, true);
       }
     } catch (err) {
       if (err instanceof StaleServiceBoundaryError || err instanceof AgendaDeferredError || err instanceof ApprovedReplyReceiptPersistenceError) throw err;
@@ -913,6 +938,10 @@ export async function sendMessageHandler(
           .maybeSingle();
         if (emFila) message = emFila as unknown as Message;
         return message;
+      }
+
+      if (comentario && msg.includes("[private_reply_consumed]")) {
+        await depoisDaRespostaDeComentario(ctx, c.id, comentario, false);
       }
 
       const { data: updated } = await supabase
