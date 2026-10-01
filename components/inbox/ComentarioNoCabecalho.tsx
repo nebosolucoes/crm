@@ -33,7 +33,7 @@ export function ContextoDoComentario({ metadata, conta }: { metadata: unknown; c
 
 /**
  * O post onde o comentário foi feito, à direita do cabeçalho, antes dos botões
- * (pedido do dono, 01/10): miniatura grande, legenda em até 3 linhas com
+ * (pedido do dono, 01/10): miniatura na proporção real, legenda em até 3 linhas com
  * reticências, e "Ver publicação" embaixo. Clicar na miniatura abre a imagem
  * grande num popup — quem responde em público precisa ver o que o cliente viu.
  */
@@ -49,13 +49,14 @@ export function PostDoComentario({ metadata }: { metadata: unknown }) {
         <button
           type="button"
           onClick={() => setAmpliada(true)}
-          className="shrink-0 overflow-hidden rounded-md border border-border transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
+          className="shrink-0 border border-border transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
           aria-label={t("Ver a imagem da publicação")}
           data-testid="miniatura-do-post"
         >
           {/* CDN da Meta, que expira: sem otimização do Next (que guardaria o link morto). */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={c.imagemDoPost} alt="" className="size-16 object-cover" loading="lazy" />
+          {/* Proporção real da publicação (retrato, quadrado ou paisagem), sem recorte e sem cantos arredondados. */}
+          <img src={c.imagemDoPost} alt="" className="block h-auto max-h-14 w-auto max-w-20" loading="lazy" />
         </button>
       )}
       <div className="flex min-w-0 max-w-[260px] flex-col gap-1">
@@ -91,7 +92,7 @@ export function PostDoComentario({ metadata }: { metadata: unknown }) {
               )}
             </DialogHeader>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={c.imagemDoPost} alt="" className="max-h-[75vh] w-full rounded-md object-contain" />
+            <img src={c.imagemDoPost} alt="" className="max-h-[75vh] w-full object-contain" />
           </DialogContent>
         </Dialog>
       )}

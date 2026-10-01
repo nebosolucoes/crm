@@ -102,8 +102,8 @@ async function semear(org: string): Promise<{ comentario: string; direct: string
       platform_post_id: "e2e-post-1",
       permalink: "https://www.instagram.com/p/e2e-post-1/",
       post_text: LEGENDA,
-      // Imagem do próprio app: a prova não depende de CDN de terceiro.
-      post_image_url: "/assets/Icone.png",
+      // Imagem do próprio app e HORIZONTAL: prova a proporção real sem depender de CDN de terceiro.
+      post_image_url: "/assets/Logo_menu.png",
       is_ad: true,
     },
   });
@@ -216,6 +216,11 @@ test.describe("Comentários na inbox — a tela", () => {
         cortada: legenda.scrollHeight > legenda.clientHeight,
         larguraDaLegenda: legenda.getBoundingClientRect().width,
         miniatura: caixa('[data-testid="miniatura-do-post"]').width,
+        proporcao: (() => {
+          const img = document.querySelector('[data-testid="miniatura-do-post"] img') as HTMLImageElement;
+          const r = img.getBoundingClientRect();
+          return { tela: r.width / r.height, real: img.naturalWidth / img.naturalHeight, altura: r.height, raio: getComputedStyle(img).borderTopLeftRadius, raioDaMoldura: getComputedStyle(img.parentElement!).borderTopLeftRadius };
+        })(),
         postAntesDosBotoes: assumir ? caixa('[data-testid="post-do-comentario"]').right <= assumir.getBoundingClientRect().left + 1 || caixa('[data-testid="post-do-comentario"]').bottom <= assumir.getBoundingClientRect().top + 1 : null,
       };
     });
@@ -223,7 +228,11 @@ test.describe("Comentários na inbox — a tela", () => {
     expect(medidas.linhas).toBeLessThanOrEqual(3);
     expect(medidas.cortada, "a legenda longa tem que ser cortada com reticências").toBe(true);
     expect(medidas.larguraDaLegenda).toBeLessThanOrEqual(260);
-    expect(medidas.miniatura).toBeGreaterThanOrEqual(62);
+    // Proporção REAL da imagem (sem recorte), menor, e sem canto arredondado.
+    expect(Math.abs(medidas.proporcao.tela - medidas.proporcao.real)).toBeLessThan(0.05);
+    expect(medidas.proporcao.altura).toBeLessThanOrEqual(56);
+    expect(medidas.proporcao.raio).toBe("0px");
+    expect(medidas.proporcao.raioDaMoldura).toBe("0px");
     expect(medidas.postAntesDosBotoes).not.toBe(false);
 
     await page.getByTestId("miniatura-do-post").click();
@@ -238,7 +247,7 @@ test.describe("Comentários na inbox — a tela", () => {
       const r = img.getBoundingClientRect();
       return { largura: r.width, altura: r.height };
     });
-    expect(caixa.altura).toBeGreaterThan(medidas.miniatura * 3);
+    expect(caixa.altura).toBeGreaterThan(medidas.proporcao.altura * 3);
     await page.screenshot({ path: `${EVIDENCIA}/03b-post-ampliado.png` });
     await page.keyboard.press("Escape");
     await expect(ampliada).toBeHidden();
