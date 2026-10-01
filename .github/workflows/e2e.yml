@@ -615,6 +615,7 @@ jobs:
         roteamento-por-canal.spec.ts
         setores.spec.ts
         canais-sociais.spec.ts
+        comentarios-na-inbox.spec.ts
         central-avisos-destino.spec.ts
         agenda-presenca-recuperacao.spec.ts
         agenda-google-sync.spec.ts

@@ -2632,3 +2632,32 @@ servidor local (3/3).
 **Não medido (precisa de conta real):** o OAuth completo, o formato exato dos blocos `account` e
 `conversation` do webhook de inbox (a doc não publica o schema), se o id devolvido pelo envio é o mesmo do
 eco `message.sent` e a entrega de áudio no Instagram. Spec 21 §9.
+
+## J32 — Comentários de Instagram e Facebook na inbox `[P0]`
+
+Spec: `docs/specs/22-spec-comentarios-na-inbox.md`. Prova de tela: `tests/e2e/comentarios-na-inbox.spec.ts`
+(evidência em `.superpowers/evidence/comentarios-na-inbox/`). **Rodou verde em 01/10/2026** contra o
+servidor local (5/5). Webhook assinado ponta a ponta medido no mesmo dia contra o :3001
+(`00-webhook-assinado-contra-3001.txt`).
+
+| # | Caso | Prioridade | Prova |
+|---|---|---|---|
+| 32.1 | Comentário que chega pelo webhook assinado vira atendimento (um por comentário principal), separado do Direct da mesma pessoa | `[P0]` | medido em 01/10 com HMAC real (ingested; reentrega `duplicate`; 401 com assinatura errada); invariante `comentarios-na-inbox` |
+| 32.2 | Tréplica do cliente entra no mesmo fio; resposta a resposta (Facebook) acha o fio pelo pai | `[P0]` | medido em 01/10 (tréplica); `tests/unit/comentarios-ingest.test.ts` (aninhado) |
+| 32.3 | Respondeu pelo app do celular: o atendimento fecha sozinho (`respondido_pelo_app`) | `[P0]` | medido em 01/10 com webhook da própria conta; unit |
+| 32.4 | Lista: balão da rede + nome da conta em todo comentário; filtro "Só comentários" | `[P0]` | e2e caso 1 |
+| 32.5 | Atendimento: post, anúncio, "Ver publicação"; composer "No post" (aviso de público) / "No Direct"; sem janela de 24h | `[P0]` | e2e caso 2 |
+| 32.6 | Responder no post / no Direct sai pelo endpoint certo; Direct gasto ou passado de 7 dias é recusado antes | `[P0]` | `tests/unit/comentarios-resposta.test.ts`; **não medido contra a API** (exige conta real) |
+| 32.7 | Parado além do prazo: um aviso por conta na Central, que abre a inbox filtrada; some quando a fila zera | `[P0]` | e2e casos 3 e 4; `tests/unit/comentarios-vigia-e-conferencia.test.ts` |
+| 32.8 | Fechar sem responder pede o motivo | `[P0]` | e2e caso 4 |
+| 32.9 | Ocultar comentário esconde na rede e fecha | `[P1]` | **não medido contra a API**; leitura de código |
+| 32.10 | Conectar escolhendo o que entra; mudar depois na lista (ligar exige o provedor) | `[P0]` | `tests/unit/comentarios-entrega-da-conexao.test.ts`; tela da lista no e2e caso 5; **OAuth não medido** |
+| 32.11 | Conferência traz o comentário que o webhook perdeu (últimas 3 h) | `[P1]` | unit com listagem simulada; **não medido contra a API** |
+| 32.12 | Configurações › Atendimento: fechar ao responder e prazo do aviso | `[P1]` | e2e caso 5 |
+
+**Não medido (precisa de conta real):** se o id devolvido pela resposta no post é o mesmo do eco
+`comment.received` da própria conta (o dedupe por texto cobre o contrário), se no Facebook o autor do
+comentário tem o mesmo id do Messenger, e o atraso real do webhook. Spec 22 §12.
+
+**Observado na tela:** com o filtro de tipo, a barra de filtros da inbox passa a ter quatro seletores e os
+rótulos ficam truncados em 1280 px ("Todo", "Mens"…) — o mesmo truncamento que os outros três já tinham.

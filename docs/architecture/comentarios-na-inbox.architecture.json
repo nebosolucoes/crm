@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Comentários na inbox — do post ao atendimento fechado",
+    "subtitle": "Um atendimento por comentário principal; ninguém fica sem resposta porque o laço fecha no cron e na Central",
+    "output": "comentarios-na-inbox.html",
+    "quality_profile": "standard"
+  },
+  "lanes": [
+    { "id": "rede", "label": "Rede social" },
+    { "id": "entrada", "label": "Entrada e relógio" },
+    { "id": "dados", "label": "Dados" },
+    { "id": "operacao", "label": "Operação" }
+  ],
+  "mainPath": ["zernio", "webhook", "ingestao", "conversa", "inbox", "envio", "fechamento"],
+  "nodes": [
+    { "id": "zernio", "lane": "rede", "col": 0, "type": "external", "label": "Zernio — comment.received (Instagram/Facebook), resposta no post, resposta privada, ocultar, listagem" },
+    { "id": "tela-conexao", "lane": "operacao", "col": 0, "type": "ui", "label": "Conexões — o que entra na inbox: Direct, comentários ou os dois (ligar exige o provedor primeiro)" },
+    { "id": "webhook", "lane": "entrada", "col": 1, "type": "service", "label": "lib/channels/inbound.ts — token da sessão dá a organização; comment.received antes da ingestão de mensagem" },
+    { "id": "ingestao", "lane": "entrada", "col": 2, "type": "service", "label": "lib/channels/comentarios/ingest.ts — fio pela raiz, tréplica no mesmo fio, resposta pelo app FECHA, eco é dedupe" },
+    { "id": "conversa", "lane": "dados", "col": 3, "type": "database", "label": "conversations kind=comment (1 por comentário raiz) + messages; channel_sessions.inbox_comments (0285)" },
+    { "id": "inbox", "lane": "operacao", "col": 4, "type": "ui", "label": "Inbox — balão da rede + @conta, filtro Só comentários, post e anúncio no cabeçalho" },
+    { "id": "envio", "lane": "entrada", "col": 5, "type": "service", "label": "messages/_handler + comentarios/resposta.ts — no post ou no Direct (1 vez, 7 dias); IA recusada" },
+    { "id": "fechamento", "lane": "dados", "col": 6, "type": "service", "label": "comentarios/fechar.ts — fn_service_status + motivo em metadata + audit conversation.closed" },
+    { "id": "cron", "lane": "entrada", "col": 4, "type": "service", "label": "cron comments-watcher (15 min) — conferência contra a listagem + vigia do prazo" },
+    { "id": "central", "lane": "operacao", "col": 6, "type": "ui", "label": "Central — 1 aviso comment_unanswered por conta (comment_queue), fecha quando a fila zera" },
+    { "id": "politica", "lane": "operacao", "col": 5, "type": "ui", "label": "Configurações › Atendimento — fechar ao responder, prazo do aviso (settings.comentarios)" }
+  ],
+  "edges": [
+    { "id": "conexao-assina", "from": "tela-conexao", "to": "zernio", "label": "registra/atualiza o webhook com os eventos escolhidos" },
+    { "id": "rede-entrega", "from": "zernio", "to": "webhook", "label": "comment.received assinado (HMAC)" },
+    { "id": "webhook-ingere", "from": "webhook", "to": "ingestao", "label": "confere conta, rede e inbox_comments" },
+    { "id": "ingere-grava", "from": "ingestao", "to": "conversa", "label": "fn_upsert_social_contact + fn_upsert_comment_conversation + mensagem (unique external_id)" },
+    { "id": "ingere-fecha", "from": "ingestao", "to": "fechamento", "label": "resposta da própria conta pelo app: respondido_pelo_app" },
+    { "id": "conversa-tela", "from": "conversa", "to": "inbox", "label": "lista e contagem filtram por kind; routing-worker põe na fila" },
+    { "id": "tela-responde", "from": "inbox", "to": "envio", "label": "No post / No Direct; Fechar com motivo; Ocultar" },
+    { "id": "envio-rede", "from": "envio", "to": "zernio", "label": "POST /v1/inbox/comments/{post} ou …/private-reply (Idempotency-Key)" },
+    { "id": "envio-fecha", "from": "envio", "to": "fechamento", "label": "respondido_no_crm quando a política manda" },
+    { "id": "politica-envio", "from": "politica", "to": "envio", "label": "fechar_ao_responder" },
+    { "id": "cron-confere", "from": "cron", "to": "zernio", "label": "posts recentes e comentários das últimas 3 h" },
+    { "id": "cron-ingere", "from": "cron", "to": "ingestao", "label": "o que o webhook perdeu entra pela MESMA ingestão" },
+    { "id": "cron-vigia", "from": "conversa", "to": "cron", "label": "abertos sem resposta além do prazo" },
+    { "id": "politica-cron", "from": "politica", "to": "cron", "label": "prazo_sem_resposta_horas" },
+    { "id": "cron-avisa", "from": "cron", "to": "central", "label": "abre, atualiza e fecha o aviso da conta" },
+    { "id": "central-abre", "from": "central", "to": "inbox", "label": "Ver comentários → ?tipo=comment&canal=" }
+  ]
+}

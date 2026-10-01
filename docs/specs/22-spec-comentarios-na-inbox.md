@@ -1,6 +1,6 @@
 # Spec 22 — Comentários de Instagram e Facebook na inbox (via Zernio)
 
-> Plano de implementação. Estado (2026-09-30): **plano com decisões do dono fechadas (§10), nada implementado.** Destino **só o fork
+> Plano de implementação. Estado (2026-10-01): **fases 1–6 implementadas** na branch `feat/comentarios-na-inbox` (migration 0285); prova de tela e conta real em §12. Destino **só o fork
 > Nebo**, a partir da `feat/canais-meta-zernio` (spec 21 já entregue: conexão OAuth, Direct e
 > Messenger na inbox, `channel_sessions.platform`, `contact_platform_identities`).
 > Lei que este plano obedece: `CLAUDE.md`, `docs/doctrine/restricao-de-canal.md`,
@@ -63,6 +63,12 @@ alter table conversations add column if not exists kind text not null default 'd
   `lib/routing/eligibles.ts:50`, `app/api/v1/conversations/[id]/retention/route.ts:82`,
   `workers/ai-sentiment-worker.ts:174`, `app/api/v1/ai/pacing/route.ts`, `lib/automation/janela-do-canal.ts`,
   `lib/automation/throttle.ts`. Refazer o grep na hora — a lista envelhece.
+  **Medido na implementação:** os seis pontos de TypeScript acima eram falsos positivos (consultam
+  `channel_knobs`/`ai_agent_versions`, não conversas). Os reais foram as quatro funções de atendimento
+  (`fn_service_begin`, `_observe`, `_observe_command`, `_event_origin`) e — achado que o plano não
+  previa — o bloco **B2** da unificação 0027 no baseline, que o `update.sh` reaplica e que fundiria e
+  APAGARIA cada fio de comentário. Os dois ganharam `kind = 'direct'`; o invariante
+  `tests/invariants/comentarios-na-inbox.test.ts` reaplica o B2 lido do baseline e prova os dois lados.
 
 ### 2.2 Contexto do post e do comentário
 
@@ -230,7 +236,23 @@ comentários desligados) a operação é idêntica à de hoje.
 | 5 | Mesma pessoa em posts diferentes | **atendimentos separados** | §5.3 |
 | 6 | Conta no limite do plano? | **não** — o recurso cobrado é a conexão, já contada | — |
 
-## 11. Não medido (confirmar com conta real)
+## 11. O que mudou do plano na implementação
+
+- **Aviso por conta, não por comentário** (§8): `comment_unanswered` com `ref_kind = 'comment_queue'`
+  e `ref_id` = a conexão — 50 comentários parados são UM aviso ("50 comentários sem resposta em
+  @conta"), atualizado a cada rodada e fechado pelo próprio cron quando a fila zera. A referência
+  própria abre `/app/inbox?filter=all&tipo=comment&canal=<id>` e não colide com a saúde da conexão
+  (`health.ts` resolve avisos por `ref_kind = channel_session`).
+- **A IA fica fora por recusa no envio**, não só por não ser acordada: `prepararRespostaDeComentario`
+  devolve 403 a qualquer ator que não seja pessoa ou token de API, cobrindo todo caminho do agente.
+- **Conferência** (`lib/channels/comentarios/conferencia.ts`): os 10 posts mais recentes de cada conta,
+  comentários das últimas 3 h, pela mesma ingestão do webhook; anúncio fica de fora (a listagem dele
+  exige o add-on de anúncios).
+- **Fechar respondido não pede motivo**: se a última mensagem do fio é nossa, `close` grava
+  `respondido_no_crm`.
+- **Ligar comentários numa conexão exige o provedor primeiro**; desligar grava primeiro (§4).
+
+## 12. Não medido (confirmar com conta real)
 
 - Se no Facebook o id do autor do comentário = PSID do Messenger.
 - Se `comment.received` da própria conta chega para respostas feitas **pelo CRM** (eco) e com o mesmo id
