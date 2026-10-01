@@ -9899,6 +9899,12 @@ export const DICIONARIO: Traducoes = {
   "Grupos do WhatsApp": { es: "Grupos de WhatsApp" },
   "Marque os grupos que recebem esta publicação.": { es: "Marca los grupos que reciben esta publicación." },
 
+  // ── Publicações: filtros do Calendário ──
+  "Programado": { es: "Programado" },
+  "Filtrar por conexão": { es: "Filtrar por conexión" },
+  "Todas as conexões": { es: "Todas las conexiones" },
+  "O mês inteiro de uma vez: cada chip é uma rede numa data, com a cor do resultado.": { es: "El mes entero de una vez: cada chip es una red en una fecha, con el color del resultado." },
+
 };
 
 /**

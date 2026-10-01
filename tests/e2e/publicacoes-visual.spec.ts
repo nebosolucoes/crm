@@ -61,7 +61,8 @@ const ocorrencia = (id: string, quando: Date, status: string, executions = { tot
   executions,
 });
 const PENDENTES = [ocorrencia(OCC_1, amanha, "pending"), ocorrencia(OCC_2, depois, "pending")];
-const FEITA = ocorrencia(OCC_DONE, ontem, "partial", { total: 4, sent: 3, failed: 1, pending: 0, sending: 0, skipped: 0, cancelled: 0 });
+// O estado POR DESTINO: no mesmo dia o Instagram saiu e o WhatsApp falhou num grupo.
+const FEITA = { ...ocorrencia(OCC_DONE, ontem, "partial", { total: 4, sent: 3, failed: 1, pending: 0, sending: 0, skipped: 0, cancelled: 0 }), destinos_estado: { "t-wa": "falhou", "t-ig": "concluido", "t-st": "concluido" } };
 
 const publicacao = {
   id: PUB,
@@ -255,20 +256,47 @@ test("Agendar: 2 arquivos, WhatsApp com 2 grupos, Instagram Feed + Stories, 2 da
   await expect(page).toHaveURL(/\/app\/publicacoes\/lista/);
 });
 
-test("Calendário e Histórico: um chip por ocorrência, '+N', e o desfecho por destino sem overflow", async ({ page }) => {
+test("Calendário e Histórico: um chip por destino com a cor do estado, abas e conexão, e o desfecho por destino sem overflow", async ({ page }) => {
   test.setTimeout(120_000);
   await loginComoAdmin(page, lerCreds());
   const capturar = { criadas: [] as unknown[], reagendadas: [] as unknown[] };
   await mockarApi(page, capturar);
   await page.goto("/app/publicacoes/calendario");
   await expect(page.getByTestId("calendario-de-publicacoes")).toBeVisible();
-  await expect(page.locator(`[data-testid="chip-${OCC_1}"]:visible`)).toBeVisible();
-  await page.locator(`[data-testid="chip-${OCC_1}"]:visible`).click();
+  // Um chip por DESTINO da data, com o ícone do Agendar e a cor do estado.
+  const chipsDaPendente = page.locator(`[data-testid="chip-${OCC_1}"]:visible`);
+  await expect(chipsDaPendente).toHaveCount(3);
+  await expect(chipsDaPendente.first()).toHaveAttribute("data-estado", "programado");
+  await expect(page.locator(`[data-testid="chip-${OCC_1}"][data-destino="instagram-feed"]:visible`)).toContainText("@nebo.demo");
+  await expect(page.locator(`[data-testid="chip-${OCC_1}"][data-destino="instagram-feed"]:visible`)).toContainText("Oferta Coca-Cola");
+  await expect(page.locator(`[data-testid="chip-${OCC_DONE}"][data-destino="whatsapp-group_message"]:visible`)).toHaveAttribute("data-estado", "falhou");
+  await expect(page.locator(`[data-testid="chip-${OCC_DONE}"][data-destino="instagram-feed"]:visible`)).toHaveAttribute("data-estado", "concluido");
+
+  // As abas filtram por situação e mostram o contador, como na Agenda.
+  await expect(page.getByTestId("contador-todos")).toHaveText("9");
+  await expect(page.getByTestId("contador-programado")).toHaveText("6");
+  await expect(page.getByTestId("contador-concluido")).toHaveText("2");
+  await expect(page.getByTestId("contador-falhou")).toHaveText("1");
+  await page.getByTestId("aba-falhou").click();
+  await expect(page.locator(`[data-testid^="chip-"]:visible`)).toHaveCount(1);
+  await expect(page.locator(`[data-testid="chip-${OCC_DONE}"]:visible`)).toHaveAttribute("data-destino", "whatsapp-group_message");
+  await page.getByTestId("aba-todos").click();
+
+  // O seletor de conexão, à direita, deixa só os chips daquela conta.
+  await page.getByTestId("filtro-de-conexao").click();
+  await page.getByRole("option", { name: "Instagram · @nebo.demo" }).click();
+  await expect(page.getByTestId("contador-todos")).toHaveText("6");
+  await expect(page.locator(`[data-destino="whatsapp-group_message"]:visible`)).toHaveCount(0);
+  await page.screenshot({ path: ".superpowers/evidence/publicacoes/calendario-filtros.png", fullPage: true });
+  await page.getByTestId("filtro-de-conexao").click();
+  await page.getByRole("option", { name: "Todas as conexões" }).click();
+
+  await chipsDaPendente.first().click();
   await expect(page.getByTestId("sheet-da-ocorrencia")).toContainText("Oferta Coca-Cola");
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Próximo mês" }).click();
   await page.getByRole("button", { name: "Hoje" }).click();
-  await expect(page.locator(`[data-testid="chip-${OCC_1}"]:visible`)).toBeVisible();
+  await expect(chipsDaPendente.first()).toBeVisible();
 
   await page.goto("/app/publicacoes/historico");
   const linha = page.getByTestId(`historico-${OCC_DONE}`);

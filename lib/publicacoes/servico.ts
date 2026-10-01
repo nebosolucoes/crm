@@ -30,6 +30,7 @@ import { FUSO_PADRAO, fusoValido } from "@/lib/tempo/fusos";
 
 import { HORIZONTE_DE_RECORRENCIA_DIAS, TETO_DE_OCORRENCIAS_PENDENTES } from "./politica";
 import { proximasOcorrencias } from "./recorrencia";
+import { estadosDosDestinos, type EstadoDoDestino, type ExecucaoParaEstado } from "./estado-do-destino";
 import { validarDestino, type ProblemaDoDestino } from "./regras-por-destino";
 import {
   chaveDeDestino,
@@ -1082,6 +1083,8 @@ export interface OcorrenciaResumida extends OcorrenciaLida {
   media_count: number;
   targets: ResumoDeDestino[];
   executions: ResumoDeExecucoes;
+  /** O estado de cada destino DESTA data (id do destino → estado), para o chip do Calendário. */
+  destinos_estado: Record<string, EstadoDoDestino>;
 }
 
 export async function listarOcorrencias(
@@ -1178,7 +1181,7 @@ async function montarResumos(
     admin.from("publication_target_groups").select("target_id").eq("organization_id", orgId),
     admin
       .from("publication_executions")
-      .select("occurrence_id, status")
+      .select("occurrence_id, target_id, group_id, media_id, attempt, status, retry_at")
       .eq("organization_id", orgId)
       .in("occurrence_id", occIds),
   ]);
@@ -1218,6 +1221,12 @@ async function montarResumos(
     targetsPorPub.set(pid, lista);
   }
   const execPorOcc = new Map<string, ResumoDeExecucoes>();
+  const execsPorOcc = new Map<string, ExecucaoParaEstado[]>();
+  for (const e of (execs.data ?? []) as Array<ExecucaoParaEstado & { occurrence_id: string }>) {
+    const lista = execsPorOcc.get(e.occurrence_id) ?? [];
+    lista.push(e);
+    execsPorOcc.set(e.occurrence_id, lista);
+  }
   for (const e of (execs.data ?? []) as Array<{ occurrence_id: string; status: StatusDaExecucao }>) {
     const r = execPorOcc.get(e.occurrence_id) ?? { total: 0, sent: 0, failed: 0, pending: 0, sending: 0, skipped: 0, cancelled: 0 };
     r.total += 1;
@@ -1228,6 +1237,12 @@ async function montarResumos(
   for (const o of ocorrencias) {
     const p = pubPorId.get(o.publication_id);
     if (!p || p.deleted_at) continue;
+    // Só os destinos DESTA data (0284): sem escolha, todos.
+    const destinosDaData = (targetsPorPub.get(o.publication_id) ?? []).filter((t) => {
+      const desta = destinosPorOcorrencia.get(o.id);
+      if (desta && !desta.includes(t.id)) return false;
+      return !t.removido || o.status !== "pending";
+    });
     saida.push({
       ...o,
       title: (p.title as string | null) ?? null,
@@ -1240,11 +1255,8 @@ async function montarResumos(
       media_count: contagemDeMidia.get(o.publication_id) ?? 0,
       target_ids: destinosPorOcorrencia.get(o.id) ?? null,
       // Só os destinos DESTA data (0284): sem linha, todos.
-      targets: (targetsPorPub.get(o.publication_id) ?? []).filter((t) => {
-        const desta = destinosPorOcorrencia.get(o.id);
-        if (desta && !desta.includes(t.id)) return false;
-        return !t.removido || o.status !== "pending";
-      }),
+      targets: destinosDaData,
+      destinos_estado: estadosDosDestinos(o.status, destinosDaData.map((t) => t.id), execsPorOcc.get(o.id) ?? []),
       executions: execPorOcc.get(o.id) ?? { total: 0, sent: 0, failed: 0, pending: 0, sending: 0, skipped: 0, cancelled: 0 },
     });
   }
