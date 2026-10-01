@@ -13,7 +13,7 @@ export function IconesClient() {
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="flex h-full flex-col gap-6 p-6" data-testid="pagina-de-icones">
+      <div className="flex h-full flex-col gap-6 p-6 pt-0" data-testid="pagina-de-icones">
         <header>
           <h1 className="text-2xl font-semibold tracking-tight">{t("Ícones de canal")}</h1>
           <p className="text-sm text-muted-foreground">{t("As 8 combinações de rede e formato nos 3 estados. Feed é círculo cheio; Stories e Status têm o anel cortado; Reels leva a claquete e o selo da rede.")}</p>

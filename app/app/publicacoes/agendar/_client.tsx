@@ -18,7 +18,7 @@ export function AgendarClient({ fuso, agoraIso }: { fuso: string; agoraIso: stri
   return (
     // O mesmo padrão das outras telas (Casos, Tarefas): p-6, título e a frase
     // de apoio embaixo, e o conteúdo ocupando a largura que sobra.
-    <div className="flex h-full w-full flex-col p-6">
+    <div className="flex h-full w-full flex-col p-6 pt-0">
       <FormularioDePublicacao
         key={editarId ?? "nova"}
         fuso={fuso}

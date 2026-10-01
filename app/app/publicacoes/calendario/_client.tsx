@@ -34,7 +34,7 @@ export function CalendarioClient({ podeEditar, fuso }: { podeEditar: boolean; fu
   }
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
+    <div className="flex h-full flex-col gap-6 p-6 pt-0">
       <CabecalhoDePublicacoes titulo={t("Calendário")} descricao={t("O mês inteiro de uma vez: cada chip é uma publicação num horário, com as redes em que sai.")} podeEditar={podeEditar} />
       <CalendarioDePublicacoes
         ano={ano}
