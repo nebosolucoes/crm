@@ -85,6 +85,9 @@ CRONS="
 # O CASO PARADO. De hora em hora, e não a cada 5 minutos: o prazo é de 24h, e
 # uma varredura mais frequente só gastaria consulta para descobrir o mesmo nada.
 7 * * * *|60|api/v1/cron/case-stale-watcher
+# O COMENTÁRIO SEM RESPOSTA (spec 22). De 15 em 15: confere o que o webhook
+# perdeu nas últimas 3 h e avisa a conta com comentário parado além do prazo.
+*/15 * * * *|90|api/v1/cron/comments-watcher
 */30 * * * *|60|api/v1/cron/contact-phones
 17 * * * *|60|api/v1/cron/contact-proposals-watcher
 # O ANIVERSÁRIO. De hora em hora, e não uma vez ao dia, porque quem decide o

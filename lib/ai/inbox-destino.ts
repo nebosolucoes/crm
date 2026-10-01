@@ -21,6 +21,11 @@ export const REFERENCIAS_DE_AVISO = {
   lead: { tabela: "crm_leads", papel: "agent", rotulo: "Abrir negócio", href: (id: string, pipelineId?: string) => `/app/pipelines/${pipelineId}?lead=${id}` },
   followup_enrollment: { tabela: "followup_enrollments", papel: "viewer", rotulo: "Abrir acompanhamento", href: (id: string) => `/app/ai/followups/enrollments/${id}` },
   channel_session: { tabela: "channel_sessions", papel: "admin", rotulo: "Revisar conexão", href: () => "/app/connections", ativo: true },
+  // Spec 22 §8: a FILA de comentários de uma conta. Mesma linha da conexão, outro
+  // destino (a inbox filtrada nela) e outro papel — quem responde é o atendente.
+  // Nome próprio também para a saúde da conexão (`health.ts`), que resolve avisos
+  // por `ref_kind = channel_session`, não fechar este por engano.
+  comment_queue: { tabela: "channel_sessions", papel: "agent", rotulo: "Ver comentários", href: (id: string) => `/app/inbox?filter=all&tipo=comment&canal=${id}`, ativo: true },
   ai_knowledge_source: { tabela: "ai_knowledge_sources", papel: "manager", rotulo: "Abrir base de conhecimento", href: () => "/app/ai/knowledge/sources" },
   agent_case: { tabela: "agent_cases", papel: "agent", rotulo: "Abrir atendimento", href: (id: string) => `/app/ai/cases?caso=${id}` },
   // Publicações (0283): o aviso aponta para a OCORRÊNCIA no Histórico, que é
@@ -75,7 +80,10 @@ export const POLITICAS_DE_AVISO = {
   voice_call_missed: { refs: ["contact"], orientacao: "Retorne a ligação quando puder — quem ligou não foi atendido." },
   entitlement_changed: { refs: [], orientacao: "Veja em Configurações › Billing o plano atual, os recursos liberados e até quando valem.", geral: { papel: "admin", href: "/app/settings/billing", rotulo: "Ver plano e recursos" } },
   publication_failed: { refs: ["publication_occurrence"], orientacao: "Abra o Histórico de Publicações: o destino que falhou mostra o motivo e permite reenviar quando fizer sentido." },
-  comment_unanswered: { refs: ["conversation"], orientacao: "Abra o atendimento e responda o comentário — no post ou no Direct. Se não precisar de resposta, feche com o motivo." },
+  // Um aviso por CONTA, não por comentário: 50 comentários parados seriam 50
+  // avisos, e alarme em massa ensina a ignorar o alarme. Quem fecha é o cron,
+  // quando a conta zera a fila.
+  comment_unanswered: { refs: ["comment_queue"], orientacao: "Abra os comentários na inbox e responda — no post ou no Direct. Se algum não precisar de resposta, feche com o motivo." },
   other: { refs: ["lead", "channel_session", "appointment", "ai_agent"], orientacao: "Confira a situação descrita neste aviso com a pessoa responsável." },
 } satisfies Record<InboxKind, Politica>;
 

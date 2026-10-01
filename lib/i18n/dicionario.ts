@@ -9897,9 +9897,20 @@ export const DICIONARIO: Traducoes = {
   "Não sei em qual publicação este comentário está. Abra a publicação e responda por lá.": { es: "No sé en qué publicación está este comentario. Abre la publicación y responde desde allí." },
   "A resposta no Direct deste comentário já foi usada ou passou de 7 dias.": { es: "La respuesta por Direct de este comentario ya se usó o pasaron más de 7 días." },
 
+  // ── Comentários: política da organização (spec 22) ──
+  "Configuração de comentários salva.": { es: "Configuración de comentarios guardada." },
+  "Comentários de Instagram e Facebook": { es: "Comentarios de Instagram y Facebook" },
+  "Cada comentário em post ou anúncio vira um atendimento. Estas duas regras garantem que nenhum fique sem resposta.": { es: "Cada comentario en una publicación o anuncio se convierte en una atención. Estas dos reglas garantizan que ninguno quede sin respuesta." },
+  "Fechar ao responder": { es: "Cerrar al responder" },
+  "Respondeu pelo CRM, o atendimento do comentário fecha sozinho. Desligado, alguém fecha à mão.": { es: "Si respondes desde el CRM, la atención del comentario se cierra sola. Desactivado, alguien la cierra a mano." },
+  "Avisar comentário sem resposta depois de (horas)": { es: "Avisar comentario sin respuesta después de (horas)" },
+  "O aviso aparece na Central, um por conta, e some sozinho quando todos forem respondidos.": { es: "El aviso aparece en la Central, uno por cuenta, y desaparece solo cuando todos se responden." },
+  "O prazo do aviso vai de 1 a 168 horas.": { es: "El plazo del aviso va de 1 a 168 horas." },
+
   // ── Central: aviso comment_unanswered (0285, spec 22) ──
   "Comentário sem resposta": { es: "Comentario sin respuesta" },
-  "Abra o atendimento e responda o comentário — no post ou no Direct. Se não precisar de resposta, feche com o motivo.": { es: "Abre la atención y responde el comentario — en la publicación o por Direct. Si no necesita respuesta, ciérrala con el motivo." },
+  "Abra os comentários na inbox e responda — no post ou no Direct. Se algum não precisar de resposta, feche com o motivo.": { es: "Abre los comentarios en la bandeja y responde — en la publicación o por Direct. Si alguno no necesita respuesta, ciérralo con el motivo." },
+  "Ver comentários": { es: "Ver comentarios" },
 
   // ── Publicações: prévia realista por destino (Feed, Stories, Reels) ──
   "(sem legenda)": { es: "(sin texto)" },

@@ -140,9 +140,17 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
   const tab = parseFilterParam(searchParams.get("filter"));
 
   // tab vive na URL (?filter=); os demais filtros são estado local de sessão.
-  const [aux, setAux] = useState<Omit<InboxFiltersValue, "tab">>({
-    search: "",
-    onlyUnread: false,
+  // `?tipo=comment` chega pelo aviso "comentários sem resposta" da Central
+  // (spec 22 §8): a inbox abre já filtrada no que precisa de resposta.
+  const [aux, setAux] = useState<Omit<InboxFiltersValue, "tab">>(() => {
+    const tipo = searchParams.get("tipo");
+    const canal = searchParams.get("canal");
+    return {
+      search: "",
+      onlyUnread: false,
+      ...(tipo === "comment" || tipo === "direct" ? { kind: tipo } : {}),
+      ...(canal && /^[0-9a-f-]{36}$/i.test(canal) ? { channel_session_id: canal } : {}),
+    };
   });
   const filterValue: InboxFiltersValue = { tab, ...aux };
   const setFilterValue = useCallback(

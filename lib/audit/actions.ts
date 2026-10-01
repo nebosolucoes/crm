@@ -212,6 +212,10 @@ export const AUDIT_ACTIONS = [
   "channel.ai_access_updated",
   // Spec 22: o que a conexão social entrega para a inbox (Direct, comentários).
   "channel.inbox_scope_changed",
+  // Spec 22 §8: rodada do cron de comentários que recuperou ou avisou algo.
+  "channel.comments_watched",
+  // Spec 22: política de comentários da organização (fechar ao responder, prazo do aviso).
+  "settings.comentarios_changed",
   "channel.reconnected",
   // Duas ações distintas de propósito: `deleted` apagou a linha (canal virgem),
   // `archived` só a escondeu porque conversas/mensagens ainda a referenciam.

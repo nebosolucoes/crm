@@ -4,7 +4,8 @@
  * Um só caminho para os três jeitos de fechar — respondido pelo CRM,
  * respondido pelo app do celular, fechado sem resposta — para o motivo cair
  * sempre no mesmo lugar (`metadata.comentario.fechamento` e o audit
- * `conversation.closed`), e o aviso de "comentário sem resposta" fechar junto.
+ * `conversation.closed`). O aviso de "comentários sem resposta" é por conta e
+ * quem o fecha é o cron (`lib/channels/comentarios/vigia.ts`), quando a fila zera.
  *
  * Usa `fn_service_status`, a mesma transição do botão "Fechar" da inbox: ela
  * trava o contato, sobe a revisão do atendimento e carimba `service_closed_at`.
@@ -64,16 +65,6 @@ export async function fecharAtendimentoDeComentario(
     .eq("organization_id", input.organizationId)
     .eq("id", input.conversationId);
   if (erroMeta) logger.warn("[comentarios] motivo do fechamento não gravado", { detail: erroMeta.message });
-
-  // O aviso de "sem resposta" deste fio perde o sentido no instante em que ele fecha.
-  await admin
-    .from("agent_inbox_items")
-    .update({ status: "resolved" })
-    .eq("organization_id", input.organizationId)
-    .eq("kind", "comment_unanswered")
-    .eq("ref_kind", "conversation")
-    .eq("ref_id", input.conversationId)
-    .eq("status", "open");
 
   void audit({
     action: "conversation.closed",
