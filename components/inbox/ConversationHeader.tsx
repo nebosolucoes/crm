@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { JanelaSelo } from "@/components/inbox/JanelaSelo";
 import { IconeDaPlataforma } from "@/components/channels/IconeDaPlataforma";
 import { CONVERSA_COMENTARIO, tipoDeConversa } from "@/lib/channels/comentarios/vocabulario";
-import { AcoesDoComentario, ContextoDoComentario } from "./ComentarioNoCabecalho";
+import { AcoesDoComentario, ContextoDoComentario, PostDoComentario } from "./ComentarioNoCabecalho";
 import { ehPlataformaSocial, plataformaDe, ROTULO_DA_PLATAFORMA } from "@/lib/channels/plataformas";
 import { Phone, ArrowRight } from "@/lib/ui/icons";
 import { useAuth } from "@/hooks/auth/AuthProvider";
@@ -233,6 +233,9 @@ export function ConversationHeader({ conversation }: Props) {
           />
         )}
       </div>
+
+      {/* Spec 22: o post do comentário, encostado nos botões pela direita. */}
+      {ehComentario && <PostDoComentario metadata={conversation.metadata} />}
 
       {/* `shrink-0` saiu daqui: era ele que impunha o piso de largura. Agora a
           barra pode encolher e quebrar internamente, e os botões continuam

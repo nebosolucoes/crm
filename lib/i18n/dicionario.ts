@@ -9907,6 +9907,8 @@ export const DICIONARIO: Traducoes = {
   "O aviso aparece na Central, um por conta, e some sozinho quando todos forem respondidos.": { es: "El aviso aparece en la Central, uno por cuenta, y desaparece solo cuando todos se responden." },
   "O prazo do aviso vai de 1 a 168 horas.": { es: "El plazo del aviso va de 1 a 168 horas." },
 
+  "Ver a imagem da publicação": { es: "Ver la imagen de la publicación" },
+  "Publicação": { es: "Publicación" },
   // ── Central: aviso comment_unanswered (0285, spec 22) ──
   "Comentário sem resposta": { es: "Comentario sin respuesta" },
   "Abra os comentários na inbox e responda — no post ou no Direct. Se algum não precisar de resposta, feche com o motivo.": { es: "Abre los comentarios en la bandeja y responde — en la publicación o por Direct. Si alguno no necesita respuesta, ciérralo con el motivo." },

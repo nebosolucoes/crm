@@ -39,6 +39,11 @@ const CONTA = "@loja.coment.e2e";
 const NOME = "Rita Comenta-E2E";
 const EVIDENCIA = ".superpowers/evidence/comentarios-na-inbox";
 const H = 60 * 60 * 1000;
+// Longa de propósito: a tela corta em 3 linhas com reticências.
+const LEGENDA =
+  "Promoção de outubro: kit completo com frete grátis para todo o Brasil. " +
+  "Escolha a cor, o tamanho e o acabamento — e ainda leve um brinde na primeira compra. " +
+  "Válido enquanto durarem os estoques, uma unidade por CPF, não cumulativo com outras ofertas da loja.";
 
 const orgId = () => (lerCreds() as unknown as { org_id: string }).org_id;
 
@@ -96,7 +101,9 @@ async function semear(org: string): Promise<{ comentario: string; direct: string
     p_contexto: {
       platform_post_id: "e2e-post-1",
       permalink: "https://www.instagram.com/p/e2e-post-1/",
-      post_text: "Promoção de outubro: kit completo",
+      post_text: LEGENDA,
+      // Imagem do próprio app: a prova não depende de CDN de terceiro.
+      post_image_url: "/assets/Icone.png",
       is_ad: true,
     },
   });
@@ -188,12 +195,53 @@ test.describe("Comentários na inbox — a tela", () => {
     await page.goto(`/app/inbox/${ids.comentario}`);
 
     const contexto = page.getByTestId("contexto-do-comentario");
-    await expect(contexto).toContainText("Promoção de outubro", { timeout: 30_000 });
+    await expect(contexto).toContainText(`Comentário em ${CONTA}`, { timeout: 30_000 });
     await expect(contexto).toContainText("Anúncio");
-    await expect(contexto.getByRole("link", { name: /Ver publicação/ })).toHaveAttribute(
+
+    // O post, à direita, ANTES dos botões: miniatura, legenda em até 3 linhas, link embaixo.
+    const post = page.getByTestId("post-do-comentario");
+    await expect(post).toBeVisible();
+    await expect(post.getByRole("link", { name: /Ver publicação/ })).toHaveAttribute(
       "href",
       "https://www.instagram.com/p/e2e-post-1/",
     );
+    const medidas = await page.evaluate(() => {
+      const caixa = (sel: string) => document.querySelector(sel)!.getBoundingClientRect();
+      const legenda = document.querySelector('[data-testid="legenda-do-post"]') as HTMLElement;
+      const estilo = getComputedStyle(legenda);
+      const assumir = [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Assumir");
+      return {
+        clamp: estilo.webkitLineClamp,
+        linhas: Math.round(legenda.getBoundingClientRect().height / parseFloat(estilo.lineHeight)),
+        cortada: legenda.scrollHeight > legenda.clientHeight,
+        larguraDaLegenda: legenda.getBoundingClientRect().width,
+        miniatura: caixa('[data-testid="miniatura-do-post"]').width,
+        postAntesDosBotoes: assumir ? caixa('[data-testid="post-do-comentario"]').right <= assumir.getBoundingClientRect().left + 1 || caixa('[data-testid="post-do-comentario"]').bottom <= assumir.getBoundingClientRect().top + 1 : null,
+      };
+    });
+    expect(medidas.clamp).toBe("3");
+    expect(medidas.linhas).toBeLessThanOrEqual(3);
+    expect(medidas.cortada, "a legenda longa tem que ser cortada com reticências").toBe(true);
+    expect(medidas.larguraDaLegenda).toBeLessThanOrEqual(260);
+    expect(medidas.miniatura).toBeGreaterThanOrEqual(62);
+    expect(medidas.postAntesDosBotoes).not.toBe(false);
+
+    await page.getByTestId("miniatura-do-post").click();
+    const ampliada = page.getByTestId("imagem-do-post-ampliada");
+    await expect(ampliada).toBeVisible();
+    // A imagem tem de CARREGAR e ocupar espaço — largura sozinha o `w-full` dá até sem imagem.
+    const imagem = ampliada.locator("img");
+    await expect
+      .poll(() => imagem.evaluate((img: HTMLImageElement) => (img.complete ? img.naturalWidth : 0)), { timeout: 15_000 })
+      .toBeGreaterThan(0);
+    const caixa = await imagem.evaluate((img) => {
+      const r = img.getBoundingClientRect();
+      return { largura: r.width, altura: r.height };
+    });
+    expect(caixa.altura).toBeGreaterThan(medidas.miniatura * 3);
+    await page.screenshot({ path: `${EVIDENCIA}/03b-post-ampliado.png` });
+    await page.keyboard.press("Escape");
+    await expect(ampliada).toBeHidden();
     // Comentário não tem janela de 24h.
     await expect(page.getByText(/^Janela \d/)).toHaveCount(0);
 
