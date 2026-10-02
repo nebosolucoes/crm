@@ -162,6 +162,21 @@ describe("GET /api/v1/system/version", () => {
     expect(body.data.notes).toBeUndefined();
   });
 
+  it("fork Nebo: a versão gravada na imagem (package.json) vence o SHA que o agente reporta", async () => {
+    versionRow.current_version = "e5a3152";
+    vi.mocked(loadAuthUser).mockResolvedValue(MEMBRO as never);
+    const { GET } = await import("../version/route");
+    vi.stubEnv("APP_VERSION", "1.0.1");
+    try {
+      expect((await (await GET(get())).json()).data.current_version).toBe("1.0.1");
+      // Build sem número de versão (SHA, `local`, `dev`) não esconde o que o agente sabe.
+      vi.stubEnv("APP_VERSION", "local");
+      expect((await (await GET(get())).json()).data.current_version).toBe("e5a3152");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("entrega o estado completo e a faixa do CHANGELOG para o dono", async () => {
     vi.mocked(loadAuthUser).mockResolvedValue(OWNER as never);
     const { GET } = await import("../version/route");

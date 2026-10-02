@@ -25,6 +25,18 @@ export const dynamic = "force-dynamic";
 /** Sem notícia do agente por 24h, a tela ensina o caminho manual. */
 const AGENT_OFFLINE_AFTER_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Fork Nebo: a versão que o dono DEFINE (`version` do package.json), gravada na
+ * imagem como APP_VERSION pelo "Publicar imagem Docker". Ela vence o que o
+ * agente do host reporta — fora de tag, o agente só sabe o SHA curto, e no
+ * Easypanel não há agente nenhum. Sem número de versão (dev local, testes,
+ * build `local`/SHA), vale o caminho de antes.
+ */
+function versaoDaImagem(): string | null {
+  const v = process.env.APP_VERSION?.trim() ?? "";
+  return /^v?\d+\.\d+\.\d+/.test(v) ? v : null;
+}
+
 export async function GET(_req: NextRequest): Promise<Response> {
   const user = await loadAuthUser();
   // `unauthenticated` (não `unauthorized`): esse último é reservado ao segredo
@@ -114,11 +126,12 @@ export async function GET(_req: NextRequest): Promise<Response> {
   const acabouDeInstalar = sucessoJaInstalado(version?.updated_at, run?.finished_at, run);
 
   const running =
-    run?.status === "failed_rolled_back" && run.from_version && !rollbackSuperado
+    versaoDaImagem() ??
+    (run?.status === "failed_rolled_back" && run.from_version && !rollbackSuperado
       ? run.from_version
       : acabouDeInstalar && run?.to_version
         ? run.to_version
-        : current;
+        : current);
 
   if (!user.is_platform_admin) {
     return ok({ current_version: running, is_owner: false });

@@ -130,15 +130,16 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # A versão que a imagem vai reportar em /api/v1/health. Numa tag v1.2.3 é
-      # "1.2.3"; fora de tag, o SHA curto — que ainda responde "o que está
-      # rodando aqui?", que é a pergunta que o campo existe para responder.
+      # "1.2.3"; fora de tag, no fork Nebo, o `version` do package.json — o
+      # número que o dono define e que o rodapé do app mostra. O SHA continua
+      # na imagem, no label `org.opencontainers.image.revision`.
       - name: Resolver APP_VERSION
         id: ver
         run: |
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
           else
-            echo "value=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+            echo "value=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Docker metadata (tags/labels)
