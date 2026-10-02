@@ -9974,6 +9974,12 @@ export const DICIONARIO: Traducoes = {
   "Escolher grupos": { es: "Elegir grupos" },
   "Grupos do WhatsApp": { es: "Grupos de WhatsApp" },
   "Marque os grupos que recebem esta publicação.": { es: "Marca los grupos que reciben esta publicación." },
+  // ── Publicações: janela de contas (rede com mais de uma conta) ──
+  "contas": { es: "cuentas" },
+  "Contas do": { es: "Cuentas de" },
+  "Contas": { es: "Cuentas" },
+  "Você tem mais de uma conta nesta rede. Marque em quais esta publicação vai sair — ela sai em todas as marcadas.": { es: "Tienes más de una cuenta en esta red. Marca en cuáles saldrá esta publicación — sale en todas las marcadas." },
+  "Tirar da publicação": { es: "Quitar de la publicación" },
 
   // ── Publicações: filtros do Calendário ──
   "Programado": { es: "Programado" },

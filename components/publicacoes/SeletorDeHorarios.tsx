@@ -13,7 +13,8 @@ import { Plus, Trash } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
 import { ChannelIcon, formatoParaChannelFormat } from "./ChannelIcon";
-import { chaveDoDestino, type ChaveDoDestino } from "./SeletorDeDestinos";
+import { chaveDoDestino, nomeDaContaPublicavel, type ChaveDoDestino } from "./SeletorDeDestinos";
+import type { ContaPublicavel } from "@/lib/publicacoes/servico";
 import { ROTULO_DA_REDE, ROTULO_DO_FORMATO } from "./rotulos";
 
 const DIAS = [0, 1, 2, 3, 4, 5, 6] as const;
@@ -51,6 +52,7 @@ export function SeletorDeHorarios({
   horarios,
   onChange,
   destinos,
+  contas = [],
   recorrencia,
   onRecorrencia,
   fuso,
@@ -60,6 +62,8 @@ export function SeletorDeHorarios({
   onChange: (horarios: HorarioDaTela[]) => void;
   /** Os destinos marcados no passo 1 — os ícones de cada linha. */
   destinos: DestinoDaPublicacao[];
+  /** Para nomear a conta no tooltip quando o mesmo formato sai em mais de uma conta. */
+  contas?: ContaPublicavel[];
   recorrencia: RecorrenciaDaPublicacao;
   onRecorrencia: (r: RecorrenciaDaPublicacao) => void;
   fuso: string;
@@ -114,7 +118,9 @@ export function SeletorDeHorarios({
                   destinos.map((d) => {
                     const chave = chaveDoDestino(d);
                     const ligado = !h.excluidos.includes(chave);
-                    const rotulo = `${ROTULO_DA_REDE[d.network]} · ${d.network === "whatsapp" ? t("Grupos") : t(ROTULO_DO_FORMATO[d.format])}`;
+                    const variasContas = destinos.some((o) => o.network === d.network && o.format === d.format && o.channel_session_id !== d.channel_session_id);
+                    const conta = variasContas ? nomeDaContaPublicavel(d.network, contas.find((c) => c.id === d.channel_session_id)) : "";
+                    const rotulo = `${ROTULO_DA_REDE[d.network]} · ${d.network === "whatsapp" ? t("Grupos") : t(ROTULO_DO_FORMATO[d.format])}${conta ? ` · ${conta}` : ""}`;
                     return (
                       <Tooltip key={chave}>
                         <TooltipTrigger asChild>

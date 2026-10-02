@@ -100,13 +100,13 @@ const EXECUCOES_DA_FEITA = [
   { id: "e4", target_id: "t-st", group_id: null, media_id: "m1", position: 1, attempt: 1, status: "sent", external_post_id: "post-2", external_url: null, provider_status: "published", error_code: null, error_category: null, error_message: null, retry_at: null, started_at: null, finished_at: ontem.toISOString(), created_at: ontem.toISOString(), group_name: null },
 ];
 
-async function mockarApi(page: import("@playwright/test").Page, capturar: { criadas: unknown[]; reagendadas: unknown[] }) {
+async function mockarApi(page: import("@playwright/test").Page, capturar: { criadas: unknown[]; reagendadas: unknown[] }, contas: unknown[] = CONTAS) {
   await page.route("**/api/v1/publicacoes**", async (route) => {
     const url = new URL(route.request().url());
     const p = url.pathname;
     const m = route.request().method();
     const json = (data: unknown, meta?: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(meta ? { data, meta } : { data }) });
-    if (p === "/api/v1/publicacoes/contas") return json(CONTAS);
+    if (p === "/api/v1/publicacoes/contas") return json(contas);
     if (p === "/api/v1/publicacoes/ocorrencias") {
       const incluir = url.searchParams.get("incluir");
       return json(incluir === "todas" ? [...PENDENTES, FEITA] : PENDENTES);
@@ -254,6 +254,59 @@ test("Agendar: 2 arquivos, WhatsApp com 2 grupos, Instagram Feed + Stories, 2 da
   expect(corpo.occurrences[0]!.targets).toBeNull();
   expect(corpo.occurrences[1]!.targets?.map((k) => k.split("/").slice(0, 2).join("/")).sort()).toEqual(["instagram/feed", "whatsapp/group_message"]);
   await expect(page).toHaveURL(/\/app\/publicacoes\/lista/);
+});
+
+test("Agendar: rede com mais de uma conta abre a janela de contas e sai em todas as marcadas; rede com uma conta liga direto", async ({ page }) => {
+  test.setTimeout(120_000);
+  const IG_2 = "02830000-0000-4000-8000-000000000003";
+  const FB = "02830000-0000-4000-8000-000000000004";
+  const contas = [
+    ...CONTAS,
+    { id: IG_2, network: "instagram", display_name: "Loja Centro", username: "loja.centro", avatar_url: null, status: "WORKING", disponivel: true, publica_grupos: false },
+    { id: FB, network: "facebook", display_name: "Página Nebo", username: null, avatar_url: null, status: "WORKING", disponivel: true, publica_grupos: false },
+  ];
+  await loginComoAdmin(page, lerCreds());
+  const capturar = { criadas: [] as unknown[], reagendadas: [] as unknown[] };
+  await mockarApi(page, capturar, contas);
+  await page.goto("/app/publicacoes/agendar");
+  await page.getByTestId("pub-titulo").fill("Duas lojas");
+  await page.getByTestId("pub-legenda").fill("Promoção nas duas lojas");
+  await page.locator('input[type="file"]').setInputFiles([{ name: "a.png", mimeType: "image/png", buffer: PNG_1PX }]);
+  await expect(page.getByTestId("anexo-1")).toBeVisible();
+
+  // Instagram tem 2 contas: o ícone NÃO liga sozinho — abre a janela, e sem conta marcada não conclui.
+  await page.getByTestId("destino-instagram-feed").click();
+  const janela = page.getByTestId("dialogo-de-contas");
+  await expect(janela).toBeVisible();
+  await expect(janela).toContainText("Contas do Instagram · Feed");
+  await expect(page.getByTestId("concluir-contas")).toBeDisabled();
+  await page.screenshot({ path: ".superpowers/evidence/publicacoes/janela-de-contas.png" });
+  await page.getByTestId(`conta-${SESSAO_IG}`).click();
+  await page.getByTestId(`conta-${IG_2}`).click();
+  await page.getByTestId("concluir-contas").click();
+  await expect(janela).toBeHidden();
+  await expect(page.getByTestId("destino-instagram-feed")).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByTestId("escolher-contas-instagram")).toContainText("2 contas");
+
+  // Cancelar a janela não liga o formato.
+  await page.getByTestId("destino-instagram-story").click();
+  await expect(page.getByTestId(`conta-${IG_2}`)).toHaveAttribute("aria-checked", "true");
+  await page.getByTestId("cancelar-contas").click();
+  await expect(page.getByTestId("destino-instagram-story")).toHaveAttribute("aria-checked", "false");
+
+  // Facebook tem 1 conta: liga direto, sem janela.
+  await page.getByTestId("destino-facebook-feed").click();
+  await expect(janela).toBeHidden();
+  await expect(page.getByTestId("destino-facebook-feed")).toHaveAttribute("aria-checked", "true");
+  await page.screenshot({ path: ".superpowers/evidence/publicacoes/contas-escolhidas.png" });
+  // Na data, os dois ícones iguais do Instagram dizem de que conta são.
+  await expect(page.getByRole("checkbox", { name: "Instagram · Feed · @loja.centro" })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "Instagram · Feed · @nebo.demo" })).toBeVisible();
+
+  await page.getByTestId("agendar-publicacao").click();
+  await expect.poll(() => capturar.criadas.length).toBe(1);
+  const corpo = capturar.criadas[0] as { targets: Array<{ network: string; format: string; channel_session_id: string }> };
+  expect(corpo.targets.map((t) => `${t.network}/${t.format}/${t.channel_session_id}`).sort()).toEqual([`facebook/feed/${FB}`, `instagram/feed/${SESSAO_IG}`, `instagram/feed/${IG_2}`].sort());
 });
 
 test("Calendário e Histórico: um chip por destino com a cor do estado, abas e conexão, e o desfecho por destino sem overflow", async ({ page }) => {

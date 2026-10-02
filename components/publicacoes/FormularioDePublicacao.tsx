@@ -324,7 +324,7 @@ function Formulario({ fuso, editarId, inicial, cabecalho }: { fuso: string; edit
                 {t("Data e horário")}
               </h2>
               <p className="-mt-1 text-xs text-muted-foreground">{t("Em cada data, apague o ícone da rede que não deve sair nela.")}</p>
-              <SeletorDeHorarios horarios={horarios} onChange={setHorarios} destinos={destinos} recorrencia={recorrencia} onRecorrencia={setRecorrencia} fuso={fuso} disabled={ocupado} />
+              <SeletorDeHorarios horarios={horarios} onChange={setHorarios} destinos={destinos} contas={contas ?? []} recorrencia={recorrencia} onRecorrencia={setRecorrencia} fuso={fuso} disabled={ocupado} />
             </section>
           </div>
 

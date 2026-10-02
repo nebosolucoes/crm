@@ -12,10 +12,11 @@ import { useT } from "@/hooks/i18n/useT";
 import { FORMATOS_POR_REDE, REDES_DA_PUBLICACAO, chaveDeDestino, type DestinoDaPublicacao, type FormatoDaPublicacao, type RedeDaPublicacao } from "@/lib/publicacoes/schema";
 import type { ProblemaDoDestino } from "@/lib/publicacoes/regras-por-destino";
 import type { ContaPublicavel } from "@/lib/publicacoes/servico";
-import { UsersThree } from "@/lib/ui/icons";
+import { CheckSquare, Square, UsersThree } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 
 import { ChannelIcon, formatoParaChannelFormat } from "./ChannelIcon";
+import { aplicarContasNaRede, contasMarcadasDaRede } from "./contas-da-rede";
 import { ROTULO_DA_REDE, ROTULO_DO_FORMATO } from "./rotulos";
 
 export type ChaveDoDestino = string;
@@ -34,7 +35,12 @@ export function nomeDaContaPublicavel(rede: RedeDaPublicacao, c: ContaPublicavel
  * é acender o ícone. Rede sem conta fica apagada com o caminho para Conexões
  * no tooltip. Embaixo, só o que precisa de escolha: a conta, quando a rede
  * tem mais de uma, e o botão que abre a janela de grupos do WhatsApp (a lista
- * não fica aberta na tela). Os problemas das regras por formato (`veredito`)
+ * não fica aberta na tela).
+ *
+ * Instagram e Facebook com MAIS DE UMA conta nunca escolhem a conta sozinhos:
+ * acender o ícone abre a janela de contas, e o formato só liga depois que a
+ * pessoa marca em quais contas sai (uma ou várias — sai em todas). Com uma
+ * conta só, o ícone liga direto. Os problemas das regras por formato (`veredito`)
  * não aparecem aqui: o tooltip do ícone diz o motivo (`data-erro`), e o
  * botão Agendar lista tudo no seu tooltip. Sem anel em volta do ícone
  * marcado — a cor contra o cinza já diz o que está ligado.
@@ -57,6 +63,8 @@ export function SeletorDeDestinos({
 }) {
   const t = useT();
   const [gruposAbertos, setGruposAbertos] = useState(false);
+  /** A janela de contas: a rede, o formato que a abriu (null = só trocar contas) e o que está marcado nela. */
+  const [janelaDeContas, setJanelaDeContas] = useState<{ rede: RedeDaPublicacao; formato: FormatoDaPublicacao | null; marcadas: string[] } | null>(null);
   const porRede = useMemo(() => {
     const m = new Map<RedeDaPublicacao, ContaPublicavel[]>();
     for (const r of REDES_DA_PUBLICACAO) m.set(r, []);
@@ -74,7 +82,24 @@ export function SeletorDeDestinos({
   function trocarConta(rede: RedeDaPublicacao, contaId: string) {
     onChange(destinos.map((d) => (d.network === rede ? { ...d, channel_session_id: contaId, group_ids: rede === "whatsapp" ? [] : d.group_ids } : d)));
   }
+  /** Rede de conteúdo com mais de uma conta: a conta é sempre escolhida na janela. */
+  function escolheContaNaJanela(rede: RedeDaPublicacao): boolean {
+    return rede !== "whatsapp" && (porRede.get(rede) ?? []).length > 1;
+  }
+  function abrirContas(rede: RedeDaPublicacao, formato: FormatoDaPublicacao | null) {
+    setJanelaDeContas({ rede, formato, marcadas: contasMarcadasDaRede(destinos, rede) });
+  }
+  function concluirContas() {
+    if (!janelaDeContas) return;
+    onChange(aplicarContasNaRede(destinos, janelaDeContas.rede, janelaDeContas.formato, janelaDeContas.marcadas));
+    setJanelaDeContas(null);
+  }
   function alternar(rede: RedeDaPublicacao, format: FormatoDaPublicacao) {
+    if (escolheContaNaJanela(rede)) {
+      if (destinos.some((d) => d.network === rede && d.format === format)) onChange(destinos.filter((d) => !(d.network === rede && d.format === format)));
+      else abrirContas(rede, format);
+      return;
+    }
     const conta = contaDaRede(rede);
     if (!conta) return;
     const chave = chaveDoDestino({ network: rede, format, channel_session_id: conta });
@@ -93,7 +118,9 @@ export function SeletorDeDestinos({
   const contaDoWhatsApp = whatsapp ? ((porRede.get("whatsapp") ?? []).find((c) => c.id === whatsapp.channel_session_id) ?? null) : null;
   const gruposDaConta = whatsapp ? grupos.filter((g) => g.channel_session_id === whatsapp.channel_session_id) : [];
   const nGrupos = whatsapp?.group_ids?.length ?? 0;
-  const redesComEscolhaDeConta = REDES_DA_PUBLICACAO.filter((rede) => destinos.some((d) => d.network === rede) && (porRede.get(rede) ?? []).length > 1);
+  const redesComEscolhaDeConta = REDES_DA_PUBLICACAO.filter((rede) => !escolheContaNaJanela(rede) && destinos.some((d) => d.network === rede) && (porRede.get(rede) ?? []).length > 1);
+  const redesComJanelaDeContas = REDES_DA_PUBLICACAO.filter((rede) => escolheContaNaJanela(rede) && destinos.some((d) => d.network === rede));
+  const contasDaJanela = janelaDeContas ? (porRede.get(janelaDeContas.rede) ?? []) : [];
 
   return (
     <div className="flex flex-col gap-3">
@@ -101,14 +128,12 @@ export function SeletorDeDestinos({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2" role="group" aria-label={t("Onde publicar")} data-testid="linha-de-destinos">
         {REDES_DA_PUBLICACAO.map((rede) => {
           const lista = porRede.get(rede) ?? [];
-          const contaId = contaDaRede(rede);
           const semConta = lista.length === 0;
           return (
             <div key={rede} className="flex items-center gap-1" data-testid={`rede-${rede}`}>
               {FORMATOS_POR_REDE[rede].map((format) => {
                 const ligado = destinos.some((d) => d.network === rede && d.format === format);
-                const chave = contaId ? chaveDoDestino({ network: rede, format, channel_session_id: contaId }) : "";
-                const erro = ligado ? (veredito[chave]?.erros[0]?.mensagem ?? null) : null;
+                const erro = ligado ? (destinos.filter((d) => d.network === rede && d.format === format).map((d) => veredito[chaveDoDestino(d)]?.erros[0]?.mensagem).find(Boolean) ?? null) : null;
                 const rotulo = `${ROTULO_DA_REDE[rede]} · ${rede === "whatsapp" ? t("Grupos") : t(ROTULO_DO_FORMATO[format])}`;
                 return (
                   <Tooltip key={format}>
@@ -147,8 +172,18 @@ export function SeletorDeDestinos({
       ) : null}
 
       {/* Só o que pede escolha: a conta (quando há mais de uma) e os grupos do WhatsApp. */}
-      {redesComEscolhaDeConta.length > 0 || whatsapp ? (
+      {redesComEscolhaDeConta.length > 0 || redesComJanelaDeContas.length > 0 || whatsapp ? (
         <div className="flex flex-wrap items-center gap-2">
+          {redesComJanelaDeContas.map((rede) => {
+            const lista = porRede.get(rede) ?? [];
+            const nomes = contasMarcadasDaRede(destinos, rede).map((id) => nomeDaContaPublicavel(rede, lista.find((c) => c.id === id)));
+            return (
+              <Button key={rede} type="button" variant="outline" size="sm" className="h-8 max-w-full" onClick={() => abrirContas(rede, null)} disabled={disabled} data-testid={`escolher-contas-${rede}`} title={nomes.join(", ")}>
+                <ChannelIcon channel={rede} format="feed" state="active" size={16} decorative />
+                <span className="truncate">{nomes.length === 1 ? nomes[0] : `${nomes.length} ${t("contas")}`}</span>
+              </Button>
+            );
+          })}
           {redesComEscolhaDeConta.map((rede) => {
             const lista = porRede.get(rede) ?? [];
             const contaId = contaDaRede(rede);
@@ -188,6 +223,57 @@ export function SeletorDeDestinos({
           })}
         </ul>
       ) : null}
+
+      {/* A janela de contas: Instagram/Facebook com mais de uma conta. */}
+      <Dialog open={janelaDeContas !== null} onOpenChange={(aberta) => (aberta ? undefined : setJanelaDeContas(null))}>
+        {janelaDeContas ? (
+          <DialogContent className="sm:max-w-md" data-testid="dialogo-de-contas">
+            <DialogHeader>
+              <DialogTitle>
+                {t("Contas do")} {ROTULO_DA_REDE[janelaDeContas.rede]}
+                {janelaDeContas.formato ? ` · ${t(ROTULO_DO_FORMATO[janelaDeContas.formato])}` : ""}
+              </DialogTitle>
+              <DialogDescription>{t("Você tem mais de uma conta nesta rede. Marque em quais esta publicação vai sair — ela sai em todas as marcadas.")}</DialogDescription>
+            </DialogHeader>
+            <ul className="max-h-72 divide-y overflow-y-auto rounded-lg border" role="group" aria-label={t("Contas")}>
+              {contasDaJanela.map((c) => {
+                const marcada = janelaDeContas.marcadas.includes(c.id);
+                return (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={marcada}
+                      disabled={disabled || (!c.disponivel && !marcada)}
+                      data-testid={`conta-${c.id}`}
+                      onClick={() => setJanelaDeContas((j) => (j ? { ...j, marcadas: marcada ? j.marcadas.filter((id) => id !== c.id) : [...j.marcadas, c.id] } : j))}
+                      className={cn("flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60", marcada && "bg-primary/5")}
+                    >
+                      {marcada ? <CheckSquare size={18} weight="fill" className="shrink-0 text-primary" aria-hidden /> : <Square size={18} className="shrink-0 text-muted-foreground" aria-hidden />}
+                      {c.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- avatar remoto da rede, sem domínio fixo para o next/image
+                        <img src={c.avatar_url} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
+                      ) : (
+                        <ChannelIcon channel={janelaDeContas.rede} format="feed" state="active" size={32} decorative />
+                      )}
+                      <span className="min-w-0 flex-1 truncate font-medium">{nomeDaContaPublicavel(janelaDeContas.rede, c)}</span>
+                      {!c.disponivel ? <span className="text-[11px] text-muted-foreground">{t("desconectada")}</span> : null}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setJanelaDeContas(null)} data-testid="cancelar-contas">
+                {t("Cancelar")}
+              </Button>
+              <Button type="button" onClick={concluirContas} disabled={janelaDeContas.formato !== null && janelaDeContas.marcadas.length === 0} data-testid="concluir-contas">
+                {janelaDeContas.formato === null && janelaDeContas.marcadas.length === 0 ? t("Tirar da publicação") : t("Concluir")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        ) : null}
+      </Dialog>
 
       {/* A janela de grupos: a lista só aparece quando a pessoa pede. */}
       {whatsapp ? (
