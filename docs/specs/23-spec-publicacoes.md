@@ -97,6 +97,20 @@ Prova com recursos reais (doutrina de QA): banco fresco do `baseline.sql` + `boo
 - O caminho de re-hospedagem de mídia (presign) contra o provedor real.
 - `pnpm test:e2e` completo no CI (a spec entra em `SPECS_PARTE_*` no lugar da antiga).
 
+## 7.1 Sugerir legenda (06/10/2026, migration 0286)
+
+No Agendar, ao lado do campo **Legenda**, o botão **Sugerir legenda** pede à IA uma legenda a partir de três coisas:
+
+1. a **instrução da rede** ("prompt prévio") — uma por rede (Instagram, Facebook, WhatsApp) para a organização inteira, editada em **Publicações › Instruções de legenda** (`/app/publicacoes/instrucoes`). Sem texto gravado vale o padrão do produto (`INSTRUCAO_PADRAO` em `lib/publicacoes/legenda/instrucoes.ts`); "Restaurar padrão" apaga a linha;
+2. até **4 imagens** já anexadas (sobem para o bucket na hora, e o salvar depois não sobe de novo). Vídeo não é lido: a tela diz quantos ficaram de fora;
+3. o **texto que já está no campo**, como ideia.
+
+Com destinos em **mais de uma rede**, o botão abre "Usar a instrução de qual rede?" (só as redes marcadas no passo 1). A sugestão aparece num painel com **Usar** / **Gerar outra** / **Descartar** — o campo só muda no "Usar".
+
+**Por dentro:** `POST /api/v1/publicacoes/legenda/sugerir` (manager, `broadcast`, 10 por minuto por usuário, audit `publication.caption_suggested` sem o texto) → `lib/publicacoes/legenda/sugerir.ts` → `runModelCall` com o ponto de IA **`legenda_de_publicacao`** (modelo escolhível em IA › Provedores; chave da organização; orçamento; linha em `llm_calls`, visível em IA › Execuções). O pedido é montado em `montar-pedido.ts` (puro, testado): instrução, formatos da rede, limite de caracteres tirado de `LIMITES_POR_DESTINO`, ideia e imagens como partes `file`. Modelo que não enxerga imagem é recusado **antes de sair byte** (`deps.conferirAntesDeEnviar` do `runModelCall` + `visaoEmVigor`), com link para IA › Provedores — nunca uma legenda inventada sem ver a foto.
+
+**Erros que a tela explica:** `modelo_sem_visao`, `ia_nao_configurada`, `modelo_nao_habilitado` (link para Provedores), `orcamento_esgotado`, `media_not_found`, `resposta_vazia`, `provedor_falhou` (o motivo fica em IA › Execuções), `rate_limited`.
+
 ## 8. Manutenção — onde mexer para…
 
 - **…mudar como uma data escolhe redes:** `lib/publicacoes/schema.ts` (`ocorrenciaDaPublicacaoSchema`, `conferirOcorrencias`), `lib/publicacoes/servico.ts` (`horariosDaEntrada`, `gravarDestinosDasOcorrencias`, `destinosDasOcorrencias`), `lib/publicacoes/worker/expandir.ts` (o filtro), `components/publicacoes/SeletorDeHorarios.tsx` (`HorarioDaTela`, `destinosDaLinha`). Testes: `lib/publicacoes/schema.test.ts`, `expandir.test.ts` ("0284"), e2e `publicacoes-visual.spec.ts` (toggles `horario-N-destino-<rede>-<formato>`).
@@ -112,5 +126,6 @@ Prova com recursos reais (doutrina de QA): banco fresco do `baseline.sql` + `boo
 | aceitar outro formato ou limite | `regras-por-destino.ts` (+ teste), `schema.ts` (`FORMATOS_POR_REDE`), CHECK em migration nova |
 | outra rede (ex.: LinkedIn) | `capabilities.ts` (`publishing`), publicador em `lib/channels/publicacao/`, `social.ts` mapeia formato→payload, `schema.ts` + migration, rótulos em `components/publicacoes/rotulos.ts` |
 | outro tipo de recorrência | `recorrencia.ts` (+ teste DST), `schema.ts`, CHECK `publications_recurrence_kind_check`, `SeletorDeHorarios.tsx` |
+| mudar a instrução padrão ou o pedido de legenda à IA | `lib/publicacoes/legenda/instrucoes.ts` (`INSTRUCAO_PADRAO`), `montar-pedido.ts` (+ teste); tela em `components/publicacoes/SugerirLegenda.tsx` e `app/app/publicacoes/instrucoes/` |
 | mensagem de erro nova na tela | `components/publicacoes/rotulos.ts` (`ROTULO_DO_ERRO`) + `lib/i18n/dicionario.ts` (es) |
 | webhook `post.*` do provedor fechando execução | `lib/channels/zernio/social.ts` (`EVENTOS_DA_CONEXAO_SOCIAL`), `envelope.ts`, `inbound.ts` → hoje a reconciliação por `GET /v1/posts/{id}` cobre; o webhook é a próxima entrega (Fatia C do plano) |

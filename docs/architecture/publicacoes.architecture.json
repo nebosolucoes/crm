@@ -154,6 +154,34 @@
       "col": 3,
       "type": "database",
       "label": "publication_occurrence_targets (0284) — os destinos que saem NESTA data; sem linha = todos"
+    },
+    {
+      "id": "tela-instrucoes",
+      "lane": "operacao",
+      "col": 1,
+      "type": "ui",
+      "label": "Instruções de legenda — o \"prompt prévio\" de cada rede (Instagram, Facebook, WhatsApp); sem texto vale o padrão do produto"
+    },
+    {
+      "id": "api-legenda",
+      "lane": "api",
+      "col": 1,
+      "type": "service",
+      "label": "Sugerir legenda — POST /publicacoes/legenda/sugerir: instrução da rede + até 4 imagens + ideia → runModelCall (ponto legenda_de_publicacao)"
+    },
+    {
+      "id": "instrucoes-legenda",
+      "lane": "dados",
+      "col": 1,
+      "type": "database",
+      "label": "publication_caption_instructions (0286) — uma linha por (organização, rede)"
+    },
+    {
+      "id": "llm-calls",
+      "lane": "dados",
+      "col": 0,
+      "type": "database",
+      "label": "llm_calls — cada sugestão com modelo, custo e motivo de falha (IA › Execuções)"
     }
   ],
   "edges": [
@@ -312,6 +340,36 @@
       "from": "ocorrencia-destinos",
       "to": "worker",
       "label": "a expansão só cria execução para os destinos escolhidos"
+    },
+    {
+      "id": "agendar-sugere",
+      "from": "tela-agendar",
+      "to": "api-legenda",
+      "label": "Sugerir legenda: rede escolhida, formatos, ideia, imagens já subidas; volta a legenda para Usar/Gerar outra/Descartar"
+    },
+    {
+      "id": "instrucoes-grava",
+      "from": "tela-instrucoes",
+      "to": "instrucoes-legenda",
+      "label": "GET/PUT /publicacoes/instrucoes-de-legenda (manager grava; vazio restaura o padrão)"
+    },
+    {
+      "id": "legenda-le-instrucao",
+      "from": "api-legenda",
+      "to": "instrucoes-legenda",
+      "label": "lê a instrução da rede escolhida"
+    },
+    {
+      "id": "legenda-le-midia",
+      "from": "api-legenda",
+      "to": "midia",
+      "label": "baixa as imagens do prefixo da organização no bucket"
+    },
+    {
+      "id": "legenda-registra",
+      "from": "api-legenda",
+      "to": "llm-calls",
+      "label": "runModelCall grava sucesso e falha; modelo sem visão é recusado antes de sair byte"
     }
   ]
 }

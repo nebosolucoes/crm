@@ -664,6 +664,9 @@ jobs:
         # channel_sessions à mão e ainda não foi validada no stack do CI. Entra em
         # SPECS_PARTE_3 quando o autor a rodar verde aqui.
         publicacoes-visual.spec.ts
+        # Sugerir legenda (0286): API mockada, mesma ressalva da irmã acima — roda
+        # local contra o :3001; entra em SPECS_PARTE_3 junto com ela.
+        publicacoes-sugerir-legenda.spec.ts
     steps:
       - uses: actions/checkout@v7
 

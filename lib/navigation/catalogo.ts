@@ -210,6 +210,15 @@ export const NAV_CATALOG = [
     sidebar: true,
   },
   {
+    href: "/app/publicacoes/instrucoes",
+    label: "Instruções de legenda",
+    description: "O jeito de escrever de cada rede, que a IA segue ao sugerir a legenda no Agendar.",
+    icon: "Lightbulb",
+    group: "publicacoes",
+    minRole: "manager",
+    sidebar: true,
+  },
+  {
     href: "/app/publicacoes/historico",
     label: "Histórico",
     description: "O que já saiu ou deixou de sair, com o resultado por destino e o motivo.",

@@ -12,7 +12,9 @@ import { useCallback, useRef } from "react";
 import { useActiveOrg } from "@/hooks/auth/AuthProvider";
 import { useRealtimeChannel } from "@/hooks/realtime/useRealtimeChannel";
 import { apiClient } from "@/lib/api/client";
-import type { AlterarPublicacao, CriarPublicacao, MidiaDaPublicacao, StatusDaOcorrencia, RedeDaPublicacao } from "@/lib/publicacoes/schema";
+import type { InstrucaoDaRede } from "@/lib/publicacoes/legenda/instrucoes";
+import type { LegendaSugerida } from "@/lib/publicacoes/legenda/sugerir";
+import type { AlterarPublicacao, CriarPublicacao, FormatoDaPublicacao, MidiaDaPublicacao, StatusDaOcorrencia, RedeDaPublicacao } from "@/lib/publicacoes/schema";
 import type {
   ContaPublicavel,
   ExecucaoLida,
@@ -138,6 +140,60 @@ export async function subirMidia(
   const json = (await res.json().catch(() => null)) as { data?: { media: MidiaDaPublicacao }; error?: { message?: string } } | null;
   if (!res.ok || !json?.data) throw new Error(json?.error?.message ?? "Não foi possível subir o arquivo.");
   return json.data.media;
+}
+
+/** As instruções de legenda das três redes (a da organização ou o padrão). */
+export function useInstrucoesDeLegenda() {
+  return useQuery({
+    queryKey: [...CHAVE_DE_PUBLICACOES, "instrucoes-de-legenda"],
+    queryFn: async () => (await apiClient.get<Envelope<InstrucaoDaRede[]>>(`${BASE}/instrucoes-de-legenda`)).data,
+    staleTime: 60_000,
+  });
+}
+
+/** Grava a instrução de UMA rede; texto vazio volta ao padrão. */
+export function useSalvarInstrucaoDeLegenda() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (entrada: { network: RedeDaPublicacao; instructions: string }) =>
+      (await apiClient.put<Envelope<InstrucaoDaRede[]>>(`${BASE}/instrucoes-de-legenda`, entrada)).data,
+    onSuccess: (dados) => qc.setQueryData([...CHAVE_DE_PUBLICACOES, "instrucoes-de-legenda"], dados),
+  });
+}
+
+/** Falha do Sugerir legenda, com o código que a tela usa para escolher o conserto. */
+export class FalhaDaLegenda extends Error {
+  constructor(
+    public readonly codigo: string,
+    mensagem: string,
+  ) {
+    super(mensagem);
+  }
+}
+
+/**
+ * Pede a legenda à IA. `fetch` direto, e não `apiClient`, de propósito: o
+ * cliente repete sozinho em 429, e aqui o 429 é o teto de custo dizendo "espere"
+ * — repetir em silêncio deixaria o botão girando um minuto inteiro.
+ */
+export async function sugerirLegendaComIa(entrada: {
+  network: RedeDaPublicacao;
+  formats: FormatoDaPublicacao[];
+  idea: string;
+  media_paths: string[];
+  ignored_videos: number;
+}): Promise<LegendaSugerida> {
+  const res = await fetch(`${BASE}/legenda/sugerir`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify(entrada),
+  });
+  const json = (await res.json().catch(() => null)) as { data?: LegendaSugerida; error?: { code?: string; message?: string } } | null;
+  if (!res.ok || !json?.data) {
+    throw new FalhaDaLegenda(json?.error?.code ?? `http_${res.status}`, json?.error?.message ?? "Não foi possível sugerir a legenda.");
+  }
+  return json.data;
 }
 
 export async function urlAssinadaDaMidia(storagePath: string): Promise<string | null> {

@@ -25,6 +25,7 @@ import { horaLocal, paredeParaInstante, proximaHoraCheia } from "@/lib/publicaco
 import { DropzoneDeMidia, type AnexoLocal } from "./DropzoneDeMidia";
 import { SeletorDeDestinos, chaveDoDestino } from "./SeletorDeDestinos";
 import { SeletorDeHorarios, destinosDaLinha, type HorarioDaTela } from "./SeletorDeHorarios";
+import { BotaoSugerirLegenda, PainelDaSugestao, useSugestaoDeLegenda } from "./SugerirLegenda";
 import type { MidiaDaPrevia } from "./previa/Aparelho";
 import { PreviaDosDestinos } from "./previa/PreviaDosDestinos";
 import { ROTULO_DA_REDE, ROTULO_DO_FORMATO } from "./rotulos";
@@ -189,9 +190,10 @@ function Formulario({ fuso, editarId, inicial, cabecalho }: { fuso: string; edit
     setHorarios((atual) => atual.map((h) => ({ ...h, excluidos: h.excluidos.filter((k) => chaves.has(k)) })));
   }
 
-  async function subirPendentes(): Promise<MidiaDaPublicacao[]> {
+  /** Sobe o que ainda não está no bucket. Com `ids`, só esses (o Sugerir legenda sobe só as imagens que a IA vai ler). */
+  async function subirPendentes(ids?: readonly string[]): Promise<MidiaDaPublicacao[]> {
     const saida: MidiaDaPublicacao[] = [];
-    for (const a of anexos) {
+    for (const a of ids ? anexos.filter((x) => ids.includes(x.id)) : anexos) {
       if (a.salvo) {
         saida.push(a.salvo);
         continue;
@@ -244,6 +246,13 @@ function Formulario({ fuso, editarId, inicial, cabecalho }: { fuso: string; edit
       setSalvando(null);
     }
   }
+
+  const sugestao = useSugestaoDeLegenda({
+    destinos,
+    anexos,
+    legenda,
+    subirImagens: async (ids) => (await subirPendentes(ids)).map((m) => m.storage_path),
+  });
 
   const grupoNome = useMemo(() => new Map((grupos ?? []).map((g) => [g.id, g.name])), [grupos]);
   const nomesDosGrupos = (ids: string[]) => ids.map((id) => grupoNome.get(id) ?? "").filter(Boolean);
@@ -335,9 +344,13 @@ function Formulario({ fuso, editarId, inicial, cabecalho }: { fuso: string; edit
             </h2>
             <DropzoneDeMidia anexos={anexos} onChange={setAnexos} disabled={ocupado} />
             <div className="grid gap-2">
-              <Label htmlFor="pub-legenda">{t("Legenda")}</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="pub-legenda">{t("Legenda")}</Label>
+                <BotaoSugerirLegenda estado={sugestao} disabled={ocupado} />
+              </div>
               <Textarea id="pub-legenda" value={legenda} onChange={(e) => setLegenda(e.target.value)} placeholder={t("O texto que sai no post e na mensagem. No WhatsApp, *negrito* e _itálico_ funcionam.")} rows={7} maxLength={4000} disabled={ocupado} data-testid="pub-legenda" />
               <span className="text-right text-[11px] text-muted-foreground">{legenda.length}/4000</span>
+              <PainelDaSugestao estado={sugestao} onUsar={setLegenda} />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="pub-titulo">{t("Título (só para você achar depois)")}</Label>
