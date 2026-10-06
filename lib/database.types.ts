@@ -7671,6 +7671,44 @@ export type Database = {
           },
         ]
       }
+      publication_caption_instructions: {
+        Row: {
+          created_at: string
+          id: string
+          instructions: string
+          network: string
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          instructions: string
+          network: string
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          instructions?: string
+          network?: string
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publication_caption_instructions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       publication_executions: {
         Row: {
           attempt: number

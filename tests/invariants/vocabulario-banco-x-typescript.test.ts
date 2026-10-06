@@ -220,6 +220,13 @@ const PARES: Array<{
     simbolo: "REDES_DA_PUBLICACAO",
   },
   {
+    // Instrução de legenda por rede (0286). As mesmas redes do destino.
+    tabela: "publication_caption_instructions",
+    coluna: "network",
+    arquivo: "lib/publicacoes/schema.ts",
+    simbolo: "REDES_DA_PUBLICACAO",
+  },
+  {
     // Publicações (0283). O par rede×formato válido é o CHECK cruzado, testado à parte.
     tabela: "publication_targets",
     coluna: "format",
