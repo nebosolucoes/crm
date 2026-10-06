@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PROVEDORES } from "@/lib/ai/pontos/provedores";
+import { ordenarModelosPorNome } from "@/lib/ai/catalogo/ordenar-modelos";
 import { useT } from "@/hooks/i18n/useT";
 
 /**
@@ -59,7 +60,12 @@ export function ModelPicker({ provider, value, onChange, disabled, id, placehold
     staleTime: 60_000,
   });
 
-  const models = query.data ?? [];
+  // A OpenRouter traz centenas de modelos por preço; em ordem de nome dá para
+  // achar o que se procura. Os provedores curados mantêm o default no topo.
+  const models = React.useMemo(() => {
+    const lista = query.data ?? [];
+    return provider === "openrouter" ? ordenarModelosPorNome(lista) : lista;
+  }, [query.data, provider]);
 
   return (
     <div className="space-y-1">
