@@ -7671,37 +7671,76 @@ export type Database = {
           },
         ]
       }
-      publication_caption_instructions: {
+      publication_caption_prompt_accounts: {
+        Row: {
+          channel_session_id: string
+          created_at: string
+          organization_id: string
+          prompt_id: string
+        }
+        Insert: {
+          channel_session_id: string
+          created_at?: string
+          organization_id: string
+          prompt_id: string
+        }
+        Update: {
+          channel_session_id?: string
+          created_at?: string
+          organization_id?: string
+          prompt_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publication_caption_prompt_accounts_channel_session_id_fkey"
+            columns: ["channel_session_id"]
+            isOneToOne: true
+            referencedRelation: "channel_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "publication_caption_prompt_accounts_prompt_id_fkey"
+            columns: ["prompt_id"]
+            isOneToOne: false
+            referencedRelation: "publication_caption_prompts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      publication_caption_prompts: {
         Row: {
           created_at: string
+          created_by: string | null
           id: string
           instructions: string
-          network: string
+          name: string
           organization_id: string
           updated_at: string
           updated_by: string | null
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
           id?: string
           instructions: string
-          network: string
+          name: string
           organization_id: string
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
           created_at?: string
+          created_by?: string | null
           id?: string
           instructions?: string
-          network?: string
+          name?: string
           organization_id?: string
           updated_at?: string
           updated_by?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "publication_caption_instructions_organization_id_fkey"
+            foreignKeyName: "publication_caption_prompts_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"

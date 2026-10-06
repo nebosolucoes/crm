@@ -12,7 +12,7 @@ const caminho = (org: string) => `${org}/publications/nova/abc.jpg`;
 
 function deps(over: Partial<DepsDaLegenda> = {}): DepsDaLegenda {
   return {
-    lerInstrucao: async () => null,
+    lerPrompt: async () => null,
     baixar: async () => ({ data: new Uint8Array([1]), mime: "image/jpeg" }),
     chamarModelo: async (_pedido, conferir) => {
       await conferir({ provider: "anthropic", model: "claude" });
@@ -22,20 +22,31 @@ function deps(over: Partial<DepsDaLegenda> = {}): DepsDaLegenda {
     ...over,
   };
 }
-const pedido = (p: Record<string, unknown>) => sugerirLegendaSchema.parse({ network: "instagram", ...p });
+const PROMPT = "33333333-3333-4333-8333-333333333333";
+const pedido = (p: Record<string, unknown>) =>
+  sugerirLegendaSchema.parse({ ...(p.prompt_id ? {} : { network: "instagram" }), destinos: [{ network: "instagram", format: "feed" }], ...p });
 
 describe("sugerirLegenda", () => {
   it("devolve a legenda com o que foi lido", async () => {
     const r = await sugerirLegenda(ORG, pedido({ media_paths: [caminho(ORG)], ignored_videos: 1 }), deps());
-    expect(r).toMatchObject({ caption: "Legenda pronta ✨", network: "instagram", used_images: 1, ignored_videos: 1, personalizada: false, llm_call_id: "call-1" });
+    expect(r).toMatchObject({ caption: "Legenda pronta ✨", origem: { tipo: "padrao", network: "instagram" }, used_images: 1, ignored_videos: 1, llm_call_id: "call-1" });
   });
 
-  it("usa a instrução gravada; sem ela, o padrão", async () => {
+  it("com prompt, usa o texto dele e diz o nome; com rede, o padrão", async () => {
     const chamar = vi.fn<DepsDaLegenda["chamarModelo"]>(async () => ({ text: "ok", model: "m", callId: null }));
-    await sugerirLegenda(ORG, pedido({ idea: "x" }), deps({ chamarModelo: chamar, lerInstrucao: async () => "Regra da marca" }));
+    const lerPrompt = vi.fn(async (id: string) => (id === PROMPT ? { name: "Padaria", instructions: "Regra da marca" } : null));
+    const r = await sugerirLegenda(ORG, pedido({ prompt_id: PROMPT, idea: "x" }), deps({ chamarModelo: chamar, lerPrompt }));
+    expect(lerPrompt).toHaveBeenCalledWith(PROMPT);
     expect(chamar.mock.calls[0]![0].system).toContain("Regra da marca");
-    await sugerirLegenda(ORG, pedido({ idea: "x" }), deps({ chamarModelo: chamar }));
+    expect(r.origem).toEqual({ tipo: "prompt", prompt_id: PROMPT, nome: "Padaria" });
+    await sugerirLegenda(ORG, pedido({ idea: "x" }), deps({ chamarModelo: chamar, lerPrompt }));
     expect(chamar.mock.calls[1]![0].system).toContain(INSTRUCAO_PADRAO.instagram.split("\n")[0]!);
+  });
+
+  it("prompt apagado entre a tela e o clique vira 404 nomeado, sem chamar a IA", async () => {
+    const chamar = vi.fn(deps().chamarModelo);
+    await expect(sugerirLegenda(ORG, pedido({ prompt_id: PROMPT, idea: "x" }), deps({ chamarModelo: chamar }))).rejects.toMatchObject({ codigo: "prompt_not_found", status: 404 });
+    expect(chamar).not.toHaveBeenCalled();
   });
 
   it("recusa arquivo de outra organização sem baixar nada", async () => {

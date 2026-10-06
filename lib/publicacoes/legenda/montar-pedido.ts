@@ -2,8 +2,7 @@ import type { ModelMessage } from "ai";
 import { z } from "zod";
 
 import { LIMITES_POR_DESTINO } from "@/lib/publicacoes/regras-por-destino";
-import { FORMATOS_DA_PUBLICACAO, FORMATOS_POR_REDE, type FormatoDaPublicacao, type RedeDaPublicacao } from "@/lib/publicacoes/schema";
-import { redeDaInstrucaoSchema } from "@/lib/publicacoes/legenda/instrucoes";
+import { FORMATOS_DA_PUBLICACAO, FORMATOS_POR_REDE, REDES_DA_PUBLICACAO, type FormatoDaPublicacao, type RedeDaPublicacao } from "@/lib/publicacoes/schema";
 
 /**
  * O PEDIDO DE LEGENDA — puro: entra rede, formatos, ideia, instrução e imagens;
@@ -17,17 +16,31 @@ export const MAXIMO_DE_IMAGENS_LIDAS = 4;
 /** Teto da ideia — o mesmo do campo Legenda da tela. */
 export const MAXIMO_DA_IDEIA = 4000;
 
-/** Corpo do POST /api/v1/publicacoes/legenda/sugerir. */
+const destinoDoPedidoSchema = z
+  .object({ network: z.enum(REDES_DA_PUBLICACAO), format: z.enum(FORMATOS_DA_PUBLICACAO) })
+  .refine((d) => FORMATOS_POR_REDE[d.network].includes(d.format), { message: "Formato fora da rede." });
+export type DestinoDoPedido = z.infer<typeof destinoDoPedidoSchema>;
+
+/**
+ * Corpo do POST /api/v1/publicacoes/legenda/sugerir. A escolha é um prompt da
+ * organização (`prompt_id`) OU o padrão de uma rede (`network`) — nunca os dois.
+ * `destinos` são os destinos marcados que essa escolha cobre.
+ */
 export const sugerirLegendaSchema = z
   .object({
-    network: redeDaInstrucaoSchema,
-    formats: z.array(z.enum(FORMATOS_DA_PUBLICACAO)).max(FORMATOS_DA_PUBLICACAO.length).default([]),
+    prompt_id: z.string().uuid().optional(),
+    network: z.enum(REDES_DA_PUBLICACAO).optional(),
+    destinos: z.array(destinoDoPedidoSchema).min(1).max(60),
     idea: z.string().max(MAXIMO_DA_IDEIA).default(""),
     media_paths: z.array(z.string().min(1).max(512)).max(MAXIMO_DE_IMAGENS_LIDAS).default([]),
     /** Quantos vídeos a tela deixou de fora — só para a resposta dizer. */
     ignored_videos: z.number().int().min(0).max(100).default(0),
   })
   .strict()
+  .refine((v) => (v.prompt_id ? 1 : 0) + (v.network ? 1 : 0) === 1, {
+    message: "Escolha um prompt ou o padrão de uma rede.",
+    path: ["prompt_id"],
+  })
   .refine((v) => v.idea.trim().length > 0 || v.media_paths.length > 0, {
     message: "Anexe uma imagem ou escreva uma ideia na legenda.",
     path: ["media_paths"],
@@ -40,17 +53,18 @@ export interface ImagemDoPedido {
 }
 
 /**
- * O maior tamanho de legenda que serve a TODOS os formatos marcados desta rede.
- * Stories (`legendaMax: 0`) não mostram legenda e não restringem; sem formato
- * informado, vale o menor teto da rede.
+ * O maior tamanho de legenda que serve a TODOS os destinos cobertos. Stories
+ * (`legendaMax: 0`) não mostram legenda e não restringem; só Stories, vale o
+ * menor teto das redes envolvidas.
  */
-export function limiteDaLegenda(network: RedeDaPublicacao, formats: readonly FormatoDaPublicacao[]): number {
-  const daRede = LIMITES_POR_DESTINO[network] as Record<string, { legendaMax: number }>;
-  const validos = formats.filter((f) => FORMATOS_POR_REDE[network].includes(f));
-  const considerados = (validos.length > 0 ? validos : FORMATOS_POR_REDE[network])
-    .map((f) => daRede[f]?.legendaMax ?? 0)
-    .filter((n) => n > 0);
-  return considerados.length > 0 ? Math.min(...considerados) : Math.min(...Object.values(daRede).map((l) => l.legendaMax).filter((n) => n > 0));
+export function limiteDaLegenda(destinos: readonly DestinoDoPedido[]): number {
+  const teto = (network: RedeDaPublicacao, format: FormatoDaPublicacao) =>
+    (LIMITES_POR_DESTINO[network] as Record<string, { legendaMax: number }>)[format]?.legendaMax ?? 0;
+  const positivos = destinos.map((d) => teto(d.network, d.format)).filter((n) => n > 0);
+  if (positivos.length > 0) return Math.min(...positivos);
+  const redes = [...new Set(destinos.map((d) => d.network))];
+  const daRede = redes.flatMap((r) => FORMATOS_POR_REDE[r].map((f) => teto(r, f))).filter((n) => n > 0);
+  return daRede.length > 0 ? Math.min(...daRede) : 2200;
 }
 
 const NOME_DA_REDE: Record<RedeDaPublicacao, string> = { instagram: "Instagram", facebook: "Facebook", whatsapp: "grupos de WhatsApp" };
@@ -63,20 +77,21 @@ const ROTULO_DO_FORMATO: Record<FormatoDaPublicacao, string> = {
 };
 
 export function montarPedidoDeLegenda(p: {
-  network: RedeDaPublicacao;
-  formats: readonly FormatoDaPublicacao[];
+  destinos: readonly DestinoDoPedido[];
   idea: string;
   instrucao: string;
   imagens: readonly ImagemDoPedido[];
   videosIgnorados: number;
 }): { system: string; messages: ModelMessage[]; limite: number } {
-  const limite = limiteDaLegenda(p.network, p.formats);
-  const formatos = p.formats.filter((f) => FORMATOS_POR_REDE[p.network].includes(f));
+  const limite = limiteDaLegenda(p.destinos);
+  const redes = [...new Set(p.destinos.map((d) => d.network))];
+  const onde = [...new Set(p.destinos.map((d) => (d.format === "group_message" ? NOME_DA_REDE.whatsapp : `${NOME_DA_REDE[d.network]} ${ROTULO_DO_FORMATO[d.format]}`)))];
   const imagens = p.imagens.slice(0, MAXIMO_DE_IMAGENS_LIDAS);
   const ideia = p.idea.trim();
 
   const system = [
-    `Você escreve legendas de publicações para ${NOME_DA_REDE[p.network]} em nome de uma empresa.`,
+    `Você escreve legendas de publicações para ${redes.map((r) => NOME_DA_REDE[r]).join(" e ")} em nome de uma empresa.`,
+    redes.length > 1 ? "A MESMA legenda sai em todas essas redes: escreva algo que funcione em todas." : null,
     "Siga à risca a instrução da empresa abaixo. Ela vale mais que qualquer preferência sua de estilo.",
     "",
     "<instrucao_da_empresa>",
@@ -88,10 +103,12 @@ export function montarPedidoDeLegenda(p: {
     "- Escreva no idioma da ideia; sem ideia, em português do Brasil.",
     "- Não invente preço, data, endereço, desconto ou dado que não esteja na ideia ou visível nas imagens.",
     "- Responda SÓ com a legenda pronta para publicar: sem título, sem aspas, sem explicação, sem opções alternativas.",
-  ].join("\n");
+  ]
+    .filter((l): l is string => l !== null)
+    .join("\n");
 
   const partes: string[] = [];
-  if (formatos.length > 0) partes.push(`Onde vai sair: ${formatos.map((f) => ROTULO_DO_FORMATO[f]).join(", ")}.`);
+  partes.push(`Onde vai sair: ${onde.join(", ")}.`);
   partes.push(
     imagens.length > 0
       ? `Estude ${imagens.length === 1 ? "a imagem anexada" : `as ${imagens.length} imagens anexadas, na ordem do post`} e escreva a legenda a partir do que elas mostram.`

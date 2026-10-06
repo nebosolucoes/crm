@@ -4,10 +4,11 @@
  * SUGERIR LEGENDA — o botão ao lado do campo Legenda no Agendar e o painel com
  * a sugestão embaixo dele.
  *
- * A IA lê a instrução da rede (Publicações › Instruções de legenda), até 4
- * imagens anexadas e o texto que já está no campo, como ideia. Com destinos em
- * mais de uma rede, o botão pergunta QUAL instrução usar — cada rede tem a sua.
- * A sugestão nunca substitui o campo sozinha: só no "Usar".
+ * A IA lê o PROMPT das contas marcadas (Publicações › Prompts de legenda), até
+ * 4 imagens anexadas e o texto que já está no campo, como ideia. Cada conta
+ * leva ao seu prompt (ou ao padrão da rede, se não tiver um); quando as contas
+ * marcadas dão em mais de um prompt, o botão pergunta QUAL usar. A sugestão
+ * nunca substitui o campo sozinha: só no "Usar".
  *
  * O estado mora em `useSugestaoDeLegenda` porque o botão e o painel ficam em
  * lugares diferentes da coluna (acima e abaixo do textarea).
@@ -19,10 +20,12 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useT } from "@/hooks/i18n/useT";
-import { FalhaDaLegenda, sugerirLegendaComIa } from "@/hooks/publicacoes/usePublicacoes";
+import { FalhaDaLegenda, sugerirLegendaComIa, usePromptsDeLegenda } from "@/hooks/publicacoes/usePublicacoes";
+import { opcoesDePrompt, type OpcaoDePrompt } from "@/lib/publicacoes/legenda/instrucoes";
 import { MAXIMO_DE_IMAGENS_LIDAS } from "@/lib/publicacoes/legenda/montar-pedido";
 import type { LegendaSugerida } from "@/lib/publicacoes/legenda/sugerir";
-import { REDES_DA_PUBLICACAO, type DestinoDaPublicacao, type RedeDaPublicacao } from "@/lib/publicacoes/schema";
+import type { DestinoDaPublicacao, FormatoDaPublicacao } from "@/lib/publicacoes/schema";
+import type { ContaPublicavel } from "@/lib/publicacoes/servico";
 import { ArrowsClockwise, CircleNotch, Sparkle, X } from "@/lib/ui/icons";
 
 import { ChannelIcon } from "./ChannelIcon";
@@ -33,15 +36,17 @@ import { ROTULO_DA_REDE } from "./rotulos";
 const CONSERTO_EM_PROVEDORES = new Set(["modelo_sem_visao", "ia_nao_configurada", "modelo_nao_habilitado"]);
 
 export interface EstadoDaSugestao {
-  redes: RedeDaPublicacao[];
+  opcoes: OpcaoDePrompt[];
   imagens: AnexoLocal[];
   videos: number;
   podeSugerir: boolean;
   motivoDesligado: string | null;
-  gerando: RedeDaPublicacao | null;
+  gerando: boolean;
   sugestao: LegendaSugerida | null;
   falha: FalhaDaLegenda | null;
-  sugerir: (rede: RedeDaPublicacao) => Promise<void>;
+  sugerir: (opcao: OpcaoDePrompt) => Promise<void>;
+  /** A última escolha — o "Gerar outra" repete com ela. */
+  ultima: OpcaoDePrompt | null;
   descartar: () => void;
 }
 
@@ -53,45 +58,50 @@ export function useSugestaoDeLegenda(p: {
   subirImagens: (ids: string[]) => Promise<string[]>;
 }): EstadoDaSugestao {
   const t = useT();
-  const [gerando, setGerando] = useState<RedeDaPublicacao | null>(null);
+  const { data: prompts, isLoading } = usePromptsDeLegenda();
+  const [gerando, setGerando] = useState(false);
   const [sugestao, setSugestao] = useState<LegendaSugerida | null>(null);
   const [falha, setFalha] = useState<FalhaDaLegenda | null>(null);
+  const [ultima, setUltima] = useState<OpcaoDePrompt | null>(null);
 
-  const marcadas = new Set(p.destinos.map((d) => d.network));
-  const redes = REDES_DA_PUBLICACAO.filter((r) => marcadas.has(r));
+  const opcoes = opcoesDePrompt(p.destinos, prompts?.prompts ?? []);
   const imagens = p.anexos.filter((a) => a.kind === "image").slice(0, MAXIMO_DE_IMAGENS_LIDAS);
   const videos = p.anexos.filter((a) => a.kind === "video").length;
   const temConteudo = imagens.length > 0 || p.legenda.trim().length > 0;
 
   let motivoDesligado: string | null = null;
-  if (redes.length === 0) motivoDesligado = t("Marque pelo menos uma rede no passo 1.");
+  if (p.destinos.length === 0) motivoDesligado = t("Marque pelo menos uma rede no passo 1.");
   else if (!temConteudo) motivoDesligado = t("Anexe uma imagem ou escreva uma ideia na legenda.");
+  else if (isLoading) motivoDesligado = t("Carregando os prompts…");
 
-  async function sugerir(rede: RedeDaPublicacao) {
-    setGerando(rede);
+  async function sugerir(opcao: OpcaoDePrompt) {
+    setGerando(true);
     setFalha(null);
+    setUltima(opcao);
     try {
       const media_paths = await p.subirImagens(imagens.map((a) => a.id));
-      const formats = [...new Set(p.destinos.filter((d) => d.network === rede).map((d) => d.format))];
-      setSugestao(await sugerirLegendaComIa({ network: rede, formats, idea: p.legenda, media_paths, ignored_videos: videos }));
+      const escolha = opcao.tipo === "prompt" ? { prompt_id: opcao.prompt_id } : { network: opcao.network };
+      const destinos = opcao.destinos.map((d) => ({ network: d.network, format: d.format as FormatoDaPublicacao }));
+      setSugestao(await sugerirLegendaComIa({ ...escolha, destinos, idea: p.legenda, media_paths, ignored_videos: videos }));
     } catch (err) {
       setSugestao(null);
       setFalha(err instanceof FalhaDaLegenda ? err : new FalhaDaLegenda("erro", err instanceof Error ? err.message : t("Não foi possível sugerir a legenda.")));
     } finally {
-      setGerando(null);
+      setGerando(false);
     }
   }
 
   return {
-    redes,
+    opcoes,
     imagens,
     videos,
-    podeSugerir: motivoDesligado === null,
+    podeSugerir: motivoDesligado === null && opcoes.length > 0,
     motivoDesligado,
     gerando,
     sugestao,
     falha,
     sugerir,
+    ultima,
     descartar: () => {
       setSugestao(null);
       setFalha(null);
@@ -99,16 +109,23 @@ export function useSugestaoDeLegenda(p: {
   };
 }
 
-export function BotaoSugerirLegenda({ estado, disabled }: { estado: EstadoDaSugestao; disabled?: boolean }) {
+/** Como uma opção se chama na tela: o nome do prompt, ou "Padrão do Instagram". */
+function useNomeDaOpcao() {
   const t = useT();
+  return (o: OpcaoDePrompt) => (o.tipo === "prompt" ? o.nome : `${t("Padrão do")} ${ROTULO_DA_REDE[o.network]}`);
+}
+
+export function BotaoSugerirLegenda({ estado, contas, disabled }: { estado: EstadoDaSugestao; contas: readonly ContaPublicavel[]; disabled?: boolean }) {
+  const t = useT();
+  const nomeDaOpcao = useNomeDaOpcao();
   const [escolhendo, setEscolhendo] = useState(false);
-  const ocupado = estado.gerando !== null;
-  const desligado = disabled || ocupado || !estado.podeSugerir;
+  const desligado = disabled || estado.gerando || !estado.podeSugerir;
+  const nomeDaConta = new Map(contas.map((c) => [c.id, c.display_name ?? c.username ?? ROTULO_DA_REDE[c.network]]));
 
   const conteudo = (
     <>
-      {ocupado ? <CircleNotch size={14} className="animate-spin" aria-hidden /> : <Sparkle size={14} weight="fill" aria-hidden />}
-      {ocupado ? (estado.imagens.length > 0 ? t("Lendo as imagens…") : t("Escrevendo…")) : t("Sugerir legenda")}
+      {estado.gerando ? <CircleNotch size={14} className="animate-spin" aria-hidden /> : <Sparkle size={14} weight="fill" aria-hidden />}
+      {estado.gerando ? (estado.imagens.length > 0 ? t("Lendo as imagens…") : t("Escrevendo…")) : t("Sugerir legenda")}
     </>
   );
 
@@ -129,9 +146,9 @@ export function BotaoSugerirLegenda({ estado, disabled }: { estado: EstadoDaSuge
     );
   }
 
-  if (estado.redes.length === 1) {
+  if (estado.opcoes.length === 1) {
     return (
-      <Button type="button" variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-xs" disabled={desligado} onClick={() => void estado.sugerir(estado.redes[0]!)} data-testid="sugerir-legenda">
+      <Button type="button" variant="outline" size="sm" className="h-7 gap-1.5 px-2.5 text-xs" disabled={desligado} onClick={() => void estado.sugerir(estado.opcoes[0]!)} data-testid="sugerir-legenda">
         {conteudo}
       </Button>
     );
@@ -144,23 +161,30 @@ export function BotaoSugerirLegenda({ estado, disabled }: { estado: EstadoDaSuge
           {conteudo}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-64 p-2" data-testid="sugerir-legenda-redes">
-        <p className="px-2 pb-1 pt-1 text-xs font-medium">{t("Usar a instrução de qual rede?")}</p>
-        <p className="px-2 pb-2 text-[11px] text-muted-foreground">{t("Cada rede tem o seu jeito de escrever. A legenda vale para todas; ajuste depois se quiser.")}</p>
+      <PopoverContent align="end" className="w-72 p-2" data-testid="sugerir-legenda-prompts">
+        <p className="px-2 pb-1 pt-1 text-xs font-medium">{t("Usar qual prompt?")}</p>
+        <p className="px-2 pb-2 text-[11px] text-muted-foreground">{t("As contas marcadas usam prompts diferentes. A legenda vale para todas; ajuste depois se quiser.")}</p>
         <div className="flex flex-col">
-          {estado.redes.map((rede) => (
+          {estado.opcoes.map((opcao) => (
             <button
-              key={rede}
+              key={opcao.chave}
               type="button"
-              className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden"
+              className="flex items-start gap-2.5 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-hidden"
               onClick={() => {
                 setEscolhendo(false);
-                void estado.sugerir(rede);
+                void estado.sugerir(opcao);
               }}
-              data-testid={`sugerir-legenda-rede-${rede}`}
+              data-testid={`sugerir-legenda-opcao-${opcao.chave}`}
             >
-              <ChannelIcon channel={rede} format="feed" state="active" size={22} decorative />
-              {ROTULO_DA_REDE[rede]}
+              <span className="mt-0.5 flex shrink-0 -space-x-1.5">
+                {opcao.redes.map((rede) => (
+                  <ChannelIcon key={rede} channel={rede} format="feed" state="active" size={20} decorative />
+                ))}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm">{nomeDaOpcao(opcao)}</span>
+                <span className="block truncate text-[11px] text-muted-foreground">{opcao.contas.map((c) => nomeDaConta.get(c) ?? "").filter(Boolean).join(", ")}</span>
+              </span>
             </button>
           ))}
         </div>
@@ -194,7 +218,7 @@ export function PainelDaSugestao({ estado, onUsar }: { estado: EstadoDaSugestao;
 
   const s = sugestao!;
   const nota = [
-    s.personalizada ? `${t("Instrução do")} ${ROTULO_DA_REDE[s.network]}` : `${t("Instrução padrão do")} ${ROTULO_DA_REDE[s.network]}`,
+    s.origem.tipo === "prompt" ? `${t("Prompt")} “${s.origem.nome}”` : `${t("Padrão do")} ${ROTULO_DA_REDE[s.origem.network]}`,
     s.used_images === 0 ? t("sem imagem") : s.used_images === 1 ? t("1 imagem lida") : `${s.used_images} ${t("imagens lidas")}`,
     s.ignored_videos > 0 ? (s.ignored_videos === 1 ? t("1 vídeo ignorado") : `${s.ignored_videos} ${t("vídeos ignorados")}`) : null,
   ].filter(Boolean);
@@ -210,8 +234,8 @@ export function PainelDaSugestao({ estado, onUsar }: { estado: EstadoDaSugestao;
       </p>
       <p className="mt-2 text-[11px] text-muted-foreground" data-testid="sugestao-de-legenda-nota">
         {nota.join(" · ")} ·{" "}
-        <Link href="/app/publicacoes/instrucoes" className="underline-offset-4 hover:underline">
-          {t("editar instrução")}
+        <Link href="/app/publicacoes/prompts" className="underline-offset-4 hover:underline">
+          {t("editar prompts")}
         </Link>
       </p>
       {estado.videos > 0 ? <p className="mt-1 text-[11px] text-muted-foreground">{t("A IA não assiste vídeo; se ele for o principal do post, descreva-o na legenda.")}</p> : null}
@@ -227,7 +251,15 @@ export function PainelDaSugestao({ estado, onUsar }: { estado: EstadoDaSugestao;
         >
           {t("Usar")}
         </Button>
-        <Button type="button" size="sm" variant="outline" className="gap-1.5" disabled={estado.gerando !== null} onClick={() => void estado.sugerir(s.network)} data-testid="sugestao-de-legenda-outra">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="gap-1.5"
+          disabled={estado.gerando || !estado.ultima}
+          onClick={() => estado.ultima && void estado.sugerir(estado.ultima)}
+          data-testid="sugestao-de-legenda-outra"
+        >
           {estado.gerando ? <CircleNotch size={14} className="animate-spin" aria-hidden /> : <ArrowsClockwise size={14} aria-hidden />}
           {t("Gerar outra")}
         </Button>

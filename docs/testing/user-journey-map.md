@@ -2587,11 +2587,11 @@ Spec: `docs/specs/23-spec-publicacoes.md`. Sucessor de J28 (migration 0283): as 
 | J31.8 | Alterar horário / cancelar / excluir | alterar horário muda SÓ a ocorrência; cancelar esta data não toca nas outras; cancelar todas pede motivo; excluir é soft e preserva o Histórico |
 | J31.9 | Recorrência | "seg, qua, sex às 19:30" materializa até 90 dias/100 pendentes em hora de parede (DST-safe); editar a regra regera só as pendentes |
 | J31.10 | Histórico | só o que saiu do pendente; filtro por situação e rede; "Instagram ✓ · WhatsApp 3/4" com o erro em frase de gente e o id externo/URL |
-| J31.11 | Sugerir legenda com uma rede marcada (06/10/2026) | o botão gera direto, sem perguntar; o painel mostra a legenda, "Instrução padrão do Instagram · 2 imagens lidas" e Usar/Gerar outra/Descartar; "Usar" preenche o campo e a prévia |
-| J31.12 | Sugerir legenda com Instagram + WhatsApp marcados | abre "Usar a instrução de qual rede?" com as duas; a escolhida é a que aparece na nota do painel |
+| J31.11 | Sugerir legenda com o Instagram e o Facebook da mesma empresa (mesmo prompt) (06/10/2026) | gera direto, sem perguntar; o painel mostra a legenda, "Prompt “Padaria” · 2 imagens lidas" e Usar/Gerar outra/Descartar; "Usar" preenche o campo e a prévia |
+| J31.12 | Sugerir legenda com contas de empresas diferentes + WhatsApp sem prompt | abre "Usar qual prompt?" com cada prompt (nome, redes, contas) e "Padrão do WhatsApp"; a escolhida é a que a nota do painel nomeia |
 | J31.13 | Sugerir legenda sem imagem e sem texto, ou sem rede | o botão fica desligado e o tooltip diz o que falta |
 | J31.14 | Modelo do ponto "Legenda de publicação" não lê imagem | o painel diz para trocar em IA › Provedores, com link; nada é enviado ao provedor |
-| J31.15 | Instruções de legenda | três cartões (Instagram, Facebook, WhatsApp) com o padrão; salvar marca "Personalizada"; "Restaurar padrão" volta |
+| J31.15 | Prompts de legenda | criar com nome, texto e contas; marcar conta que é de outro prompt a move (o chip diz de qual é); apagar devolve as contas ao padrão da rede, mostrado no pé da tela |
 
 Cobertura automática: `lib/publicacoes/**/*.test.ts` (recorrência, regras, política, tempo da tela, worker), `lib/channels/publicacao/*.test.ts`, `lib/channels/zernio/posts.test.ts`, `tests/unit/publicacoes-navegacao.test.ts`, `tests/invariants/publicacoes-estao-na-publicacao.test.ts`, a cerca de vocabulário e o isolamento RLS nas seis tabelas. **Não medido nesta entrega:** envio real por WAHA com número pareado e post real em conta social (as contas locais são de cliente; ver "O que NÃO medi" na spec).
 

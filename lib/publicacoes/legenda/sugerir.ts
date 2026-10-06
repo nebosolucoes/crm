@@ -61,8 +61,8 @@ export function enxergaPeloCatalogo(db: pg.Pool): DepsDaLegenda["enxerga"] {
 }
 
 export interface DepsDaLegenda {
-  /** Instrução gravada da rede, ou `null` (vale o padrão). */
-  lerInstrucao: () => Promise<string | null>;
+  /** O prompt escolhido (nome e instrução), lido por organização + id; `null` quando não existe. */
+  lerPrompt: (promptId: string) => Promise<{ name: string; instructions: string } | null>;
   /** Bytes de um arquivo do bucket; `null` quando não existe. */
   baixar: (storagePath: string) => Promise<{ data: Uint8Array; mime: string } | null>;
   /**
@@ -79,10 +79,10 @@ export interface DepsDaLegenda {
 
 export interface LegendaSugerida {
   caption: string;
-  network: SugerirLegenda["network"];
+  /** Qual instrução a IA seguiu — o painel diz "Prompt Padaria" ou "Padrão do Instagram". */
+  origem: { tipo: "prompt"; prompt_id: string; nome: string } | { tipo: "padrao"; network: NonNullable<SugerirLegenda["network"]> };
   used_images: number;
   ignored_videos: number;
-  personalizada: boolean;
   model: string;
   llm_call_id: string | null;
 }
@@ -93,6 +93,7 @@ export class ErroDaLegenda extends Error {
     public readonly codigo:
       | "media_not_found"
       | "media_not_image"
+      | "prompt_not_found"
       | "modelo_sem_visao"
       | "ia_nao_configurada"
       | "modelo_nao_habilitado"
@@ -128,11 +129,20 @@ export async function sugerirLegenda(orgId: string, pedido: SugerirLegenda, deps
     imagens.push({ data: arquivo.data, mediaType: mime });
   }
 
-  const gravada = (await deps.lerInstrucao())?.trim() ?? "";
-  const instrucao = gravada || INSTRUCAO_PADRAO[pedido.network];
+  let instrucao: string;
+  let origem: LegendaSugerida["origem"];
+  if (pedido.prompt_id) {
+    const prompt = await deps.lerPrompt(pedido.prompt_id);
+    if (!prompt) throw new ErroDaLegenda("prompt_not_found", "Esse prompt não existe mais. Recarregue a página e escolha de novo.", 404);
+    instrucao = prompt.instructions;
+    origem = { tipo: "prompt", prompt_id: pedido.prompt_id, nome: prompt.name };
+  } else {
+    const network = pedido.network!;
+    instrucao = INSTRUCAO_PADRAO[network];
+    origem = { tipo: "padrao", network };
+  }
   const { system, messages, limite } = montarPedidoDeLegenda({
-    network: pedido.network,
-    formats: pedido.formats,
+    destinos: pedido.destinos,
     idea: pedido.idea,
     instrucao,
     imagens,
@@ -152,10 +162,9 @@ export async function sugerirLegenda(orgId: string, pedido: SugerirLegenda, deps
   if (!caption) throw new ErroDaLegenda("resposta_vazia", "A IA respondeu em branco. Tente gerar outra.", 502);
   return {
     caption,
-    network: pedido.network,
+    origem,
     used_images: imagens.length,
     ignored_videos: pedido.ignored_videos,
-    personalizada: gravada.length > 0,
     model: resposta.model,
     llm_call_id: resposta.callId,
   };

@@ -12,7 +12,7 @@ import { useCallback, useRef } from "react";
 import { useActiveOrg } from "@/hooks/auth/AuthProvider";
 import { useRealtimeChannel } from "@/hooks/realtime/useRealtimeChannel";
 import { apiClient } from "@/lib/api/client";
-import type { InstrucaoDaRede } from "@/lib/publicacoes/legenda/instrucoes";
+import type { PromptDeLegenda, PromptsDaOrganizacao } from "@/lib/publicacoes/legenda/instrucoes";
 import type { LegendaSugerida } from "@/lib/publicacoes/legenda/sugerir";
 import type { AlterarPublicacao, CriarPublicacao, FormatoDaPublicacao, MidiaDaPublicacao, StatusDaOcorrencia, RedeDaPublicacao } from "@/lib/publicacoes/schema";
 import type {
@@ -142,23 +142,36 @@ export async function subirMidia(
   return json.data.media;
 }
 
-/** As instruções de legenda das três redes (a da organização ou o padrão). */
-export function useInstrucoesDeLegenda() {
+const CHAVE_DOS_PROMPTS = [...CHAVE_DE_PUBLICACOES, "prompts-de-legenda"] as const;
+
+/** Os prompts de legenda da organização, com as contas de cada um, e o padrão de cada rede. */
+export function usePromptsDeLegenda() {
   return useQuery({
-    queryKey: [...CHAVE_DE_PUBLICACOES, "instrucoes-de-legenda"],
-    queryFn: async () => (await apiClient.get<Envelope<InstrucaoDaRede[]>>(`${BASE}/instrucoes-de-legenda`)).data,
+    queryKey: CHAVE_DOS_PROMPTS,
+    queryFn: async () => (await apiClient.get<Envelope<PromptsDaOrganizacao>>(`${BASE}/prompts-de-legenda`)).data,
     staleTime: 60_000,
   });
 }
 
-/** Grava a instrução de UMA rede; texto vazio volta ao padrão. */
-export function useSalvarInstrucaoDeLegenda() {
+/** Criar, alterar e apagar prompt. Toda escrita relê a lista: mover conta muda DOIS prompts. */
+export function useMutacoesDePrompt() {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (entrada: { network: RedeDaPublicacao; instructions: string }) =>
-      (await apiClient.put<Envelope<InstrucaoDaRede[]>>(`${BASE}/instrucoes-de-legenda`, entrada)).data,
-    onSuccess: (dados) => qc.setQueryData([...CHAVE_DE_PUBLICACOES, "instrucoes-de-legenda"], dados),
+  const reler = () => qc.invalidateQueries({ queryKey: CHAVE_DOS_PROMPTS });
+  const criar = useMutation({
+    mutationFn: async (entrada: { name: string; instructions: string; channel_session_ids: string[] }) =>
+      (await apiClient.post<Envelope<PromptDeLegenda>>(`${BASE}/prompts-de-legenda`, entrada)).data,
+    onSuccess: reler,
   });
+  const alterar = useMutation({
+    mutationFn: async ({ id, ...entrada }: { id: string; name?: string; instructions?: string; channel_session_ids?: string[] }) =>
+      (await apiClient.patch<Envelope<PromptDeLegenda>>(`${BASE}/prompts-de-legenda/${id}`, entrada)).data,
+    onSuccess: reler,
+  });
+  const excluir = useMutation({
+    mutationFn: async (id: string) => (await apiClient.delete<Envelope<{ id: string }>>(`${BASE}/prompts-de-legenda/${id}`)).data,
+    onSuccess: reler,
+  });
+  return { criar, alterar, excluir };
 }
 
 /** Falha do Sugerir legenda, com o código que a tela usa para escolher o conserto. */
@@ -177,8 +190,9 @@ export class FalhaDaLegenda extends Error {
  * — repetir em silêncio deixaria o botão girando um minuto inteiro.
  */
 export async function sugerirLegendaComIa(entrada: {
-  network: RedeDaPublicacao;
-  formats: FormatoDaPublicacao[];
+  prompt_id?: string;
+  network?: RedeDaPublicacao;
+  destinos: Array<{ network: RedeDaPublicacao; format: FormatoDaPublicacao }>;
   idea: string;
   media_paths: string[];
   ignored_videos: number;

@@ -185,10 +185,15 @@ beforeAll(() => {
         insert into public.publication_occurrence_targets (organization_id, occurrence_id, target_id)
           values (v_org, v_occ, v_target)
           on conflict do nothing;
-        -- 0286: a instrução de legenda da rede é o tom privado da marca.
-        insert into public.publication_caption_instructions (organization_id, network, instructions)
-          values (v_org, 'instagram', 'RLS invariant private caption instruction')
-          on conflict (organization_id, network) do nothing;
+        -- 0286: o prompt de legenda é o tom privado da marca, e o vínculo diz
+        -- qual conta o usa. Um de cada por tenant.
+        if not exists (select 1 from public.publication_caption_prompts where organization_id = v_org) then
+          insert into public.publication_caption_prompts (organization_id, name, instructions)
+            values (v_org, 'RLS Invariant Prompt', 'RLS invariant private caption instruction');
+        end if;
+        insert into public.publication_caption_prompt_accounts (organization_id, prompt_id, channel_session_id)
+          select v_org, id, v_sess from public.publication_caption_prompts where organization_id = v_org limit 1
+          on conflict (channel_session_id) do nothing;
 
         select id into v_contact from public.contacts
           where organization_id = v_org and display_name = 'RLS Invariant Contact';
@@ -434,8 +439,9 @@ export const TABLES = [
   "publication_executions",
   // migration 0284 — cada data escolhe seus destinos.
   "publication_occurrence_targets",
-  // migration 0286 — instrução de legenda por rede (tom privado da marca).
-  "publication_caption_instructions",
+  // migration 0286 — prompts de legenda (tom privado da marca) e as contas que os usam.
+  "publication_caption_prompts",
+  "publication_caption_prompt_accounts",
   // migration 0207 — as credenciais de IA da organização. A 0150 apagou a policy
   // de leitura por organização sem que nada acusasse, e a 0207 a restaurou; esta
   // linha é o que passa a acusar se ela sumir de novo (issue #545). A leitura é

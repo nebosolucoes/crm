@@ -546,8 +546,10 @@ export const AUDIT_ACTIONS = [
   "publication.occurrence_cancelled",
   "publication.execution_resent",
   "publication.worker_run",
-  // Sugerir legenda (migration 0286): a instrução da rede e cada sugestão pedida à IA.
-  "publication.caption_instructions_updated",
+  // Sugerir legenda (migration 0286): os prompts de legenda e cada sugestão pedida à IA.
+  "publication.caption_prompt_created",
+  "publication.caption_prompt_updated",
+  "publication.caption_prompt_deleted",
   "publication.caption_suggested",
 
   // ── O compromisso em si (frentes 1 e 5 do Calendário Vivo) ──────────────

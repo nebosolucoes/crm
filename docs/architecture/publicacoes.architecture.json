@@ -160,21 +160,21 @@
       "lane": "operacao",
       "col": 1,
       "type": "ui",
-      "label": "Instruções de legenda — o \"prompt prévio\" de cada rede (Instagram, Facebook, WhatsApp); sem texto vale o padrão do produto"
+      "label": "Prompts de legenda — o jeito de escrever de cada marca e as CONTAS que o usam (Instagram e Facebook da mesma empresa dividem um); conta sem prompt usa o padrão da rede"
     },
     {
       "id": "api-legenda",
       "lane": "api",
       "col": 1,
       "type": "service",
-      "label": "Sugerir legenda — POST /publicacoes/legenda/sugerir: instrução da rede + até 4 imagens + ideia → runModelCall (ponto legenda_de_publicacao)"
+      "label": "Sugerir legenda — POST /publicacoes/legenda/sugerir: prompt das contas marcadas (ou padrão da rede) + até 4 imagens + ideia → runModelCall (ponto legenda_de_publicacao)"
     },
     {
       "id": "instrucoes-legenda",
       "lane": "dados",
       "col": 1,
       "type": "database",
-      "label": "publication_caption_instructions (0286) — uma linha por (organização, rede)"
+      "label": "publication_caption_prompts + publication_caption_prompt_accounts (0286) — prompt com nome; uma conta usa um prompt só"
     },
     {
       "id": "llm-calls",
@@ -345,19 +345,19 @@
       "id": "agendar-sugere",
       "from": "tela-agendar",
       "to": "api-legenda",
-      "label": "Sugerir legenda: rede escolhida, formatos, ideia, imagens já subidas; volta a legenda para Usar/Gerar outra/Descartar"
+      "label": "Sugerir legenda: as contas marcadas dizem os prompts em jogo; com mais de um, a tela pergunta qual; volta a legenda para Usar/Gerar outra/Descartar"
     },
     {
       "id": "instrucoes-grava",
       "from": "tela-instrucoes",
       "to": "instrucoes-legenda",
-      "label": "GET/PUT /publicacoes/instrucoes-de-legenda (manager grava; vazio restaura o padrão)"
+      "label": "GET/POST/PATCH/DELETE /publicacoes/prompts-de-legenda (manager; mover conta de prompt é uma transação)"
     },
     {
       "id": "legenda-le-instrucao",
       "from": "api-legenda",
       "to": "instrucoes-legenda",
-      "label": "lê a instrução da rede escolhida"
+      "label": "lê o prompt escolhido (por organização + id)"
     },
     {
       "id": "legenda-le-midia",

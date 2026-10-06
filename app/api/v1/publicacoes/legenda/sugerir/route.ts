@@ -1,9 +1,10 @@
 /**
  * POST /api/v1/publicacoes/legenda/sugerir — o botão Sugerir legenda do Agendar.
  *
- * Recebe a rede cuja instrução vale, os formatos marcados nela, a ideia (o que
- * já está no campo Legenda) e até 4 imagens JÁ subidas (`storage_path` do
- * prefixo desta organização). Devolve a legenda; quem decide usar é a tela.
+ * Recebe a escolha — um prompt da organização (`prompt_id`) ou o padrão de uma
+ * rede (`network`) —, os destinos marcados que ela cobre, a ideia (o que já
+ * está no campo Legenda) e até 4 imagens JÁ subidas (`storage_path` do prefixo
+ * desta organização). Devolve a legenda; quem decide usar é a tela.
  *
  * Custa dinheiro a cada clique, então tem teto por usuário. A chamada passa por
  * `runModelCall` (ponto `legenda_de_publicacao`): fica em IA › Execuções, conta
@@ -23,6 +24,7 @@ import { traduzir } from "@/lib/i18n/dicionario";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { logger } from "@/lib/logger";
 import { sugerirLegendaSchema } from "@/lib/publicacoes/legenda/montar-pedido";
+import { lerPrompt } from "@/lib/publicacoes/legenda/prompts";
 import { chamarModeloDaLegenda, enxergaPeloCatalogo, ErroDaLegenda, sugerirLegenda } from "@/lib/publicacoes/legenda/sugerir";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -58,16 +60,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   const pool = getRequestPool();
   try {
     const sugestao = await sugerirLegenda(orgId, parsed.data, {
-      lerInstrucao: async () => {
-        const { data, error } = await admin
-          .from("publication_caption_instructions")
-          .select("instructions")
-          .eq("organization_id", orgId)
-          .eq("network", parsed.data.network)
-          .maybeSingle();
-        if (error) throw new Error(error.message);
-        return data?.instructions ?? null;
-      },
+      lerPrompt: (promptId) => lerPrompt(pool, orgId, promptId),
       baixar: async (storagePath) => {
         const { data, error } = await admin.storage.from("whatsapp-media").download(storagePath);
         if (error || !data) return null;
@@ -85,11 +78,11 @@ export async function POST(req: NextRequest): Promise<Response> {
       requestId,
       // Nunca o texto: a legenda é conteúdo, a auditoria registra o ato.
       metadata: {
-        network: sugestao.network,
+        origem: sugestao.origem.tipo === "prompt" ? { tipo: "prompt", prompt_id: sugestao.origem.prompt_id } : sugestao.origem,
+        redes: [...new Set(parsed.data.destinos.map((d) => d.network))],
         model: sugestao.model,
         llm_call_id: sugestao.llm_call_id,
         used_images: sugestao.used_images,
-        personalizada: sugestao.personalizada,
       },
     });
     return ok(sugestao, { requestId });

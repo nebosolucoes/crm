@@ -346,7 +346,7 @@ function Formulario({ fuso, editarId, inicial, cabecalho }: { fuso: string; edit
             <div className="grid gap-2">
               <div className="flex items-center justify-between gap-2">
                 <Label htmlFor="pub-legenda">{t("Legenda")}</Label>
-                <BotaoSugerirLegenda estado={sugestao} disabled={ocupado} />
+                <BotaoSugerirLegenda estado={sugestao} contas={contas ?? []} disabled={ocupado} />
               </div>
               <Textarea id="pub-legenda" value={legenda} onChange={(e) => setLegenda(e.target.value)} placeholder={t("O texto que sai no post e na mensagem. No WhatsApp, *negrito* e _itálico_ funcionam.")} rows={7} maxLength={4000} disabled={ocupado} data-testid="pub-legenda" />
               <span className="text-right text-[11px] text-muted-foreground">{legenda.length}/4000</span>

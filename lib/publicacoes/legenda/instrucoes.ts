@@ -1,19 +1,23 @@
 import { z } from "zod";
 
-import { REDES_DA_PUBLICACAO, type RedeDaPublicacao } from "@/lib/publicacoes/schema";
+import type { RedeDaPublicacao } from "@/lib/publicacoes/schema";
 
 /**
- * A INSTRUÇÃO DE LEGENDA DE CADA REDE — o "prompt prévio" do Sugerir legenda.
+ * OS PROMPTS DE LEGENDA — o jeito de escrever da marca, que o Sugerir legenda
+ * manda à IA.
  *
- * A organização escreve uma por rede em Publicações › Instruções de legenda
- * (tabela `publication_caption_instructions`, migration 0286). Sem linha, vale o
- * padrão daqui — e é por isso que o padrão mora no código e não numa linha
- * semeada no banco: quem nunca personalizou ganha a melhoria quando o produto
- * melhora, e "Restaurar padrão" é só apagar a linha.
+ * O prompt é da MARCA, não da rede (migration 0286): tem nome, e se liga às
+ * CONTAS que o usam — o Instagram e o Facebook da mesma empresa podem dividir
+ * um prompt, e dois perfis de Instagram de empresas diferentes têm cada um o
+ * seu. Uma conta pertence a no máximo um prompt.
+ *
+ * Conta sem prompt usa o padrão do produto para a rede dela, que mora aqui e
+ * não numa linha semeada no banco: quem nunca personalizou ganha a melhoria
+ * quando o produto melhora.
  */
 
-/** Teto da instrução — o mesmo do CHECK `publication_caption_instructions_instructions_check`. */
 export const MAXIMO_DA_INSTRUCAO = 4000;
+export const MAXIMO_DO_NOME = 120;
 
 export const INSTRUCAO_PADRAO: Record<RedeDaPublicacao, string> = {
   instagram: [
@@ -39,41 +43,80 @@ export const INSTRUCAO_PADRAO: Record<RedeDaPublicacao, string> = {
   ].join("\n"),
 };
 
-export const redeDaInstrucaoSchema = z.enum(REDES_DA_PUBLICACAO);
+const uuid = z.string().uuid();
 
-/** PUT de Instruções de legenda. Texto vazio = apagar e voltar ao padrão. */
-export const salvarInstrucaoSchema = z
+export const criarPromptSchema = z
   .object({
-    network: redeDaInstrucaoSchema,
-    instructions: z.string().max(MAXIMO_DA_INSTRUCAO),
+    name: z.string().trim().min(1).max(MAXIMO_DO_NOME),
+    instructions: z.string().trim().min(1).max(MAXIMO_DA_INSTRUCAO),
+    channel_session_ids: z.array(uuid).max(200).default([]),
   })
   .strict();
-export type SalvarInstrucao = z.infer<typeof salvarInstrucaoSchema>;
+export type CriarPrompt = z.infer<typeof criarPromptSchema>;
 
-/** O que a tela recebe: as três redes, sempre, com a instrução em vigor. */
-export interface InstrucaoDaRede {
-  network: RedeDaPublicacao;
+export const alterarPromptSchema = z
+  .object({
+    name: z.string().trim().min(1).max(MAXIMO_DO_NOME).optional(),
+    instructions: z.string().trim().min(1).max(MAXIMO_DA_INSTRUCAO).optional(),
+    channel_session_ids: z.array(uuid).max(200).optional(),
+  })
+  .strict()
+  .refine((v) => Object.keys(v).length > 0, { message: "Nada para alterar." });
+export type AlterarPrompt = z.infer<typeof alterarPromptSchema>;
+
+/** Um prompt como a tela o recebe. */
+export interface PromptDeLegenda {
+  id: string;
+  name: string;
   instructions: string;
-  /** `false` = a org não escreveu nada e vale o padrão do produto. */
-  personalizada: boolean;
-  padrao: string;
-  updated_at: string | null;
+  channel_session_ids: string[];
+  updated_at: string;
 }
 
-/** Junta o que está no banco com o padrão, nas três redes e na ordem do vocabulário. */
-export function instrucoesEmVigor(
-  linhas: ReadonlyArray<{ network: string; instructions: string; updated_at: string | null }>,
-): InstrucaoDaRede[] {
-  const porRede = new Map(linhas.map((l) => [l.network, l]));
-  return REDES_DA_PUBLICACAO.map((network) => {
-    const linha = porRede.get(network);
-    const texto = linha?.instructions.trim() ?? "";
-    return {
-      network,
-      instructions: texto || INSTRUCAO_PADRAO[network],
-      personalizada: texto.length > 0,
-      padrao: INSTRUCAO_PADRAO[network],
-      updated_at: linha?.updated_at ?? null,
-    };
-  });
+/** GET /prompts-de-legenda — os prompts da organização e os padrões por rede. */
+export interface PromptsDaOrganizacao {
+  prompts: PromptDeLegenda[];
+  padroes: Record<RedeDaPublicacao, string>;
 }
+
+/**
+ * Uma escolha possível no Agendar: um prompt da organização, ou o padrão de
+ * uma rede (para as contas sem prompt). `destinos` são os destinos marcados
+ * que esta escolha cobre — é deles que sai o limite de caracteres.
+ */
+export type OpcaoDePrompt =
+  | { tipo: "prompt"; chave: string; prompt_id: string; nome: string; redes: RedeDaPublicacao[]; contas: string[]; destinos: Array<{ network: RedeDaPublicacao; format: string }> }
+  | { tipo: "padrao"; chave: string; network: RedeDaPublicacao; nome: string; redes: RedeDaPublicacao[]; contas: string[]; destinos: Array<{ network: RedeDaPublicacao; format: string }> };
+
+/**
+ * Quais prompts estão em jogo nas contas marcadas — a regra do Agendar.
+ *
+ * Cada conta marcada leva ao prompt dela; conta sem prompt leva ao padrão da
+ * sua rede. Contas que dão no mesmo prompt viram UMA opção. Uma opção só:
+ * gera direto; mais de uma: a tela pergunta qual usar. A ordem segue a dos
+ * destinos marcados, para a pergunta listar na ordem em que a pessoa marcou.
+ */
+export function opcoesDePrompt(
+  destinos: ReadonlyArray<{ network: RedeDaPublicacao; format: string; channel_session_id: string }>,
+  prompts: ReadonlyArray<Pick<PromptDeLegenda, "id" | "name" | "channel_session_ids">>,
+): OpcaoDePrompt[] {
+  const promptDaConta = new Map<string, Pick<PromptDeLegenda, "id" | "name">>();
+  for (const p of prompts) for (const conta of p.channel_session_ids) promptDaConta.set(conta, p);
+  const opcoes = new Map<string, OpcaoDePrompt>();
+  for (const d of destinos) {
+    const prompt = promptDaConta.get(d.channel_session_id);
+    const chave = prompt ? `prompt:${prompt.id}` : `padrao:${d.network}`;
+    let o = opcoes.get(chave);
+    if (!o) {
+      o = prompt
+        ? { tipo: "prompt", chave, prompt_id: prompt.id, nome: prompt.name, redes: [], contas: [], destinos: [] }
+        : { tipo: "padrao", chave, network: d.network, nome: "", redes: [], contas: [], destinos: [] };
+      opcoes.set(chave, o);
+    }
+    if (!o.redes.includes(d.network)) o.redes.push(d.network);
+    if (!o.contas.includes(d.channel_session_id)) o.contas.push(d.channel_session_id);
+    o.destinos.push({ network: d.network, format: d.format });
+  }
+  return [...opcoes.values()];
+}
+
