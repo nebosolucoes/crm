@@ -138,6 +138,15 @@ export interface RunModelCallInput {
 export interface RunModelCallDeps {
   registry?: ProviderRegistry;
   log?: Logger;
+  /**
+   * Última palavra de quem chama, já com provider e modelo DECIDIDOS e antes de
+   * sair byte (e antes do gate de orçamento). Lançar aqui recusa a chamada sem
+   * custo. Existe para o chamador conferir capacidade contra o modelo que de
+   * fato vai rodar — ex.: Sugerir legenda recusa modelo que não enxerga imagem
+   * (`lib/publicacoes/legenda/sugerir.ts`) em vez de mandar a foto e receber um
+   * texto inventado. Resolver o modelo por fora duplicaria a precedência do seam.
+   */
+  conferirAntesDeEnviar?: (escolha: { provider: string; model: string }) => Promise<void>;
 }
 
 /**
@@ -380,6 +389,10 @@ export async function runModelCall(db: pg.Pool, cfg: LlmEdgeConfig, input: RunMo
     throw new Error('params inválidos em organizations.settings.llm.params — corrija a config da org');
   }
   const { temperature, topP, topK, maxOutputTokens } = parsedParams.data;
+
+  if (deps.conferirAntesDeEnviar) {
+    await deps.conferirAntesDeEnviar({ provider: config.provider, model });
+  }
 
   // ═══ O TETO, LOGO ANTES DE SAIR BYTE ═══
   //

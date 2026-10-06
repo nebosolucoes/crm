@@ -546,6 +546,9 @@ export const AUDIT_ACTIONS = [
   "publication.occurrence_cancelled",
   "publication.execution_resent",
   "publication.worker_run",
+  // Sugerir legenda (migration 0286): a instrução da rede e cada sugestão pedida à IA.
+  "publication.caption_instructions_updated",
+  "publication.caption_suggested",
 
   // ── O compromisso em si (frentes 1 e 5 do Calendário Vivo) ──────────────
   // Marcar, remarcar e cancelar são mutações de um compromisso com hora e

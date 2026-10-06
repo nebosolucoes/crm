@@ -395,6 +395,19 @@ export const PONTOS_DE_IA: readonly PontoDeIa[] = [
     registraEm: "nenhum",
   },
 
+  {
+    id: "legenda_de_publicacao",
+    rotulo: "Legenda de publicação",
+    oQueFaz:
+      "Olha as imagens do post e escreve a legenda seguindo a instrução da rede (Instagram, Facebook ou WhatsApp), quando você clica em Sugerir legenda no Agendar.",
+    papel: "atender",
+    exige: { imagem: true },
+    emissor: "lib/publicacoes/legenda/sugerir.ts",
+    sintomaDeFalha:
+      "O botão Sugerir legenda mostra um aviso em vez da legenda, ou a legenda ignora o que aparece na foto.",
+    registraEm: "llm_calls",
+  },
+
   // ───────────────────────────── Ver e ouvir ───────────────────────────────
   {
     id: "transcricao_de_audio",
