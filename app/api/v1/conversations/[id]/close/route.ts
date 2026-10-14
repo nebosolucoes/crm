@@ -6,7 +6,7 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
  * Não bloqueia por assignee — qualquer membro com permissão (RLS) pode fechar.
  */
 import { randomUUID } from "node:crypto";
-import { type NextRequest } from "next/server";
+import { after, type NextRequest } from "next/server";
 
 import { audit } from "@/lib/audit";
 import { ok, fail } from "@/lib/api/wrappers";
@@ -97,14 +97,20 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
     error.code === "40001" ? 409 : 500, { requestId });
   const conv = data as unknown as Conversation;
 
-  await audit({
-    action: "conversation.closed",
-    actorUserId: user.id,
-    organizationId: conv.organization_id,
-    resourceType: "conversation",
-    resourceId: conv.id,
-    requestId,
-  });
+  // Auditoria DEPOIS da resposta (`after`), como a doutrina pede: fire-and-forget.
+  // `audit()` revalida a sessão e o contexto de suporte antes do INSERT — três idas
+  // ao banco que o operador esperava com o botão travado, a cada fechamento.
+  // `audit()` nunca lança: falha vira Sentry, não 500.
+  after(() =>
+    audit({
+      action: "conversation.closed",
+      actorUserId: user.id,
+      organizationId: conv.organization_id,
+      resourceType: "conversation",
+      resourceId: conv.id,
+      requestId,
+    }),
+  );
 
   return ok(conv, { requestId });
 }

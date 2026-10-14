@@ -80,8 +80,14 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("visibleInboxTabs (lógica pura de visões)", () => {
-  // Desde 28/09 "Todas" é a única porta para fechadas e arquivadas (as abas
-  // saíram), então ela aparece para TODO papel — a RLS é quem escopa.
+  // As visões aparecem para TODO papel — a RLS é quem escopa. Desde 14/10 a
+  // porta para as que o atendente encerrou é a aba Fechadas.
+  it("a ordem das abas é a do dono (14/10): Fila | Minhas | Robô | Todas | Fechadas", () => {
+    expect(visibleInboxTabs("agent", "own")).toEqual(["unassigned", "mine", "ai", "all", "closed"]);
+  });
+  it("todo papel vê a aba Fechadas", () => {
+    expect(visibleInboxTabs("agent", "own")).toContain("closed");
+  });
   it("agent em own_and_unassigned VÊ 'all' (é a porta para as que ele encerrou)", () => {
     expect(visibleInboxTabs("agent", "own_and_unassigned")).toContain("all");
   });

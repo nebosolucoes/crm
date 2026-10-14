@@ -29,8 +29,13 @@ describe("tabToFilter — o que cada aba significa", () => {
     expect(tabToFilter("mine")).toEqual({ assigned_to: "me", exclude_finished: true });
   });
 
-  it("Fechadas continua mostrando as fechadas — senão não sobra onde vê-las", () => {
-    expect(tabToFilter("closed")).toEqual({ status: "closed" });
+  it("Fechadas mostra fechadas E arquivadas — senão não sobra onde vê-las", () => {
+    // 14/10: Todas deixou de listar as terminais; a arquivada precisa de porta.
+    expect(tabToFilter("closed")).toEqual({ status: ["closed", "archived"] });
+  });
+
+  it("Todas é o atendimento VIVO: sem fechadas nem arquivadas (pedido do dono, 14/10)", () => {
+    expect(tabToFilter("all")).toEqual({ exclude_finished: true });
   });
 
   it("a Fila pergunta QUEM MANDA, não o status — e o valor mudou por medição", () => {
@@ -67,7 +72,6 @@ describe("tabToFilter — o que cada aba significa", () => {
 
   it("as outras abas não ganham o filtro de tabela", () => {
     expect(tabToFilter("unassigned").exclude_finished).toBeUndefined();
-    expect(tabToFilter("all").exclude_finished).toBeUndefined();
     expect(tabToFilter("ai").exclude_finished).toBeUndefined();
   });
 });

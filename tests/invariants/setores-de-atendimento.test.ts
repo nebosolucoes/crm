@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   countAs,
@@ -21,8 +21,10 @@ import {
  *   1. Tenant: setor e membro de A não aparecem para B, mesmo com o mesmo slug.
  *   2. Visibilidade: agent de fora do setor não lê a conversa (nem as mensagens
  *      dela); membro lê; dono direto lê mesmo fora do setor; setor `scope='all'`
- *      lê tudo; manager lê tudo; conversa SEM setor segue `visibility_mode`;
- *      setor INATIVO cai na regra antiga.
+ *      lê tudo; manager SEM setor lê tudo; manager COM setor lê o(s) dele e as
+ *      sem setor. Desde a 0287 o setor é a regra principal: conversa SEM setor
+ *      (ou de setor INATIVO) some para o agent que pertence a algum setor e só
+ *      segue `visibility_mode` para o agent sem setor nenhum.
  *   3. Escrita: a RPC de atribuição recusa quem não vê a conversa — a RLS
  *      esconde a linha da lista, mas a RPC recebe o id; o roteamento não entrega
  *      conversa de setor a quem não é membro.
@@ -39,6 +41,10 @@ const ORG_B = "eeeeeeee-0000-4000-8000-000000000001";
 const AGENT_B2 = "eeeeeeee-1111-4000-8000-000000000001";
 /** Agent da GOV_ORG, membro do setor de supervisão (scope=all). */
 const AGENT_C = "eeeeeeee-1111-4000-8000-000000000002";
+/** Agent da GOV_ORG sem setor nenhum — segue o `visibility_mode`. */
+const AGENT_SEM_SETOR = "eeeeeeee-1111-4000-8000-000000000003";
+/** Manager da GOV_ORG membro do COM (0287: fica restrito ao setor dele). */
+const MANAGER_COM = "eeeeeeee-1111-4000-8000-000000000004";
 const SESSION_B = "eeeeeeee-2222-4000-8000-000000000001";
 const FIN = "eeeeeeee-3333-4000-8000-000000000001";
 const COM = "eeeeeeee-3333-4000-8000-000000000002";
@@ -111,14 +117,18 @@ beforeAll(() => {
   sql(`
     insert into auth.users (id, email) values
       ('${AGENT_B2}', 'set-agent-b2@invariant.test'),
-      ('${AGENT_C}',  'set-agent-c@invariant.test')
+      ('${AGENT_C}',  'set-agent-c@invariant.test'),
+      ('${AGENT_SEM_SETOR}', 'set-agent-sem-setor@invariant.test'),
+      ('${MANAGER_COM}', 'set-manager-com@invariant.test')
       on conflict do nothing;
     insert into public.organizations (id, slug, legal_name, display_name)
       values ('${ORG_B}', 'set-inv-b', 'Setores Invariant Org B', 'Set Inv B')
       on conflict do nothing;
     insert into public.user_organizations (user_id, organization_id, role, accepted_at) values
       ('${AGENT_B2}', '${ORG_B}',   'agent', now()),
-      ('${AGENT_C}',  '${GOV_ORG}', 'agent', now())
+      ('${AGENT_C}',  '${GOV_ORG}', 'agent', now()),
+      ('${AGENT_SEM_SETOR}', '${GOV_ORG}', 'agent', now()),
+      ('${MANAGER_COM}', '${GOV_ORG}', 'manager', now())
       on conflict do nothing;
     do $set$ begin
       insert into public.channel_sessions (id, organization_id, waha_session_name, webhook_secret_encrypted)
@@ -136,6 +146,7 @@ beforeAll(() => {
       ('${GOV_ORG}', '${FIN}',   '${GOV_AGENT_A}'),
       ('${GOV_ORG}', '${COM}',   '${GOV_AGENT_B}'),
       ('${GOV_ORG}', '${SUP}',   '${AGENT_C}'),
+      ('${GOV_ORG}', '${COM}',   '${MANAGER_COM}'),
       ('${ORG_B}',   '${FIN_B}', '${AGENT_B2}')
       on conflict do nothing;
 
@@ -162,6 +173,14 @@ beforeAll(() => {
         from public.conversations where id in ('${CONV_FIN}', '${CONV_COM}')
           and not exists (select 1 from public.messages m where m.conversation_id = conversations.id);
   `);
+});
+
+// Desde a 0287 pertencer a um setor ESCONDE do agent a conversa sem setor.
+// GOV_AGENT_A/B são do seed compartilhado (`seedGov`) e outros arquivos de
+// invariantes medem a visibilidade deles sem setor — por isso a filiação sai no
+// fim, e a suíte não depende da ordem dos arquivos.
+afterAll(() => {
+  sql(`delete from public.sector_members where organization_id = '${GOV_ORG}';`);
 });
 
 describe("tenant: setor e membro não vazam entre organizações", () => {
@@ -208,29 +227,47 @@ describe("visibilidade por setor (papel agent)", () => {
     expect(ve(GOV_MANAGER, CONV_COM)).toBe(1);
   });
 
-  it("conversa sem setor segue visibility_mode (own_and_unassigned: fila visível a todo agent)", () => {
-    expect(ve(GOV_AGENT_A, CONV_NONE)).toBe(1);
-    expect(ve(GOV_AGENT_B, CONV_NONE)).toBe(1);
+  it("0287 — conversa sem setor some para o agent que tem setor; o agent sem setor segue visibility_mode", () => {
+    // Antes da 0287 os dois primeiros eram 1: a fila sem setor aparecia para todo
+    // agent, inclusive o do Financeiro — o defeito relatado pelo dono em 14/10.
+    expect(ve(GOV_AGENT_A, CONV_NONE)).toBe(0);
+    expect(ve(GOV_AGENT_B, CONV_NONE)).toBe(0);
+    // Controle positivo: o agent sem setor nenhum vê (own_and_unassigned).
+    expect(ve(AGENT_SEM_SETOR, CONV_NONE)).toBe(1);
+    expect(ve(AGENT_SEM_SETOR, CONV_FIN)).toBe(0);
   });
 
-  it("visibility_mode NÃO abre conversa de setor: com 'all' o agent de fora continua sem ver", () => {
+  it("0287 — manager com setor vê o dele e as sem setor, não o de outro setor", () => {
+    expect(ve(MANAGER_COM, CONV_COM)).toBe(1);
+    expect(ve(MANAGER_COM, CONV_NONE)).toBe(1);
+    expect(ve(MANAGER_COM, CONV_FIN)).toBe(0);
+    // Controle: o manager sem setor continua vendo o FIN.
+    expect(ve(GOV_MANAGER, CONV_FIN)).toBe(1);
+  });
+
+  it("visibility_mode NÃO abre conversa de setor nem a sem setor para quem tem setor", () => {
     sql(`update public.organizations set settings = coalesce(settings, '{}'::jsonb) || '{"visibility_mode":"all"}'::jsonb where id = '${GOV_ORG}';`);
     try {
-      expect(ve(GOV_AGENT_B, CONV_NONE)).toBe(1);
+      expect(ve(GOV_AGENT_B, CONV_NONE)).toBe(0);
       expect(ve(GOV_AGENT_B, CONV_FIN)).toBe(0);
+      // Sem setor e com 'all': vê a sem setor, mas não a de setor alheio.
+      expect(ve(AGENT_SEM_SETOR, CONV_NONE)).toBe(1);
+      expect(ve(AGENT_SEM_SETOR, CONV_FIN)).toBe(0);
     } finally {
       sql(`update public.organizations set settings = settings - 'visibility_mode' where id = '${GOV_ORG}';`);
     }
   });
 
-  it("setor inativo cai na regra antiga", () => {
+  it("setor inativo vira 'sem setor': some para quem tem setor, aparece para quem não tem", () => {
     sql(`update public.sectors set is_active = false where id = '${FIN}';`);
     try {
-      expect(ve(GOV_AGENT_B, CONV_FIN)).toBe(1);
+      expect(ve(GOV_AGENT_B, CONV_FIN)).toBe(0);
+      expect(ve(AGENT_SEM_SETOR, CONV_FIN)).toBe(1);
+      expect(ve(MANAGER_COM, CONV_FIN)).toBe(1);
     } finally {
       sql(`update public.sectors set is_active = true where id = '${FIN}';`);
     }
-    expect(ve(GOV_AGENT_B, CONV_FIN)).toBe(0);
+    expect(ve(AGENT_SEM_SETOR, CONV_FIN)).toBe(0);
   });
 
   it("a org B não vê nada da org A e vice-versa", () => {

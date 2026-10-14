@@ -22,18 +22,21 @@ import type { Role, VisibilityMode } from "@/lib/auth/types";
 export type InboxTab = "unassigned" | "mine" | "all" | "closed" | "archived" | "ai";
 
 /**
- * As abas VISÍVEIS, na ordem pedida pelo dono (28/09): Minhas | Fila | Robô | Todas.
- * "Todas" inclui fechadas e arquivadas (é `{}` em tabToFilter: nenhum filtro de
- * status). `closed` e `archived` continuam no tipo e em FILTER_TABS para o
- * deep-link `?filter=` seguir valendo — só deixaram de ser abas.
+ * As abas VISÍVEIS: Fila | Minhas | Robô | Todas | Fechadas (ordem do dono, 14/10).
+ *
+ * Até 14/10 "Todas" incluía fechadas e arquivadas (decisão de 28/09). O dono
+ * pediu de volta a separação: "Todas" é o atendimento vivo e "Fechadas" guarda
+ * o que saiu dele (fechadas E arquivadas — ver `tabToFilter`). `archived`
+ * continua no tipo e em FILTER_TABS para o deep-link `?filter=` seguir valendo.
  */
 const INBOX_TABS: { value: InboxTab; label: string }[] = [
-  { value: "mine", label: "Minhas" },
   { value: "unassigned", label: "Fila" },
+  { value: "mine", label: "Minhas" },
   // "Robô" é o rótulo da aba; o ESTADO segue se chamando "automático" em todo o
   // resto do produto (botão "Devolver ao automático", `comando_da_conversa`).
   { value: "ai", label: "Robô" },
   { value: "all", label: "Todas" },
+  { value: "closed", label: "Fechadas" },
 ];
 
 /**
@@ -41,11 +44,9 @@ const INBOX_TABS: { value: InboxTab; label: string }[] = [
  * (G4-01) é quem garante o escopo, então "Todas" para um `agent` em modo own* é
  * "tudo o que ele vê" — as dele, a fila, as do setor dele e as que ele encerrou.
  *
- * Até 28/09 a G4-02 ocultava "Todas" do `agent` fora do modo `all`, e isso era
- * cosmético enquanto existiam as abas Fechadas e Arquivadas. Quando as duas
- * viraram parte de "Todas" (a ordem pedida pelo dono: Minhas | Fila | Robô |
- * Todas), esconder "Todas" deixava o atendente sem NENHUM caminho pela tela para
- * uma conversa que ele mesmo encerrou — "Minhas" exclui fechadas de propósito.
+ * Até 28/09 a G4-02 ocultava "Todas" do `agent` fora do modo `all`. Não volta:
+ * a aba Fechadas é a porta do atendente para a conversa que ele mesmo encerrou
+ * ("Minhas" exclui fechadas de propósito), e ela tem de existir para todo papel.
  * Os parâmetros ficam para a assinatura não mudar em quem chama.
  */
 export function visibleInboxTabs(_role: Role, _mode: VisibilityMode | undefined): InboxTab[] {

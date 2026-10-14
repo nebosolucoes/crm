@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils";
 import { gravarFichaRecolhida, useFichaRecolhida } from "@/lib/inbox/ficha-recolhida";
 import { comandosDaFila } from "@/lib/inbox/comando-da-conversa";
 import { buscaValeConsulta } from "@/lib/inbox/termo-de-busca";
+import { CONVERSATION_TERMINAL_STATUSES } from "@/lib/schemas/messaging";
 import { useAutomaticoAtivo } from "@/hooks/ai/useAutomaticoAtivo";
 
 /**
@@ -93,7 +94,11 @@ export function tabToFilter(
       // é histórico). O lugar de "minhas fechadas" é a aba Fechadas.
       return { assigned_to: "me", exclude_finished: true };
     case "closed":
-      return { status: "closed" };
+      // A aba FECHADAS é o lugar de tudo que saiu do atendimento: fechadas e
+      // arquivadas. Desde 14/10 (pedido do dono) "Todas" deixou de listá-las —
+      // então, se Fechadas pedisse só `closed`, a arquivada ficaria sem porta na
+      // tela. A aba Arquivadas segue existindo pelo deep-link `?filter=archived`.
+      return { status: [...CONVERSATION_TERMINAL_STATUSES] };
     case "archived":
       // O ARQUIVO É UM ESTADO SÓ ELE, não `in(terminais)`.
       //
@@ -110,7 +115,10 @@ export function tabToFilter(
       return { comando: ["automatico"] };
     case "all":
     default:
-      return {};
+      // "Todas" = todo o atendimento VIVO que o usuário vê. Fechadas e
+      // arquivadas moram na aba Fechadas (pedido do dono, 14/10): misturadas
+      // aqui, a lista crescia sem fim e o que estava em andamento se perdia.
+      return { exclude_finished: true };
   }
 }
 

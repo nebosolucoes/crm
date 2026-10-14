@@ -81,14 +81,15 @@ describe("aba Arquivadas — filtro da lista", () => {
 });
 
 describe("aba Arquivadas — rótulo e badge", () => {
-  it("desde 28/09 não é mais uma aba: vive dentro de Todas, e o deep-link ?filter=archived segue valendo", () => {
-    // Pedido do dono: Minhas | Fila | Robô | Todas, com fechadas e arquivadas
-    // dentro de Todas. `archived` fica no TIPO e em FILTER_TABS (deep-link), mas
-    // não é mais uma aba visível — e Todas não pode filtrar status nenhum.
+  it("não é aba própria: vive dentro de Fechadas, e o deep-link ?filter=archived segue valendo", () => {
+    // 14/10 (pedido do dono): Fila | Minhas | Robô | Todas | Fechadas. Todas é o
+    // atendimento vivo; fechadas e arquivadas moram em Fechadas. `archived` fica
+    // no TIPO e em FILTER_TABS (deep-link), mas não é uma aba visível.
     const filtros = fonte("components/inbox/InboxFilters.tsx");
     expect(filtros).not.toContain('{ value: "archived", label: "Arquivadas" }');
-    expect(filtros).toContain('"archived"');
-    expect(tabToFilter("all")).toEqual({});
+    expect(filtros).toContain('{ value: "closed", label: "Fechadas" }');
+    expect(tabToFilter("all")).toEqual({ exclude_finished: true });
+    expect(tabToFilter("closed").status).toContain("archived");
   });
 
   it("o badge lê a contagem archived (não a de fechadas)", () => {
@@ -98,10 +99,10 @@ describe("aba Arquivadas — rótulo e badge", () => {
 });
 
 describe("contagem de arquivadas", () => {
-  it("a rota counts filtra archived separadamente de closed", () => {
+  it("a rota counts conta archived sozinha, e Fechadas com as duas terminais", () => {
     const rota = fonte("app/api/v1/conversations/counts/route.ts");
     expect(rota).toMatch(/\.eq\("status",\s*"archived"\)/);
-    expect(rota).toMatch(/\.eq\("status",\s*"closed"\)/);
+    expect(rota).toMatch(/\.in\("status",\s*\[\.\.\.CONVERSATION_TERMINAL_STATUSES\]\)/);
   });
 
   it("devolve a chave archived no corpo", () => {

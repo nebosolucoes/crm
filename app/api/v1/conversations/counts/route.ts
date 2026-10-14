@@ -113,7 +113,7 @@ export async function GET(req: NextRequest): Promise<Response> {
   };
 
   // Espelha tabToFilter (InboxLayout): unassigned = fila aberta sem dono;
-  // mine = atribuídas a mim e ainda ABERTAS; all = tudo que o usuário VÊ.
+  // mine = atribuídas a mim e ainda ABERTAS; all = tudo de VIVO que o usuário vê.
   //
   // O `not in (terminais)` do `mine` espelha o `exclude_finished` da aba, e o
   // espelhamento é o ponto: um badge que conta o que a aba não mostra é pior
@@ -141,7 +141,8 @@ export async function GET(req: NextRequest): Promise<Response> {
     countExact()
       .eq("assigned_to_user_id", user.id)
       .not("status", "in", `(${CONVERSATION_TERMINAL_STATUSES.join(",")})`),
-    countExact(),
+    // "Todas" = atendimento vivo (14/10): espelha o `exclude_finished` da aba.
+    countExact().not("status", "in", `(${CONVERSATION_TERMINAL_STATUSES.join(",")})`),
     // A aba "Fechadas" existia SEM número nenhum. Num inbox antigo, é o número
     // que diz o tamanho do arquivo — e a sua ausência fazia a aba parecer um
     // lugar vazio. Mesma fábrica: herda organização e filtros.
@@ -153,7 +154,10 @@ export async function GET(req: NextRequest): Promise<Response> {
     // `status='closed'` — o badge dizia 120 e a lista mostrava 40. Era a mesma
     // classe de defeito que este arquivo já conserta desde a Fila, encontrada
     // aqui no caminho (#923).
-    countExact().eq("status", "closed"),
+    //
+    // 14/10: a aba passou a listar fechadas E arquivadas (Todas deixou de
+    // listá-las, e a arquivada precisa de uma porta). O badge conta a mesma lista.
+    countExact().in("status", [...CONVERSATION_TERMINAL_STATUSES]),
     // A aba "Arquivadas" (#923): a pasta do histórico, separada de "Fechadas"
     // para que arquivar seja reversível e auditável sem se confundir com o
     // encerramento do atendimento.

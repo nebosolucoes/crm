@@ -146,7 +146,7 @@ test("trocar de aba logo após digitar NÃO volta à aba anterior", async ({ pag
   ).toHaveAttribute("aria-selected", "true");
 });
 
-test('a aba "Todas" inclui a conversa fechada e mostra número', async ({ page }) => {
+test('a conversa fechada sai de "Todas" e aparece em "Fechadas", com número', async ({ page }) => {
   // Ela existia sem contador nenhum. Num inbox antigo é o número que diz o
   // tamanho do arquivo, e a ausência fazia a aba parecer um lugar vazio.
   //
@@ -158,8 +158,10 @@ test('a aba "Todas" inclui a conversa fechada e mostra número', async ({ page }
   // E ele CRIA a sua em vez de fechar uma existente. Este Supabase é
   // compartilhado entre frentes; fechar conversa alheia muda o mundo de outra
   // spec, e o estrago apareceria longe daqui.
+  // Nome único: rodadas anteriores deixam outros "Arquivo do teste" fechados.
+  const nome = `Arquivo do teste ${Date.now()}`;
   const aberta = await page.request.post("/api/v1/conversations/open-with-contact", {
-    data: { phone_number: `+5511${Date.now().toString().slice(-9)}`, name: "Arquivo do teste" },
+    data: { phone_number: `+5511${Date.now().toString().slice(-9)}`, name: nome },
   });
   expect(aberta.ok(), await aberta.text()).toBe(true);
   // `open-with-contact` devolve `{ conversation_id, contact_id }` — NAO um `id`.
@@ -173,9 +175,11 @@ test('a aba "Todas" inclui a conversa fechada e mostra número', async ({ page }
   expect(fechada.ok(), await fechada.text()).toBe(true);
 
   await page.reload();
-  // Desde 28/09 fechadas e arquivadas vivem dentro de "Todas" (Minhas | Fila | Robô | Todas).
-  await expect(page.getByRole("tab", { name: /Fechadas/i })).toHaveCount(0);
-  await expect(page.getByRole("tab", { name: /Todas/i })).toHaveText(/\d/);
+  // Desde 14/10 (pedido do dono): Fila | Minhas | Robô | Todas | Fechadas.
+  // "Todas" é o atendimento vivo; fechadas e arquivadas moram em "Fechadas".
   await page.getByRole("tab", { name: /Todas/i }).click();
-  await expect(page.getByText("Arquivo do teste").first()).toBeVisible();
+  await expect(page.getByText(nome)).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: /Fechadas/i })).toHaveText(/\d/);
+  await page.getByRole("tab", { name: /Fechadas/i }).click();
+  await expect(page.getByText(nome).first()).toBeVisible();
 });

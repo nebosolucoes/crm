@@ -11,6 +11,28 @@ interface CloseArgs {
   motivo?: "sem_resposta_necessaria" | "spam" | "ocultado";
 }
 
+/**
+ * FECHAR RESPONDE NA HORA — a conversa sai da lista no clique, não no fim da ida
+ * e volta.
+ *
+ * Antes o clique só desabilitava o botão: a lista esperava o POST (sessão,
+ * papel, recurso, RPC) e DEPOIS o refetch de todas as listas abertas, e só
+ * então a conversa saía. Com o banco em outro continente, isso eram segundos
+ * de tela parada — o "está muito demorado para fechar" relatado em 14/10.
+ *
+ * Agora o cache é ajustado antes: a conversa some das listas que não mostram
+ * fechadas (todas, menos a aba Fechadas) e o cabeçalho já mostra "Fechada".
+ * Falhou (409, rede)? Restaura o retrato e relê — o servidor é quem vale.
+ */
+type ListaEmCache = { pages: { data: Conversation[] }[]; pageParams: unknown[] };
+
+function listaMostraFechadas(chave: readonly unknown[]): boolean {
+  const filtros = chave[1] as { status?: string | readonly string[] } | undefined;
+  const status = filtros?.status;
+  if (!status) return false;
+  return (typeof status === "string" ? [status] : status).includes("closed");
+}
+
 export function useCloseConversation() {
   const qc = useQueryClient();
 
@@ -20,14 +42,38 @@ export function useCloseConversation() {
         `/api/v1/conversations/${args.conversation_id}/close`,
         { expected_revision: args.expected_revision, ...(args.motivo ? { motivo: args.motivo } : {}) },
       ),
-    onError: (err, args) => {
-      qc.invalidateQueries({ queryKey: ["conversations"] });
-      qc.invalidateQueries({ queryKey: ["conversation", args.conversation_id] });
+    onMutate: async (args) => {
+      await qc.cancelQueries({ queryKey: ["conversations"] });
+      await qc.cancelQueries({ queryKey: ["conversation", args.conversation_id] });
+      const listas = qc.getQueriesData<ListaEmCache>({ queryKey: ["conversations"] });
+      const detalhe = qc.getQueryData<Conversation>(["conversation", args.conversation_id]);
+      for (const [chave, dados] of listas) {
+        if (!dados?.pages) continue;
+        const mostra = listaMostraFechadas(chave);
+        qc.setQueryData<ListaEmCache>(chave, {
+          ...dados,
+          pages: dados.pages.map((p) => ({
+            ...p,
+            data: mostra
+              ? p.data.map((c) => (c.id === args.conversation_id ? { ...c, status: "closed" } : c))
+              : p.data.filter((c) => c.id !== args.conversation_id),
+          })),
+        });
+      }
+      if (detalhe) {
+        qc.setQueryData<Conversation>(["conversation", args.conversation_id], { ...detalhe, status: "closed" });
+      }
+      return { listas, detalhe };
+    },
+    onError: (err, args, ctx) => {
+      for (const [chave, dados] of ctx?.listas ?? []) qc.setQueryData(chave, dados);
+      if (ctx?.detalhe) qc.setQueryData(["conversation", args.conversation_id], ctx.detalhe);
       showApiError(err);
     },
-    onSuccess: (_data, args) => {
+    onSettled: (_data, _err, args) => {
       qc.invalidateQueries({ queryKey: ["conversations"] });
       qc.invalidateQueries({ queryKey: ["conversation", args.conversation_id] });
+      qc.invalidateQueries({ queryKey: ["conversation-counts"] });
     },
   });
 }
