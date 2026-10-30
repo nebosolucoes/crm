@@ -374,6 +374,11 @@ export const AUDIT_ACTIONS = [
   // verificação de URL que estava valendo até alguém colar o valor novo na Meta.
   "platform_meta_app.updated",
   "platform_meta_app.verify_token_rotated",
+  // O widget de suporte da INSTALAÇÃO (migration 0289): quem tem o segredo HMAC
+  // se identifica no widget como qualquer usuário. Sem `organization_id`.
+  "platform_support_widget.updated",
+  // O webhook de erro da INSTALAÇÃO (migration 0290): para onde vai cada erro da API.
+  "platform_error_webhook.updated",
   // A conexão da ORGANIZAÇÃO com a conta de anúncios (migration 0213).
   // Auditável porque o token gravado aqui escreve conversões na conta de
   // mídia do cliente: "quem apontou minhas vendas para este destino?" só tem

@@ -30098,6 +30098,172 @@ $$;
 revoke all on function public.fn_user_can_view_conversation(uuid, text, uuid, uuid, uuid, uuid) from public, anon, authenticated;
 grant execute on function public.fn_user_can_view_conversation(uuid, text, uuid, uuid, uuid, uuid) to service_role;
 
+-- ---- Registro de erros da API, procurável pelo X-Request-Id (migration 0288) ----
+--
+-- Toda resposta de erro da API devolve um `X-Request-Id`, e a tela o mostra
+-- ("ID: …") para o usuário mandar ao suporte. Até aqui esse número não era
+-- gravado em lugar nenhum: a auditoria só registra mutação BEM-SUCEDIDA, e o
+-- `fail()` sorteava o ID e o esquecia. Quem recebia o ID não tinha onde
+-- procurá-lo (medido em 30/10/2026 num ID real: zero linhas em todo o schema).
+--
+-- Agora cada `fail()` e cada exceção não tratada de request viram uma linha
+-- aqui, procurável pelo ID que a tela mostrou.
+--
+-- Sem `organization_id` de propósito: o erro acontece muitas vezes ANTES de a
+-- organização ser resolvida (sessão expirada, corpo inválido), e a tabela é de
+-- diagnóstico da instalação, não dado do tenant. Nenhum papel do PostgREST lê
+-- ou escreve; só o service role (o servidor) grava e o operador consulta.
+--
+-- Retenção: 30 dias, podada em lotes pelo cron `data-retention`.
+
+create table if not exists public.api_error_log (
+  id          uuid primary key default gen_random_uuid(),
+  request_id  text not null,
+  method      text,
+  path        text,
+  status      int  not null,
+  code        text not null,
+  message     text not null,
+  details     jsonb,
+  user_id     uuid references auth.users(id) on delete set null,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists idx_api_error_log_request_id on public.api_error_log (request_id);
+create index if not exists idx_api_error_log_created_at on public.api_error_log (created_at);
+
+alter table public.api_error_log enable row level security;
+
+-- O default ACL do Supabase concede tudo aos três papéis em toda tabela nova
+-- de `public` (ver CLAUDE.md, migration 0258): o revoke é explícito.
+revoke all on table public.api_error_log from anon, authenticated;
+
+comment on table public.api_error_log is
+  'Erros devolvidos pela API (fail()) e exceções não tratadas de request, procuráveis pelo X-Request-Id mostrado na tela. Só service role. Retenção de 30 dias (cron data-retention, fn_expurgar_erros_da_api).';
+
+-- A quinta poda do `data-retention`. Assinatura idêntica às irmãs.
+create or replace function public.fn_expurgar_erros_da_api(p_retencao_dias int, p_limite int default 1000)
+returns int
+language plpgsql
+security definer
+set search_path to 'public', 'pg_temp'
+as $$
+declare
+  v_removidas int;
+begin
+  -- Piso no CORPO: um chamador que passe 0 não apaga o erro de agora há pouco.
+  if p_retencao_dias is null or p_retencao_dias < 7 then
+    p_retencao_dias := 7;
+  end if;
+
+  with alvo as (
+    select id
+      from public.api_error_log
+     where created_at < now() - make_interval(days => p_retencao_dias)
+     limit greatest(p_limite, 1)
+  )
+  delete from public.api_error_log e
+   using alvo
+   where e.id = alvo.id;
+
+  get diagnostics v_removidas = row_count;
+  return v_removidas;
+end$$;
+
+revoke execute on function public.fn_expurgar_erros_da_api(int, int) from public, anon, authenticated;
+grant execute on function public.fn_expurgar_erros_da_api(int, int) to service_role;
+
+-- ---- Widget de suporte da instalação (migration 0289) ----
+--
+-- Um botão de suporte em todas as telas logadas: um `<script>` de uma central de
+-- chamados externa, com a chave pública do widget, e a identidade de quem está
+-- logado assinada por HMAC-SHA256 do id do usuário com o segredo do widget.
+--
+-- O objeto é a INSTALAÇÃO (o mesmo botão para todas as empresas desta VPS), então
+-- o desenho é o de `platform_meta_app` (0257): uma linha só, RLS ligada SEM
+-- policies, `anon`/`authenticated` revogados, leitura e escrita pelo
+-- `service_role` atrás de `requirePlatformAdmin()`. O segredo é cifrado por
+-- `fn_encrypt_oauth` e nunca vai ao navegador: o servidor calcula o HMAC e só o
+-- hash atravessa a fronteira.
+--
+-- Desligado por padrão: sem `enabled` e sem os três campos, nenhuma tela carrega
+-- script de terceiro.
+
+create table if not exists public.platform_support_widget (
+  id smallint primary key default 1,
+  enabled boolean not null default false,
+  script_url text,
+  public_key text,
+  hmac_secret_encrypted bytea,
+  updated_at timestamptz not null default now(),
+  updated_by uuid,
+  constraint platform_support_widget_singleton check (id = 1),
+  constraint platform_support_widget_script_https
+    check (script_url is null or script_url ~ '^https://'),
+  constraint platform_support_widget_public_key_tamanho
+    check (public_key is null or length(public_key) between 4 and 200)
+);
+
+comment on table public.platform_support_widget is
+  'Widget de suporte DESTA INSTALAÇÃO (singleton): URL do script, chave pública e segredo HMAC que assina a identidade do usuário logado. Server-side only: RLS ligada sem policies e grants revogados de anon/authenticated. O segredo nunca volta ao browser; só o HMAC calculado no servidor.';
+comment on column public.platform_support_widget.hmac_secret_encrypted is
+  'Cifrado por fn_encrypt_oauth. Quem tem este valor se identifica no widget como qualquer usuário e lê os chamados dele.';
+
+alter table public.platform_support_widget enable row level security;
+
+revoke all on public.platform_support_widget from anon, authenticated;
+grant select, insert, update on public.platform_support_widget to service_role;
+
+drop trigger if exists trg_platform_support_widget_updated_at on public.platform_support_widget;
+create trigger trg_platform_support_widget_updated_at
+  before update on public.platform_support_widget
+  for each row execute function public.fn_set_updated_at();
+
+-- ---- Webhook de erro da instalação (migration 0290) ----
+--
+-- Todo erro gravado em `api_error_log` (migration 0288) pode também ser
+-- enviado, na hora, a um endereço externo — tipicamente o webhook de uma
+-- central de chamados, que abre um card por erro. O `request_id` vai como
+-- identificador externo: reenviar o mesmo erro não duplica o card.
+--
+-- Molde de `platform_meta_app` (0257) e `platform_support_widget` (0289): uma
+-- linha só, RLS ligada SEM policies, `anon`/`authenticated` revogados, escrita
+-- pelo `service_role` atrás de `requirePlatformAdmin()`. O segredo que assina
+-- o corpo (HMAC-SHA256) é cifrado por `fn_encrypt_oauth`.
+--
+-- `scope`: `all` manda todo erro (4xx inclusive); `server` só os 5xx e as
+-- exceções não tratadas. Desligado por padrão.
+
+create table if not exists public.platform_error_webhook (
+  id smallint primary key default 1,
+  enabled boolean not null default false,
+  url text,
+  secret_encrypted bytea,
+  scope text not null default 'all',
+  updated_at timestamptz not null default now(),
+  updated_by uuid,
+  constraint platform_error_webhook_singleton check (id = 1),
+  constraint platform_error_webhook_url_http
+    check (url is null or url ~ '^https?://'),
+  constraint platform_error_webhook_scope
+    check (scope in ('all', 'server'))
+);
+
+comment on table public.platform_error_webhook is
+  'Webhook de erro DESTA INSTALAÇÃO (singleton): cada erro de api_error_log é enviado a este endereço (um card por erro na central de chamados), com o request_id como id externo. Server-side only: RLS ligada sem policies e grants revogados de anon/authenticated.';
+comment on column public.platform_error_webhook.secret_encrypted is
+  'Cifrado por fn_encrypt_oauth. Assina o corpo enviado (X-Nebo-Assinatura: sha256=<HMAC-SHA256>). Nunca volta ao browser.';
+
+alter table public.platform_error_webhook enable row level security;
+
+revoke all on public.platform_error_webhook from anon, authenticated;
+grant select, insert, update on public.platform_error_webhook to service_role;
+
+drop trigger if exists trg_platform_error_webhook_updated_at on public.platform_error_webhook;
+create trigger trg_platform_error_webhook_updated_at
+  before update on public.platform_error_webhook
+  for each row execute function public.fn_set_updated_at();
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria

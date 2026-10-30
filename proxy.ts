@@ -11,16 +11,26 @@ import {
 const COOKIE_NAME = "sb-deskcomm-auth";
 
 export async function proxy(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+  // Carimbados ANTES do `NextResponse.next()`: ele copia os cabeçalhos do request
+  // na construção, e um `set` depois não chega à rota. Sempre sobrescritos — o
+  // valor do cliente nunca passa. O registro de erros (`lib/api/registro-de-erro.ts`)
+  // lê método e caminho daqui; o layout de onboarding lê o caminho.
+  request.headers.set("x-pathname", pathname);
+  request.headers.set("x-method", request.method);
+  // O ID da requisição também vai para a ROTA, não só para a resposta: este
+  // cabeçalho vence o que a rota pusesse na resposta, então é ele que a tela
+  // mostra — e o registro de erros (migration 0288) precisa gravar o mesmo.
+  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  request.headers.set("x-request-id", requestId);
+
   const response = NextResponse.next({ request: { headers: request.headers } });
 
   // Inject X-Request-Id for downstream correlation (audit log, error wrappers).
-  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   response.headers.set("x-request-id", requestId);
 
-  const { pathname, search } = request.nextUrl;
   // Expose pathname to Server Components via header (used by onboarding layout).
   response.headers.set("x-pathname", pathname);
-  request.headers.set("x-pathname", pathname);
 
   // EPIC-11: the admin surface is reached by PATH (`/admin/*`) — the self-host kit
   // points `NEXT_PUBLIC_ADMIN_URL` at the same host as the app and maps no `admin.`

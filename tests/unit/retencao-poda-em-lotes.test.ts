@@ -203,6 +203,8 @@ describe("houveEfeito — as duas direções", () => {
     espelho_apagado: 0,
     // Quarta poda (migration 0190): os nonces de OAuth do Google já queimados.
     nonces_apagados: 0,
+    // Quinta (migration 0288): o registro de erros da API.
+    erros_da_api_apagados: 0,
     lotes_espelho: 0,
     espelho_tem_resto: false,
     retencao_fila_dias: RETENCAO_FILA_DIAS_PADRAO,
@@ -228,6 +230,10 @@ describe("houveEfeito — as duas direções", () => {
     // deixar rastro em vez de encolher a trilha em silêncio.
     expect(houveEfeito({ ...base, jobs_apagados: 1 })).toBe(true);
     expect(houveEfeito({ ...base, auditoria_apagada: 1 })).toBe(true);
+  });
+
+  it("apagou erro da API vencido → audita (migration 0288)", () => {
+    expect(houveEfeito({ ...base, erros_da_api_apagados: 1 })).toBe(true);
   });
 
   it("...e apagou espelho da agenda → TAMBÉM audita (migration 0187)", () => {

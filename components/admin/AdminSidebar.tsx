@@ -17,6 +17,8 @@ import {
   WebhooksLogo,
   ArrowRight,
   Receipt,
+  Lifebuoy,
+  Bug,
 } from "@/lib/ui/icons";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
@@ -64,6 +66,12 @@ const NAV_ITEMS: NavItem[] = [
   // A porta da tela que decide em que moeda (e com que margem) o custo de IA
   // é mostrado a toda organização desta instalação — mesma razão das de cima.
   { href: "/admin/custo-de-ia", label: "Custo de IA", icon: Receipt },
+  // A porta do botão de suporte que aparece em todas as telas logadas (migration
+  // 0289) — configuração da INSTALAÇÃO, mesma razão das de cima.
+  { href: "/admin/suporte", label: "Widget de suporte", icon: Lifebuoy },
+  // A porta do webhook que manda cada erro da API para a central de chamados
+  // (migration 0290) — configuração da INSTALAÇÃO, mesma razão das de cima.
+  { href: "/admin/webhook-de-erro", label: "Webhook de erro", icon: Bug },
 ];
 
 interface AdminSidebarProps {

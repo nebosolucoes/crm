@@ -10,4 +10,12 @@ export async function register() {
   }
 }
 
-export const onRequestError = Sentry.captureRequestError;
+export const onRequestError: typeof Sentry.captureRequestError = async (err, request, context) => {
+  Sentry.captureRequestError(err, request, context);
+  // Também no banco (`api_error_log`), pelo digest que a tela mostra. Import
+  // tardio: este arquivo roda no edge também, e o registro usa o admin client.
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    const { registrarExcecaoDeRequest } = await import("@/lib/api/registro-de-erro");
+    await registrarExcecaoDeRequest(err, request);
+  }
+};

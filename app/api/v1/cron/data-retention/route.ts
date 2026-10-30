@@ -60,6 +60,7 @@ import {
   RETENCAO_AUDITORIA_DIAS_PISO,
   RETENCAO_ESPELHO_AGENDA_DIAS_PADRAO,
   RETENCAO_ESPELHO_AGENDA_DIAS_PISO,
+  RETENCAO_ERROS_DA_API_DIAS,
   RETENCAO_FILA_DIAS_PADRAO,
   RETENCAO_FILA_DIAS_PISO,
   interpretarRetencao,
@@ -98,6 +99,8 @@ export interface ResultadoDaRetencao {
   auditoria_tem_resto: boolean;
   /** Os nonces de OAuth do Google já queimados (migration 0190). */
   nonces_apagados: number;
+  /** O registro de erros da API (migration 0288), 30 dias. */
+  erros_da_api_apagados: number;
   /** O espelho da agenda conectada — cache com prazo (migration 0187). */
   espelho_apagado: number;
   lotes_espelho: number;
@@ -112,14 +115,14 @@ export interface ResultadoDaRetencao {
 /** Só a superfície que este cron usa — o teste injeta uma implementação. */
 export interface PodaDb {
   rpc(
-    nome: "fn_podar_fila_de_jobs" | "fn_expurgar_auditoria_vencida" | "fn_expurgar_espelho_da_agenda" | "fn_expurgar_nonces_de_oauth",
+    nome: "fn_podar_fila_de_jobs" | "fn_expurgar_auditoria_vencida" | "fn_expurgar_espelho_da_agenda" | "fn_expurgar_nonces_de_oauth" | "fn_expurgar_erros_da_api",
     args: { p_retencao_dias: number; p_limite: number },
   ): Promise<{ data: number | null; error: { message: string } | null }>;
 }
 
 async function drenar(
   db: PodaDb,
-  nome: "fn_podar_fila_de_jobs" | "fn_expurgar_auditoria_vencida" | "fn_expurgar_espelho_da_agenda" | "fn_expurgar_nonces_de_oauth",
+  nome: "fn_podar_fila_de_jobs" | "fn_expurgar_auditoria_vencida" | "fn_expurgar_espelho_da_agenda" | "fn_expurgar_nonces_de_oauth" | "fn_expurgar_erros_da_api",
   dias: number,
 ): Promise<{ apagadas: number; lotes: number; temResto: boolean }> {
   let apagadas = 0;
@@ -178,12 +181,15 @@ export async function podarHistorico(
   // cresceria para sempre, uma linha por conexão tentada, num produto que se
   // instala e ninguém monitora.
   const nonces = await drenar(db, "fn_expurgar_nonces_de_oauth", 1);
+  // Quinta: o registro de erros da API — depuração com prazo, não rastro.
+  const erros = await drenar(db, "fn_expurgar_erros_da_api", RETENCAO_ERROS_DA_API_DIAS);
 
   return {
     jobs_apagados: jobs.apagadas,
     auditoria_apagada: linhas.apagadas,
     espelho_apagado: eventos.apagadas,
     nonces_apagados: nonces.apagadas,
+    erros_da_api_apagados: erros.apagadas,
     lotes_fila: jobs.lotes,
     lotes_auditoria: linhas.lotes,
     lotes_espelho: eventos.lotes,
@@ -215,7 +221,8 @@ export function houveEfeito(resultado: ResultadoDaRetencao): boolean {
     // A quarta, pela MESMA razão, e ela quase entrou sem: acrescentei a poda de
     // nonces ao laço e ao retorno e esqueci desta linha. O comentário acima
     // descrevia exatamente o defeito que eu estava criando um parágrafo abaixo.
-    resultado.nonces_apagados > 0
+    resultado.nonces_apagados > 0 ||
+    resultado.erros_da_api_apagados > 0
   );
 }
 

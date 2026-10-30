@@ -70,6 +70,13 @@ export const RETENCAO_ESPELHO_AGENDA_DIAS_PADRAO = 90;
  */
 export const RETENCAO_ESPELHO_AGENDA_DIAS_PISO = 7;
 
+/**
+ * 30 dias para o registro de erros da API (`api_error_log`, migration 0288).
+ * É depuração, não rastro: o ID serve enquanto alguém ainda pergunta por ele.
+ * O piso de 7 dias mora no corpo de `fn_expurgar_erros_da_api`.
+ */
+export const RETENCAO_ERROS_DA_API_DIAS = 30;
+
 export const RETENCAO_CAPTACAO_DIAS_PADRAO = 365;
 /**
  * Piso da captação: o knob nunca vira apagador de ORIGEM.

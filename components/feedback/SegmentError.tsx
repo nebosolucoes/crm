@@ -25,7 +25,8 @@ export function SegmentError({ error, reset, segment }: SegmentErrorProps) {
     setEventId(id);
   }, [error, segment]);
 
-  const displayId = eventId ?? error.digest ?? "—";
+  // O digest primeiro: é o ID que fica gravado em `api_error_log` (migration 0288).
+  const displayId = error.digest ?? eventId ?? "—";
 
   function copyId() {
     void copyToClipboard(displayId).then((ok) => {

@@ -20,6 +20,8 @@ import { exibicaoDoCusto } from "@/lib/ai/custo/exibicao-da-instalacao";
 import { listarConexoesCaidas, type ConexaoCaida } from "@/lib/channels/health";
 import { VoiceCallProvider } from "@/components/voice/VoiceCallContext";
 import { acessoFoiRevogado } from "@/lib/auth/vinculo-revogado";
+import { widgetDeSuporteParaTela } from "@/lib/suporte/widget";
+import { WidgetDeSuporte } from "@/components/app/WidgetDeSuporte";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await loadAuthUser();
@@ -143,6 +145,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // linha, sem coluna ou sem banco vale dólar, como sempre foi.
   const exibicaoCusto = await exibicaoDoCusto();
 
+  // Botão de suporte da instalação (Admin › Widget de suporte, migration 0289).
+  // Memoizado 30 s e nunca lança; desligado, é `null`. Fora do modo suporte:
+  // quem entra pela conta de um cliente não abre chamado em nome dele.
+  const widgetDeSuporte = user.support
+    ? null
+    : await widgetDeSuporteParaTela(user, activeOrg?.name ?? null);
+
   const shell = (
     <VoiceCallProvider>
       <AppShell sidebarCollapsed={collapsed}>{children}</AppShell>
@@ -160,6 +169,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <div className="contents">
         <ImpersonateBanner impersonating={impersonating} />
         <ConexaoCaidaBanner caidas={conexoesCaidas} />
+        {widgetDeSuporte ? <WidgetDeSuporte widget={widgetDeSuporte} /> : null}
         {needsMfaGate ? (
           // Gate always mounted for MFA-required roles; it latches the blocking
           // decision client-side so the enroll Server Action's revalidation

@@ -20,7 +20,8 @@ export default function GlobalError({
     setEventId(id);
   }, [error]);
 
-  const displayId = eventId ?? error.digest ?? "—";
+  // O digest primeiro: é o ID que fica gravado em `api_error_log` (migration 0288).
+  const displayId = error.digest ?? eventId ?? "—";
 
   return (
     <html lang="pt-BR">

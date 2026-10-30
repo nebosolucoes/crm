@@ -171,4 +171,8 @@ export {
   WhatsappLogo,
   FilmStrip,
   Circle,
+  // botão de suporte da instalação (/admin/suporte, migration 0289)
+  Lifebuoy,
+  // webhook de erro da instalação (/admin/webhook-de-erro, migration 0290)
+  Bug,
 } from "@phosphor-icons/react/dist/ssr";

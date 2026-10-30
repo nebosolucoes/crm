@@ -5,12 +5,14 @@
  * Garante:
  *  - Formato consistente { data, meta? } / { error: { code, message, details? } }
  *  - Header X-Request-Id correlacionando com audit log
+ *  - Todo `fail()` gravado em `api_error_log`, procurável por esse ID
  *  - Status codes corretos (200/201/204/400/401/403/404/409/422/429/500)
  */
 
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import type { ApiErrorCode } from "@/lib/api/errors";
+import { registrarErroDaApi } from "@/lib/api/registro-de-erro";
 
 // -----------------------------------------------------------------------------
 // Tipos públicos
@@ -77,8 +79,12 @@ export function fail(
     },
   };
 
+  const requestId = opts.requestId ?? randomUUID();
   const res = NextResponse.json(body, { status, headers: opts.headers });
-  res.headers.set("X-Request-Id", opts.requestId ?? randomUUID());
+  res.headers.set("X-Request-Id", requestId);
+  // O ID que a tela mostra ao usuário passa a ter onde ser procurado
+  // (`api_error_log`, migration 0288).
+  registrarErroDaApi({ requestId, status, code, message, details: opts.details });
   return res;
 }
 
