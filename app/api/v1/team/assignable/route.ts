@@ -5,6 +5,11 @@
  * Exceção deliberada e MÍNIMA à matriz spec 13 §4 (team read = manager+): um
  * agent precisa escolher o destino pra transferir (decisão G1-06d). Exposto o
  * mínimo — user_id, nome e role. Sem e-mail, sem last_sign_in (LGPD/PII).
+ *
+ * `pode_receber`: se QUEM PEDE pode transferir para esta pessoa. Para um agent
+ * em algum setor, só quem divide um setor ativo com ele — a mesma regra que o
+ * servidor da transferência aplica (`lib/setores/transferencia.ts`). Marcar, e
+ * não esconder, para a tela poder dizer por quê.
  */
 import { randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
@@ -14,6 +19,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isServiceRoleConfigured } from "@/lib/audit";
+import { foraDosMeusSetores, setoresAtivosPorPessoa } from "@/lib/setores/transferencia";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +27,7 @@ interface AssignableMember {
   user_id: string;
   role: string;
   full_name: string | null;
+  pode_receber: boolean;
 }
 
 export async function GET(_req: NextRequest): Promise<Response> {
@@ -28,6 +35,7 @@ export async function GET(_req: NextRequest): Promise<Response> {
   const authz = await requireRole("agent", { requestId, resource: "team" });
   if (!authz.ok) return authz.response;
   const orgId = authz.org.orgId; // fonte confiável (cookie validado)
+  const euId = authz.user.id;
 
   // A RLS de user_organizations só mostra o próprio membership a um agent —
   // admin client filtrado manualmente pela org resolvida acima (doutrina:
@@ -46,17 +54,41 @@ export async function GET(_req: NextRequest): Promise<Response> {
   const memberships = (rows ?? []) as Array<{ user_id: string; role: string }>;
 
   if (!isServiceRoleConfigured() || memberships.length === 0) {
-    const degraded: AssignableMember[] = memberships.map((m) => ({ ...m, full_name: null }));
+    // Sem service role não dá para ler os setores dos colegas: ninguém é
+    // marcado, e o servidor da transferência continua sendo a palavra final.
+    const degraded: AssignableMember[] = memberships.map((m) => ({
+      ...m,
+      full_name: null,
+      pode_receber: true,
+    }));
     return ok(degraded, { requestId });
   }
 
   const admin = createAdminClient();
+
+  let podeReceber: (userId: string) => boolean = () => true;
+  if (authz.org.role === "agent") {
+    try {
+      const porPessoa = await setoresAtivosPorPessoa(admin, orgId, [
+        euId,
+        ...memberships.map((m) => m.user_id),
+      ]);
+      const meus = porPessoa.get(euId) ?? new Set<string>();
+      podeReceber = (userId) => !foraDosMeusSetores(meus, porPessoa.get(userId));
+    } catch (err) {
+      return fail("internal_error", err instanceof Error ? err.message : String(err), 500, {
+        requestId,
+      });
+    }
+  }
+
   const members: AssignableMember[] = await Promise.all(
     memberships.map(async (m) => {
       const { data: userRes } = await admin.auth.admin.getUserById(m.user_id);
       return {
         ...m,
         full_name: (userRes?.user?.user_metadata?.full_name as string | undefined) ?? null,
+        pode_receber: podeReceber(m.user_id),
       };
     }),
   );

@@ -4695,6 +4695,13 @@ export const DICIONARIO: Traducoes = {
   "Nenhum outro atendente disponível nesta organização.": {
     es: "No hay ningún otro agente disponible en esta organización.",
   },
+  "fora dos seus setores": { es: "fuera de sus sectores" },
+  "Você só transfere para pessoas dos seus setores.": {
+    es: "Solo puede transferir a personas de sus sectores.",
+  },
+  "Você só transfere para pessoas dos seus setores. Para outra área, use “Para um setor”.": {
+    es: "Solo puede transferir a personas de sus sectores. Para otra área, use “A un sector”.",
+  },
   "Motivo (opcional)": { es: "Motivo (opcional)" },
   "Ex.: cliente pediu falar com o financeiro": { es: "Ej.: el cliente pidió hablar con finanzas" },
   "Transferindo…": { es: "Transfiriendo…" },

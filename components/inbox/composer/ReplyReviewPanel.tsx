@@ -36,6 +36,20 @@ export function ReplyReviewPanel({
     refetchInterval: 4000,
     retry: false,
   });
+  // Há agente publicado para esta conversa? Mesma regra do servidor (`?agente=1`).
+  // Separado da lista acima, que roda a cada 4 s: isto muda raramente.
+  const agente = useQuery({
+    queryKey: ["reply-agent", conversationId],
+    queryFn: () =>
+      apiClient.get<{ data: { agente_disponivel: boolean } }>(
+        `/api/v1/conversations/${conversationId}/draft-reply?agente=1`,
+      ),
+    staleTime: 60_000,
+    retry: false,
+  });
+  // Só `false` explícito desabilita: sem resposta (carregando, erro), o botão
+  // segue como antes e o servidor decide.
+  const semAgente = agente.data?.data.agente_disponivel === false;
   const [edits, setEdits] = useState<Record<string, string>>({}),
     [feedback, setFeedback] = useState(""),
     [busy, setBusy] = useState(false),
@@ -117,12 +131,17 @@ export function ReplyReviewPanel({
           type="button"
           variant="outline"
           size="sm"
-          disabled={disabled || busy}
+          disabled={disabled || busy || semAgente}
           onClick={generate}
         >
           {t(busy ? "Preparando…" : "Sugerir resposta")}
         </Button>
       </div>
+      {semAgente && (
+        <p className="text-xs text-muted-foreground" data-testid="sugestao-sem-agente">
+          {t("Nenhum agente publicado atende este canal. Publique uma versão do agente em IA › Agentes.")}
+        </p>
+      )}
       {draft && (
         <>
           <p className="text-xs text-muted-foreground">

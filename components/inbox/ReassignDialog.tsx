@@ -55,6 +55,7 @@ export function ReassignDialog({ conversationId, open, onOpenChange }: Props) {
   const temSetores = (setores.data?.length ?? 0) > 0;
 
   const options = (members.data ?? []).filter((m) => m.user_id !== user.id);
+  const foraDosSetores = options.filter((m) => m.pode_receber === false).length;
 
   function close(v: boolean) {
     if (!v) {
@@ -115,15 +116,27 @@ export function ReassignDialog({ conversationId, open, onOpenChange }: Props) {
               </SelectTrigger>
               <SelectContent>
                 {options.map((m) => (
-                  <SelectItem key={m.user_id} value={m.user_id}>
+                  // Fora dos setores de quem transfere: o servidor recusaria.
+                  // Aparece desabilitado, e não escondido, para a regra ser vista.
+                  <SelectItem key={m.user_id} value={m.user_id} disabled={m.pode_receber === false}>
                     {m.full_name ?? `${t("Atendente")} ${m.user_id.slice(0, 8)}`}
                     <span className="ml-1 text-muted-foreground">
                       · {t(ROLE_LABEL[m.role] ?? m.role)}
                     </span>
+                    {m.pode_receber === false ? (
+                      <span className="ml-1 text-muted-foreground">· {t("fora dos seus setores")}</span>
+                    ) : null}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {foraDosSetores > 0 && (
+              <p className="text-xs text-muted-foreground" data-testid="reassign-fora-dos-setores">
+                {temSetores
+                  ? t("Você só transfere para pessoas dos seus setores. Para outra área, use “Para um setor”.")
+                  : t("Você só transfere para pessoas dos seus setores.")}
+              </p>
+            )}
             {!members.isLoading && options.length === 0 && (
               <p className="text-xs text-muted-foreground">
                 {t("Nenhum outro atendente disponível nesta organização.")}

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getRequestPool } from "@/lib/agent-engine/db/request-pool";
 import { requestTurnDeps } from "@/lib/agent-engine/agent/request-deps";
 import { generateReplyDraft } from "@/lib/agent-engine/agent/reply-drafts";
+import { loadConversationAgentConfig } from "@/lib/agent-engine/agent/agent-config";
 import { motivoDaFalha } from "@/lib/agent-engine/agent/sugestao-de-resposta";
 import { logger } from "@/lib/logger";
 import { ok, fail } from "@/lib/api/wrappers";
@@ -29,10 +30,40 @@ async function context(ctx: Ctx, requestId: string) {
     return { response: fail("not_found", t("Conversa não encontrada."), 404, { requestId }) } as const;
   return { auth, conversation, t } as const;
 }
-export async function GET(_req: NextRequest, ctx: Ctx) {
+/**
+ * `?agente=1`: diz se ALGUM agente publicado atende esta conversa, pela MESMA
+ * função que o POST usa para recusar com `reply_no_agent`. A tela pergunta isso
+ * separado (e raramente), e não a cada consulta da lista de sugestões, que roda
+ * a cada 4 s. Sem isso o botão "Sugerir resposta" aparecia ativo num canal sem
+ * agente e a pessoa só via a recusa depois de clicar (produção, 03/11/2026).
+ * Na dúvida (erro ao ler), responde `true`: quem decide é o POST.
+ */
+async function agenteDisponivel(orgId: string, conversationId: string, channelId: string | null) {
+  if (!channelId) return false;
+  try {
+    const agente = await loadConversationAgentConfig(getRequestPool(), orgId, conversationId, channelId);
+    return agente !== null;
+  } catch (erro) {
+    logger.warn("[draft-reply] não deu para conferir o agente da conversa", {
+      conversationId,
+      erro: erro instanceof Error ? erro.message : String(erro),
+    });
+    return true;
+  }
+}
+
+export async function GET(req: NextRequest, ctx: Ctx) {
   const requestId = randomUUID(),
     c = await context(ctx, requestId);
   if ("response" in c) return c.response;
+  if (req.nextUrl.searchParams.get("agente") === "1") {
+    const disponivel = await agenteDisponivel(
+      c.auth.org.orgId,
+      c.conversation.id,
+      c.conversation.channel_session_id,
+    );
+    return ok({ agente_disponivel: disponivel }, { requestId });
+  }
   const { rows } = await getRequestPool().query(
     `select id,revision::text,original_body,edited_body,approved_body,proposals,feedback,error_code,created_at,
  case when status in ('generating','pending','approved') and not fn_reply_context_current(organization_id,id) then 'stale' else status end as status

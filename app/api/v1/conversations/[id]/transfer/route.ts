@@ -20,6 +20,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { transferConversationSchema, validateRequest } from "@/lib/schemas";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { recusaForaDosMeusSetores } from "@/lib/setores/transferencia";
 import type { Conversation } from "@/lib/types/messaging";
 import { traduzir } from "@/lib/i18n/dicionario";
 
@@ -248,31 +249,4 @@ async function transferirParaSetor(p: TransferenciaParaSetor): Promise<Response>
   });
 
   return ok(row, { requestId });
-}
-
-/**
- * `true` = o agent está em algum setor e o destino não divide nenhum setor ATIVO
- * com ele. Agent sem setor (organização sem setores, ou ele fora de todos) não
- * é restringido: é o comportamento de antes da spec 20.
- */
-async function recusaForaDosMeusSetores(
-  admin: ReturnType<typeof createAdminClient>,
-  orgId: string,
-  actorId: string,
-  toUserId: string,
-): Promise<boolean> {
-  const { data, error } = await admin
-    .from("sector_members")
-    .select("sector_id, user_id, sectors!inner(is_active)")
-    .eq("organization_id", orgId)
-    .in("user_id", [actorId, toUserId])
-    .eq("sectors.is_active", true);
-  if (error) throw new Error(error.message);
-  const meus = new Set<string>();
-  const dele = new Set<string>();
-  for (const m of (data ?? []) as Array<{ sector_id: string; user_id: string }>) {
-    (m.user_id === actorId ? meus : dele).add(m.sector_id);
-  }
-  if (meus.size === 0) return false;
-  return ![...meus].some((s) => dele.has(s));
 }

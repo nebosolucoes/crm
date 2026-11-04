@@ -6,6 +6,11 @@ export interface AssignableMember {
   user_id: string;
   role: string;
   full_name: string | null;
+  /**
+   * Se quem pede pode transferir para esta pessoa (atendente em setor: só quem
+   * divide um setor com ele). Opcional: cache gravado antes deste campo existir.
+   */
+  pode_receber?: boolean;
 }
 
 /** G3-01: destinos válidos de transferência (membros ativos agent+ da org). */
