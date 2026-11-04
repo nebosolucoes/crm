@@ -13,7 +13,10 @@ export type SupportContext = z.infer<typeof supportSchema>;
 /** Chamar depois de getUser. A RPC resolve auth.uid + auth.session_id, nunca cookie. */
 export async function readSupportContext(db: Awaited<ReturnType<typeof createClient>>): Promise<SupportContext | null> {
   const { data, error } = await db.rpc("fn_support_context");
-  if (error) throw new Error("Não foi possível confirmar o acompanhamento administrativo.");
+  // O motivo do banco entra na mensagem: sem ele o registro de erros guardava só
+  // a frase, e não dava para separar pool esgotado de tempo esgotado ou de
+  // função ausente.
+  if (error) throw new Error(`Não foi possível confirmar o acompanhamento administrativo: ${error.message}`);
   return data === null ? null : supportSchema.parse(data);
 }
 

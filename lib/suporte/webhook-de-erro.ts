@@ -8,14 +8,20 @@
  * `prioridade`, `id_externo`, `solicitante`, `campos`) e é assinado com
  * `X-Nebo-Assinatura: sha256=<HMAC-SHA256(segredo, corpo)>` quando há segredo.
  *
- * `id_externo` = o ID do erro (o mesmo que a tela mostra): reenviar não duplica.
+ * `id_externo` agrupa: o mesmo TIPO de erro (rota normalizada, status, código e
+ * mensagem normalizada) na mesma hora UTC tem o mesmo `id_externo`, e o Task
+ * não abre card duplicado. Antes era o `requestId`, único por requisição: uma
+ * rajada de timeouts abriu ~1000 cards em 36 h (03–04/11/2026). O ID da
+ * requisição continua no campo "ID do erro". O "Enviar teste" da tela segue
+ * mandando o `requestId`, para cada clique virar um card.
  *
  * NUNCA LANÇA e nunca chama `fail()` — um erro ao avisar de um erro geraria
  * outro aviso. Falha de envio vira uma linha de log, e só.
  */
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 
 import { assertSafeOutboundUrl } from "@/lib/automation/outbound-url";
+import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decryptWebhookSecret } from "@/lib/webhooks/secrets";
@@ -54,6 +60,69 @@ export const TETO_POR_MINUTO = 60;
 declare global {
   var __memoDoWebhookDeErro: { readonly valor: WebhookEmVigor | null; readonly expiraEm: number } | null | undefined;
   var __janelaDoWebhookDeErro: { inicio: number; enviados: number; pulados: number } | undefined;
+  var __gruposAvisadosDoWebhookDeErro: { hora: string; ids: Set<string> } | undefined;
+}
+
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+
+/** `/api/v1/leads/<uuid>?x=1` → `/api/v1/leads/:id`. Puro. */
+export function rotaNormalizada(path: string | null): string {
+  if (!path) return "";
+  return path
+    .split("?")[0]!
+    .replace(UUID, ":id")
+    .split("/")
+    .map((parte) => (/^\d+$/.test(parte) ? ":id" : parte))
+    .join("/");
+}
+
+/** IDs e números fora da mensagem, para "o mesmo erro" ser o mesmo texto. Puro. */
+export function mensagemNormalizada(message: string): string {
+  return message.replace(UUID, ":id").replace(/\d+/g, "N").replace(/\s+/g, " ").trim().slice(0, 300);
+}
+
+/** O que define "o mesmo erro". Puro. */
+export function chaveDoAgrupamento(erro: ErroParaAvisar): string {
+  return [
+    erro.method ?? "",
+    rotaNormalizada(erro.path),
+    String(erro.status),
+    erro.code,
+    mensagemNormalizada(erro.message),
+  ].join(" | ");
+}
+
+/** `crm-erro:<hash da chave>:<AAAA-MM-DDTHH>` — um card por tipo de erro por hora UTC. Puro. */
+export function idExternoAgrupado(erro: ErroParaAvisar): string {
+  const hash = createHash("sha1").update(chaveDoAgrupamento(erro)).digest("hex").slice(0, 16);
+  return `crm-erro:${hash}:${erro.quando.toISOString().slice(0, 13)}`;
+}
+
+/**
+ * Já avisou deste grupo nesta hora? Se sim, nem faz o POST (o Task devolveria
+ * "duplicado") e não gasta o teto por minuto, que fica para erros DIFERENTES.
+ */
+function gruposDaHora(hora: string): Set<string> {
+  const g = globalThis.__gruposAvisadosDoWebhookDeErro;
+  if (g && g.hora === hora) return g.ids;
+  const ids = new Set<string>();
+  globalThis.__gruposAvisadosDoWebhookDeErro = { hora, ids };
+  return ids;
+}
+
+/**
+ * O endereço desta instalação, lido em RUNTIME. `process.env.NEXT_PUBLIC_APP_URL`
+ * é trocado no build, e a imagem do self-host é construída com
+ * `https://placeholder.invalid` — era isso que os cards mostravam. Mesmo
+ * tratamento de `lib/channels/url-publica.ts`.
+ */
+function enderecoDaInstalacao(): string | null {
+  try {
+    const url = texto(env.NEXT_PUBLIC_APP_URL);
+    return url && !url.includes("placeholder.invalid") ? url : null;
+  } catch {
+    return null;
+  }
 }
 
 export function invalidarWebhookDeErro(): void {
@@ -130,7 +199,11 @@ function cabeDentroDoTeto(agora = Date.now()): boolean {
 }
 
 /** O corpo no formato da integração por webhook do Nebo Task. Puro. */
-export function corpoDoAviso(erro: ErroParaAvisar, instalacao: string | null): Record<string, unknown> {
+export function corpoDoAviso(
+  erro: ErroParaAvisar,
+  instalacao: string | null,
+  idExterno: string = erro.requestId,
+): Record<string, unknown> {
   const rota = [erro.method, erro.path].filter(Boolean).join(" ") || "rota desconhecida";
   const detalhes =
     erro.details === undefined || erro.details === null ? null : JSON.stringify(erro.details).slice(0, 3000);
@@ -148,7 +221,7 @@ export function corpoDoAviso(erro: ErroParaAvisar, instalacao: string | null): R
     titulo: `Erro ${erro.status} no CRM: ${erro.code} em ${rota}`.slice(0, 200),
     descricao: erro.message,
     prioridade: erro.status >= 500 ? "alta" : "media",
-    id_externo: erro.requestId,
+    id_externo: idExterno,
     ...(erro.usuario
       ? {
           solicitante: {
@@ -172,11 +245,11 @@ export type ResultadoDaEntrega = { ok: boolean; status: number | null; falha?: s
 export async function entregar(
   destino: { url: string; segredo: string | null },
   erro: ErroParaAvisar,
+  idExterno?: string,
 ): Promise<ResultadoDaEntrega> {
   try {
     if (!enderecoPermitido(destino.url)) return { ok: false, status: null, falha: "endereco_nao_permitido" };
-    const instalacao = texto(process.env.NEXT_PUBLIC_APP_URL) || null;
-    const corpo = JSON.stringify(corpoDoAviso(erro, instalacao));
+    const corpo = JSON.stringify(corpoDoAviso(erro, enderecoDaInstalacao(), idExterno));
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (destino.segredo) headers["X-Nebo-Assinatura"] = assinatura(destino.segredo, corpo);
     const r = await fetch(destino.url, {
@@ -219,10 +292,16 @@ export async function avisarErro(erro: ErroParaAvisar): Promise<void> {
     const webhook = await webhookEmVigor();
     if (!webhook) return;
     if (webhook.escopo === "server" && erro.status < 500) return;
+    const idExterno = idExternoAgrupado(erro);
+    const avisados = gruposDaHora(erro.quando.toISOString().slice(0, 13));
+    if (avisados.has(idExterno)) return;
     if (!cabeDentroDoTeto()) return;
+    avisados.add(idExterno);
 
-    const r = await entregar(webhook, erro);
+    const r = await entregar(webhook, erro, idExterno);
     if (!r.ok) {
+      // Não entregou: a próxima ocorrência do grupo tenta de novo.
+      avisados.delete(idExterno);
       logger.warn("[webhook-de-erro] aviso não entregue", {
         requestId: erro.requestId,
         status: r.status,

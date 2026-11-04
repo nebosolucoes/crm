@@ -312,6 +312,9 @@ const schema = z.object({
    */
   JOB_QUEUE_RETENTION_DAYS: z.string().optional().default(""),
   AUDIT_LOG_RETENTION_DAYS: z.string().optional().default(""),
+  // Espelho da agenda do Google (migration 0187): 90 dias, piso 7. Existia como
+  // knob no cron mas nunca chegava até ele — o valor era sempre o padrão.
+  CALENDAR_MIRROR_RETENTION_DAYS: z.string().optional().default(""),
 
   // LGPD export (S-08.04)
   LGPD_SIGNING_KEY: z.string().optional().default(""),

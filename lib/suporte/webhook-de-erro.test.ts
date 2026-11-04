@@ -17,8 +17,10 @@ vi.mock("@/lib/webhooks/secrets", () => ({
 import {
   TETO_POR_MINUTO,
   avisarErro,
+  chaveDoAgrupamento,
   corpoDoAviso,
   enderecoPermitido,
+  idExternoAgrupado,
   invalidarWebhookDeErro,
   type ErroParaAvisar,
 } from "./webhook-de-erro";
@@ -41,6 +43,7 @@ describe("webhook de erro (migration 0290)", () => {
   beforeEach(() => {
     invalidarWebhookDeErro();
     globalThis.__janelaDoWebhookDeErro = undefined;
+    globalThis.__gruposAvisadosDoWebhookDeErro = undefined;
     chamadas.length = 0;
     linha = { enabled: true, url: "https://task.exemplo.com/api/integracoes/tok", secret_encrypted: "\\xc", scope: "all" };
     vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
@@ -89,9 +92,44 @@ describe("webhook de erro (migration 0290)", () => {
     expect(chamadas).toHaveLength(1);
   });
 
-  it("rajada: passa do teto por minuto e para de enviar", async () => {
-    for (let i = 0; i < TETO_POR_MINUTO + 5; i += 1) await avisarErro(erro());
+  it("rajada de erros DIFERENTES: passa do teto por minuto e para de enviar", async () => {
+    for (let i = 0; i < TETO_POR_MINUTO + 5; i += 1) await avisarErro({ ...erro(), code: `codigo_${"x".repeat(i)}` });
     expect(chamadas).toHaveLength(TETO_POR_MINUTO);
+  });
+
+  it("o MESMO erro repetido na mesma hora vira um aviso só, com id_externo agrupado", async () => {
+    // Produção, 03–04/11/2026: 515 timeouts da mesma rota viraram 515 cards.
+    for (let i = 0; i < 10; i += 1) {
+      await avisarErro({ ...erro(500), requestId: `req-${i}`, path: `/api/v1/leads/${i}?cursor=${i}` });
+    }
+    expect(chamadas).toHaveLength(1);
+    const corpo = JSON.parse(String(chamadas[0]!.init.body)) as { id_externo: string; campos: Record<string, string> };
+    expect(corpo.id_externo).toMatch(/^crm-erro:[0-9a-f]{16}:2026-10-30T12$/);
+    expect(corpo.campos["ID do erro"]).toBe("req-0");
+  });
+
+  it("na hora seguinte o mesmo erro abre outro card; entrega que falhou tenta de novo", async () => {
+    await avisarErro(erro(500));
+    await avisarErro({ ...erro(500), quando: new Date("2026-10-30T13:05:00Z") });
+    expect(chamadas).toHaveLength(2);
+
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+      chamadas.push({ url, init });
+      return new Response("{}", { status: 502 });
+    }));
+    const outro = { ...erro(500), code: "outro" };
+    await avisarErro(outro);
+    await avisarErro(outro);
+    expect(chamadas).toHaveLength(4);
+  });
+
+  it("a chave ignora IDs, números e query; separa status, código e rota", () => {
+    const a = { ...erro(500), path: "/api/v1/leads/0dbf7a63-5f9a-482c-bb6d-153987baecc6?x=1", message: "lote 12 falhou" };
+    const b = { ...erro(500), path: "/api/v1/leads/11111111-2222-4333-8444-555555555555", message: "lote 99 falhou" };
+    expect(chaveDoAgrupamento(a)).toBe(chaveDoAgrupamento(b));
+    expect(idExternoAgrupado(a)).toBe(idExternoAgrupado(b));
+    expect(chaveDoAgrupamento({ ...a, status: 503 })).not.toBe(chaveDoAgrupamento(a));
+    expect(chaveDoAgrupamento({ ...a, path: "/api/v1/contacts/1" })).not.toBe(chaveDoAgrupamento(a));
   });
 
   it("destino fora do ar não lança (um erro ao avisar de um erro não pode virar outro)", async () => {

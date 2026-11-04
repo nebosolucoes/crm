@@ -71,10 +71,18 @@ export function fail(
   status: number,
   opts: FailOptions = {},
 ): NextResponse<ApiError> {
+  // Rede de proteção: ~180 rotas passam `error.message` do PostgREST direto, e
+  // em resposta HEAD (`count, head: true`) ele chega vazio. Mensagem vazia vira
+  // card e linha de log sem nada para investigar (03/11/2026: 460 assim).
+  // `typeof` porque, em runtime, o `message` repassado pode ser `undefined`.
+  const mensagem =
+    typeof message === "string" && message.trim()
+      ? message
+      : `${code} (HTTP ${status}) sem mensagem do servidor`;
   const body: ApiError = {
     error: {
       code,
-      message,
+      message: mensagem,
       ...(opts.details !== undefined ? { details: opts.details } : {}),
     },
   };
@@ -84,7 +92,7 @@ export function fail(
   res.headers.set("X-Request-Id", requestId);
   // O ID que a tela mostra ao usuário passa a ter onde ser procurado
   // (`api_error_log`, migration 0288).
-  registrarErroDaApi({ requestId, status, code, message, details: opts.details });
+  registrarErroDaApi({ requestId, status, code, message: mensagem, details: opts.details });
   return res;
 }
 

@@ -132,7 +132,11 @@ export async function POST(req: NextRequest): Promise<Response> {
       logger.error("[system/agent] heartbeat não conseguiu achar o run pendente", {
         error: runLookupError.message,
       });
-      return fail("internal_error", "Não consegui checar o pedido de atualização.", 500);
+      return fail(
+        "internal_error",
+        `Não consegui checar o pedido de atualização: ${runLookupError.message}`,
+        500,
+      );
     }
 
     return ok({ update_requested: Boolean(run), run_id: run?.id ?? null });

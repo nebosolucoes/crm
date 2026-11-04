@@ -35,7 +35,12 @@ vi.mock("@/lib/supabase/admin", () => ({
   }),
 }));
 
-import { detalhesGravaveis, registrarErroDaApi, registrarExcecaoDeRequest } from "./registro-de-erro";
+import {
+  detalhesGravaveis,
+  ehClienteQueDesistiu,
+  registrarErroDaApi,
+  registrarExcecaoDeRequest,
+} from "./registro-de-erro";
 import { fail } from "./wrappers";
 
 describe("registro de erros da API (migration 0288)", () => {
@@ -106,6 +111,18 @@ describe("registro de erros da API (migration 0288)", () => {
       code: "unhandled_exception",
       message: "quebrou",
     });
+  });
+
+  it("cliente que fechou a conexão no meio do streaming NÃO vira linha", async () => {
+    // Produção, 04/11/2026: "The destination stream closed early." em /app/inbox virou card.
+    await registrarExcecaoDeRequest(new Error("The destination stream closed early."), {
+      path: "/app/inbox",
+      method: "GET",
+      headers: {},
+    });
+    await registrarExcecaoDeRequest(Object.assign(new Error("x"), { code: "ECONNRESET" }), { headers: {} });
+    expect(inserts).toHaveLength(0);
+    expect(ehClienteQueDesistiu(new Error("quebrou"))).toBe(false);
   });
 
   it("detalhes grandes são truncados, nunca gravados inteiros", () => {

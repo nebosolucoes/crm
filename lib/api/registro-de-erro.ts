@@ -79,11 +79,31 @@ function logarErro(erro: ErroDaApi): void {
  * `instrumentation.ts`). O ID gravado é o `digest` do Next — o mesmo que a tela
  * "Algo deu errado" mostra.
  */
+const CODIGOS_DE_CLIENTE_QUE_DESISTIU = new Set(["ERR_STREAM_PREMATURE_CLOSE", "ECONNRESET", "ABORT_ERR"]);
+
+/** A exceção é só o cliente indo embora no meio da resposta? Pura. */
+export function ehClienteQueDesistiu(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const { message, code, name } = err as { message?: unknown; code?: unknown; name?: unknown };
+  if (typeof code === "string" && CODIGOS_DE_CLIENTE_QUE_DESISTIU.has(code)) return true;
+  if (name === "AbortError") return true;
+  return message === "The destination stream closed early." || message === "aborted";
+}
+
 export async function registrarExcecaoDeRequest(
   err: unknown,
   request: { path?: string; method?: string; headers?: Record<string, string | string[] | undefined> },
 ): Promise<void> {
   if (process.env.VITEST) return;
+  if (ehClienteQueDesistiu(err)) {
+    // Não é defeito: o navegador fechou a conexão no meio do streaming (trocou
+    // de página, fechou a aba). Fica no log, mas não vira linha nem card.
+    logger.warn("[api] cliente fechou a conexão", {
+      path: request.path ?? null,
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return;
+  }
   const digest =
     err && typeof err === "object" && "digest" in err && typeof err.digest === "string"
       ? err.digest

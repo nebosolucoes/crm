@@ -110,19 +110,59 @@ export interface ResultadoDaRetencao {
   retencao_espelho_dias: number;
   /** Avisos de configuração — nunca ausentes em silêncio quando existem. */
   avisos: string[];
+  /**
+   * As podas que falharam, como `<função>: <mensagem do banco>`. Cada poda roda
+   * isolada: uma que falha não impede as seguintes (antes, a dos nonces falhava
+   * e a do registro de erros da API nunca rodava).
+   */
+  falhas: string[];
+}
+
+export type NomeDaPoda =
+  | "fn_podar_fila_de_jobs"
+  | "fn_expurgar_auditoria_vencida"
+  | "fn_expurgar_espelho_da_agenda"
+  | "fn_expurgar_nonces_de_oauth"
+  | "fn_expurgar_erros_da_api";
+
+/**
+ * O NOME de cada argumento, por função. O PostgREST resolve a RPC pelo nome dos
+ * argumentos, não pela posição: `fn_expurgar_nonces_de_oauth` nasceu na 0190
+ * como `(p_dias, p_lote)`, e chamá-la com `{ p_retencao_dias, p_limite }` dava
+ * "Could not find the function" todo dia. Renomear no banco exigiria
+ * `drop function` (o Postgres não deixa `create or replace` mudar nome de
+ * parâmetro), então a tradução mora aqui — e
+ * `tests/unit/retencao-poda-em-lotes.test.ts` confere esta tabela contra as
+ * assinaturas das migrations.
+ */
+export const ARGUMENTOS_DAS_PODAS: Record<NomeDaPoda, { dias: string; limite: string }> = {
+  fn_podar_fila_de_jobs: { dias: "p_retencao_dias", limite: "p_limite" },
+  fn_expurgar_auditoria_vencida: { dias: "p_retencao_dias", limite: "p_limite" },
+  fn_expurgar_espelho_da_agenda: { dias: "p_retencao_dias", limite: "p_limite" },
+  fn_expurgar_nonces_de_oauth: { dias: "p_dias", limite: "p_lote" },
+  fn_expurgar_erros_da_api: { dias: "p_retencao_dias", limite: "p_limite" },
+};
+
+/** Os argumentos lógicos da poda, com os nomes que a função do banco espera. */
+export function argumentosDaRpc(
+  nome: NomeDaPoda,
+  args: { p_retencao_dias: number; p_limite: number },
+): Record<string, number> {
+  const nomes = ARGUMENTOS_DAS_PODAS[nome];
+  return { [nomes.dias]: args.p_retencao_dias, [nomes.limite]: args.p_limite };
 }
 
 /** Só a superfície que este cron usa — o teste injeta uma implementação. */
 export interface PodaDb {
   rpc(
-    nome: "fn_podar_fila_de_jobs" | "fn_expurgar_auditoria_vencida" | "fn_expurgar_espelho_da_agenda" | "fn_expurgar_nonces_de_oauth" | "fn_expurgar_erros_da_api",
+    nome: NomeDaPoda,
     args: { p_retencao_dias: number; p_limite: number },
   ): Promise<{ data: number | null; error: { message: string } | null }>;
 }
 
 async function drenar(
   db: PodaDb,
-  nome: "fn_podar_fila_de_jobs" | "fn_expurgar_auditoria_vencida" | "fn_expurgar_espelho_da_agenda" | "fn_expurgar_nonces_de_oauth" | "fn_expurgar_erros_da_api",
+  nome: NomeDaPoda,
   dias: number,
 ): Promise<{ apagadas: number; lotes: number; temResto: boolean }> {
   let apagadas = 0;
@@ -173,16 +213,27 @@ export async function podarHistorico(
     piso: RETENCAO_ESPELHO_AGENDA_DIAS_PISO,
   });
 
-  const jobs = await drenar(db, "fn_podar_fila_de_jobs", fila.dias);
-  const linhas = await drenar(db, "fn_expurgar_auditoria_vencida", auditoria.dias);
-  const eventos = await drenar(db, "fn_expurgar_espelho_da_agenda", espelho.dias);
+  // Cada poda isolada: a falha de uma entra em `falhas` e as outras seguem.
+  const falhas: string[] = [];
+  const tentar = async (nome: NomeDaPoda, dias: number) => {
+    try {
+      return await drenar(db, nome, dias);
+    } catch (err) {
+      falhas.push(err instanceof Error ? err.message : String(err));
+      return { apagadas: 0, lotes: 0, temResto: false };
+    }
+  };
+
+  const jobs = await tentar("fn_podar_fila_de_jobs", fila.dias);
+  const linhas = await tentar("fn_expurgar_auditoria_vencida", auditoria.dias);
+  const eventos = await tentar("fn_expurgar_espelho_da_agenda", espelho.dias);
   // Quarta poda: os nonces de OAuth já queimados. O `state` vale dez minutos,
   // então um dia é folga de duas ordens de grandeza — e sem esta linha a tabela
   // cresceria para sempre, uma linha por conexão tentada, num produto que se
   // instala e ninguém monitora.
-  const nonces = await drenar(db, "fn_expurgar_nonces_de_oauth", 1);
+  const nonces = await tentar("fn_expurgar_nonces_de_oauth", 1);
   // Quinta: o registro de erros da API — depuração com prazo, não rastro.
-  const erros = await drenar(db, "fn_expurgar_erros_da_api", RETENCAO_ERROS_DA_API_DIAS);
+  const erros = await tentar("fn_expurgar_erros_da_api", RETENCAO_ERROS_DA_API_DIAS);
 
   return {
     jobs_apagados: jobs.apagadas,
@@ -202,6 +253,7 @@ export async function podarHistorico(
     avisos: [fila.aviso, auditoria.aviso, espelho.aviso].filter(
       (a): a is string => a !== null,
     ),
+    falhas,
   };
 }
 
@@ -248,13 +300,17 @@ async function handle(req: NextRequest): Promise<Response> {
     // `recover-stuck-messages` dá a `emit_event`.
     const db: PodaDb = {
       async rpc(nome, args) {
-        const { data, error } = await admin.rpc(nome as never, args as never);
+        const { data, error } = await admin.rpc(
+          nome as never,
+          argumentosDaRpc(nome, args) as never,
+        );
         return { data: typeof data === "number" ? data : null, error };
       },
     };
     resultado = await podarHistorico(db, {
       JOB_QUEUE_RETENTION_DAYS: env.JOB_QUEUE_RETENTION_DAYS,
       AUDIT_LOG_RETENTION_DAYS: env.AUDIT_LOG_RETENTION_DAYS,
+      CALENDAR_MIRROR_RETENTION_DAYS: env.CALENDAR_MIRROR_RETENTION_DAYS,
     });
     // ── A cascata de anonimização que ficou pela metade ──────────────────
     //
@@ -295,17 +351,41 @@ async function handle(req: NextRequest): Promise<Response> {
       metadata: { falhou: true, erro: detail.slice(0, 300) },
       requestId,
     });
-    return fail("internal_error", "Failed to prune history.", 500, { requestId });
+    // O motivo vai na resposta: o registro de erros (0288) e o card do Task só
+    // guardam o que o fail() recebe, e "Failed to prune history." sozinho não diz
+    // QUAL função de expurgo falhou nem por quê. `detail` é `<função>: <mensagem
+    // do banco>` (ver `drenar`) — nome de função e erro do Postgres, nenhum dado
+    // de cliente.
+    return fail("internal_error", `Failed to prune history: ${detail.slice(0, 300)}`, 500, {
+      requestId,
+    });
   }
 
   for (const aviso of resultado.avisos) {
     logger.warn("[data-retention] configuração de retenção ajustada", { aviso, requestId });
   }
 
+  // Falha PARCIAL: as outras podas rodaram, mas a rodada falhou e isso entra na
+  // trilha — uma linha só, com o que foi apagado E o que falhou.
+  const falhaParcial = resultado.falhas.length > 0 ? resultado.falhas.join(" | ") : null;
+  if (falhaParcial) {
+    logger.error("[data-retention] poda falhou", { error: falhaParcial, requestId });
+    void audit({
+      action: "retention.sweep_run",
+      organizationId: null,
+      bypassedRls: true,
+      metadata: {
+        ...(resultado as unknown as Record<string, unknown>),
+        falhou: true,
+        erro: falhaParcial.slice(0, 300),
+      },
+      requestId,
+    });
+  }
   // Ver o cabeçalho: rodada que não apagou nada não é mutação. E rodada que
   // apagou SEMPRE deixa rastro — é isto que impede o expurgo do audit de ser
   // encolhimento silencioso da trilha.
-  if (houveEfeito(resultado)) {
+  else if (houveEfeito(resultado)) {
     void audit({
       action: "retention.sweep_run",
       organizationId: null,
@@ -344,6 +424,19 @@ async function handle(req: NextRequest): Promise<Response> {
         },
       });
     }
+  }
+
+  if (falhaParcial) {
+    // 500 com o motivo: o registro de erros (0288) e o card do Task só guardam o
+    // que o fail() recebe. `falhaParcial` é `<função>: <mensagem do banco>`.
+    return fail("internal_error", `Failed to prune history: ${falhaParcial.slice(0, 300)}`, 500, {
+      requestId,
+      details: {
+        ...resultado,
+        anonimizacoes_examinadas: varredura.examinados,
+        anonimizacoes_completadas: varredura.completados.length,
+      },
+    });
   }
 
   return ok(

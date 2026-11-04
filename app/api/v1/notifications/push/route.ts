@@ -11,6 +11,7 @@ import { z } from "zod";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { vapidPronto, vapidPublica } from "@/lib/notifications/vapid";
 import { traduzir } from "@/lib/i18n/dicionario";
@@ -51,6 +52,9 @@ export async function PUT(req: NextRequest): Promise<Response> {
   try {
     raw = await req.json();
   } catch {
+    // Requisição abortada pelo navegador (navegou logo depois do login): o corpo
+    // não chegou e ninguém vai ler a resposta. Não é erro do cliente nem nosso.
+    if (req.signal.aborted) return new Response(null, { status: 400 });
     return fail("invalid_request", t("Body JSON inválido."), 400, { requestId });
   }
   const parsed = subSchema.safeParse(raw);
@@ -62,8 +66,17 @@ export async function PUT(req: NextRequest): Promise<Response> {
   }
 
   const { user, org } = authz;
-  const supabase = await createClient();
-  const { error } = await supabase.from("push_subscriptions" as never).upsert(
+  // Cliente de SERVIÇO, de propósito. `endpoint` é único na tabela inteira e
+  // identifica o NAVEGADOR, não a pessoa: quando outra conta (ou a mesma conta
+  // em outra organização) já se inscreveu neste navegador, a linha existente
+  // é de outro dono, a RLS a esconde e o `ON CONFLICT DO UPDATE` morre com
+  // "new row violates row-level security policy (USING expression)" — 500 a
+  // cada login. O navegador é de quem está logado agora: a linha passa para
+  // esta sessão (o que também para de mandar a bandeja do dono anterior para
+  // este navegador). `organization_id` e `user_id` vêm de `requireRole`
+  // (sessão validada), nunca do body.
+  const admin = createAdminClient();
+  const { error } = await admin.from("push_subscriptions" as never).upsert(
     {
       organization_id: org.orgId,
       user_id: user.id,
@@ -107,6 +120,9 @@ export async function DELETE(req: NextRequest): Promise<Response> {
   try {
     raw = await req.json();
   } catch {
+    // Requisição abortada pelo navegador (navegou logo depois do login): o corpo
+    // não chegou e ninguém vai ler a resposta. Não é erro do cliente nem nosso.
+    if (req.signal.aborted) return new Response(null, { status: 400 });
     return fail("invalid_request", t("Body JSON inválido."), 400, { requestId });
   }
   const parsed = z.object({ endpoint: z.string().url() }).safeParse(raw);

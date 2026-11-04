@@ -34,6 +34,8 @@ export async function syncPushSubscription(): Promise<void> {
 
   await fetch("/api/v1/notifications/push", {
     method: "PUT",
+    // Sobrevive à navegação logo depois do login (o corpo é pequeno, < 64 KB).
+    keepalive: true,
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       endpoint: json.endpoint,

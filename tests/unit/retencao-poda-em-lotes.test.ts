@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  ARGUMENTOS_DAS_PODAS,
   GET,
   MAX_LOTES,
+  argumentosDaRpc,
   type PodaDb,
   TAMANHO_DO_LOTE,
   houveEfeito,
@@ -25,6 +27,7 @@ vi.mock("@/lib/env", () => ({
     INTERNAL_SECRET: "",
     JOB_QUEUE_RETENTION_DAYS: "",
     AUDIT_LOG_RETENTION_DAYS: "",
+    CALENDAR_MIRROR_RETENTION_DAYS: "",
   },
 }));
 const auditou = vi.fn();
@@ -182,13 +185,80 @@ describe("podarHistorico — o laço de lotes", () => {
     expect(r.avisos).toHaveLength(2);
   });
 
-  it("erro do banco sobe — a poda não engole falha em silêncio", async () => {
+  it("erro do banco vira falha DECLARADA — a poda não engole falha em silêncio", async () => {
     const db: PodaDb = {
       async rpc() {
         return { data: null, error: { message: "permission denied for table api_audit_log" } };
       },
     };
-    await expect(podarHistorico(db, {})).rejects.toThrow(/permission denied/);
+    const r = await podarHistorico(db, {});
+    expect(r.falhas).toHaveLength(5);
+    expect(r.falhas[0]).toMatch(/^fn_podar_fila_de_jobs: permission denied/);
+  });
+
+  it("uma poda que falha NÃO impede as seguintes", async () => {
+    // Produção, 03/11/2026: a dos nonces falhava todo dia e a do registro de
+    // erros da API, que vem depois, nunca rodava — o log crescia sem limite.
+    const chamadas: string[] = [];
+    const db: PodaDb = {
+      async rpc(nome) {
+        chamadas.push(nome);
+        if (nome === "fn_expurgar_nonces_de_oauth") {
+          return { data: null, error: { message: "Could not find the function" } };
+        }
+        return { data: nome === "fn_expurgar_erros_da_api" ? 3 : 0, error: null };
+      },
+    };
+    const r = await podarHistorico(db, {});
+    expect(chamadas).toContain("fn_expurgar_erros_da_api");
+    expect(r.erros_da_api_apagados).toBe(3);
+    expect(r.falhas).toEqual(["fn_expurgar_nonces_de_oauth: Could not find the function"]);
+  });
+
+  it("CALENDAR_MIRROR_RETENTION_DAYS chega à poda do espelho", async () => {
+    const chamadas: { nome: string; dias: number }[] = [];
+    const db: PodaDb = {
+      async rpc(nome, args) {
+        chamadas.push({ nome, dias: args.p_retencao_dias });
+        return { data: 0, error: null };
+      },
+    };
+    await podarHistorico(db, { CALENDAR_MIRROR_RETENTION_DAYS: "30" });
+    expect(chamadas.find((c) => c.nome === "fn_expurgar_espelho_da_agenda")?.dias).toBe(30);
+  });
+});
+
+describe("os nomes dos argumentos batem com as funções do banco", () => {
+  // O PostgREST casa a RPC pelo NOME dos argumentos. O `PodaDb` falso deste
+  // arquivo aceita qualquer nome, e foi assim que `(p_dias, p_lote)` da 0190
+  // passou meses chamado como `(p_retencao_dias, p_limite)` sem teste vermelho.
+  it("cada função, na migration mais recente que a cria, tem os dois argumentos traduzidos", async () => {
+    const { readdirSync, readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const pasta = join(__dirname, "..", "..", "supabase", "migrations");
+    const arquivos = readdirSync(pasta).filter((f) => f.endsWith(".sql")).sort();
+    for (const [nome, nomes] of Object.entries(ARGUMENTOS_DAS_PODAS)) {
+      const padrao = new RegExp(String.raw`create or replace function public\.${nome}\s*\(([^)]*)\)`, "i");
+      let assinatura: string | null = null;
+      for (const f of arquivos) {
+        const m = padrao.exec(readFileSync(join(pasta, f), "utf8"));
+        if (m?.[1] !== undefined) assinatura = m[1];
+      }
+      expect(assinatura, `${nome} não encontrada nas migrations`).not.toBeNull();
+      expect(assinatura, nome).toMatch(new RegExp(String.raw`\b${nomes.dias}\b`));
+      expect(assinatura, nome).toMatch(new RegExp(String.raw`\b${nomes.limite}\b`));
+    }
+  });
+
+  it("argumentosDaRpc traduz os nonces para (p_dias, p_lote)", () => {
+    expect(argumentosDaRpc("fn_expurgar_nonces_de_oauth", { p_retencao_dias: 1, p_limite: 1000 })).toEqual({
+      p_dias: 1,
+      p_lote: 1000,
+    });
+    expect(argumentosDaRpc("fn_podar_fila_de_jobs", { p_retencao_dias: 90, p_limite: 1000 })).toEqual({
+      p_retencao_dias: 90,
+      p_limite: 1000,
+    });
   });
 });
 
@@ -211,6 +281,7 @@ describe("houveEfeito — as duas direções", () => {
     retencao_auditoria_dias: RETENCAO_AUDITORIA_DIAS_PADRAO,
     retencao_espelho_dias: RETENCAO_ESPELHO_AGENDA_DIAS_PADRAO,
     avisos: [] as string[],
+    falhas: [] as string[],
   };
 
   it("rodada que não apagou nada NÃO ocupa linha de auditoria", () => {
