@@ -30264,6 +30264,190 @@ create trigger trg_platform_error_webhook_updated_at
   before update on public.platform_error_webhook
   for each row execute function public.fn_set_updated_at();
 
+-- ---- a caixa de entrada e a poda diária sob carga (migration 0291) ----
+--
+-- 0291 — A caixa de entrada e a poda diária sob carga (erros de 03–04/11/2026)
+--
+-- Em 36 h de produção: 515 statement timeouts na lista de conversas (aba Fila),
+-- 460 na contagem das abas e o pool do PostgREST esgotado duas vezes. A RLS de
+-- `conversations` é avaliada linha a linha, então o que mais pesa é QUANTAS
+-- linhas chegam até ela. Esta migration ataca isso do lado do banco; o código
+-- (`comRecorteDoComando`) já manda os predicados que estes índices esperam.
+--
+-- 1. Índice da Fila. A aba pede `comando_da_conversa in (aguardando[,automatico])`
+--    e o código acrescenta o que esse comando já implica: sem dono e não
+--    encerrada. O `idx_conversations_open_unassigned` do baseline exige
+--    `status = 'open'` e por isso não serve. O predicado abaixo é o MESMO texto
+--    que o PostgREST gera a partir de `STATUS_ENCERRADOS`
+--    (`lib/inbox/comando-da-conversa.ts`), na mesma ordem: sem isso o planner
+--    não prova que a consulta cabe no índice parcial. A coluna de ordem é a da
+--    Fila (`ORDEM_DA_ESPERA`: `last_inbound_at` asc, nulls last).
+--
+-- 2. Índice das conversas vivas ("Todas" e "Minhas" na contagem e na lista):
+--    `status not in ('closed','archived')`, que é `CONVERSATION_TERMINAL_STATUSES`.
+--    Corta o histórico encerrado antes da RLS.
+--
+-- 3. `comando_da_conversa(c)`: uma busca em `contacts` por linha, não duas. A
+--    regra continua em `fn_comando_da_conversa`, intocada (o espelho com o
+--    TypeScript é vigiado por `comando-da-conversa-espelha-o-ts.test.ts`).
+--
+-- 4. `ai_reply_drafts.send_job_id` passa a ser `on delete set null`. Nasceu na
+--    0227 sem `on delete`, então a poda diária (`fn_podar_fila_de_jobs`) falharia
+--    por FK assim que um job `approved_reply` terminado passasse da retenção
+--    (90 dias, a partir de dez/2026) — e o lote inteiro iria junto. O rascunho
+--    não perde nada: o envio já aconteceu e o vínculo com a mensagem fica em
+--    `message_id`. Condicional: o baseline é reaplicado a cada deploy, e recriar
+--    a FK revalidaria a tabela inteira toda vez.
+--
+-- Idempotente. Sem `concurrently` porque o runner envolve em transação; o
+-- `deploy-nebo.sh` para app/worker/scheduler antes de reaplicar o baseline.
+
+create index if not exists idx_conversations_fila_sem_dono
+  on public.conversations (organization_id, last_inbound_at, id)
+  where assigned_to_user_id is null
+    and status not in ('closed', 'archived', 'resolved');
+
+create index if not exists idx_conversations_vivas
+  on public.conversations (organization_id, assigned_to_user_id)
+  where status not in ('closed', 'archived');
+
+create or replace function public.comando_da_conversa(c public.conversations)
+returns text
+language sql
+stable
+set search_path = public
+as $comando$
+  select public.fn_comando_da_conversa(
+    c.status,
+    c.assigned_to_user_id,
+    c.bot_silenced_until,
+    -- `coalesce` porque `contact_id` é anulável no schema: contato ausente não pode
+    -- virar `null` e derrubar a linha inteira para fora de todo filtro — o efeito
+    -- seria uma conversa invisível em TODAS as abas. O `left join` com `(select 1)`
+    -- garante uma linha mesmo sem contato.
+    coalesce(ct.force_human, false),
+    coalesce(ct.is_blocked, false),
+    now()
+  )
+  from (select 1) as uma_linha
+  left join public.contacts ct on ct.id = c.contact_id;
+$comando$;
+
+comment on function public.comando_da_conversa(public.conversations)
+  is 'Campo calculado exposto pelo PostgREST: ?select=comando_da_conversa e ?comando_da_conversa=in.(...). Resolve o contato (uma busca) e carimba now(); a regra em si é fn_comando_da_conversa.';
+
+revoke execute on function public.comando_da_conversa(public.conversations) from public, anon;
+grant execute on function public.comando_da_conversa(public.conversations) to authenticated, service_role;
+
+do $fk$
+begin
+  if exists (
+    select 1
+      from pg_constraint
+     where conrelid = 'public.ai_reply_drafts'::regclass
+       and contype = 'f'
+       and conname = 'ai_reply_drafts_send_job_id_fkey'
+       and confdeltype <> 'n'
+  ) then
+    alter table public.ai_reply_drafts drop constraint ai_reply_drafts_send_job_id_fkey;
+  end if;
+  if not exists (
+    select 1
+      from pg_constraint
+     where conrelid = 'public.ai_reply_drafts'::regclass
+       and conname = 'ai_reply_drafts_send_job_id_fkey'
+  ) then
+    alter table public.ai_reply_drafts
+      add constraint ai_reply_drafts_send_job_id_fkey
+      foreign key (send_job_id) references public.job_queue(id) on delete set null;
+  end if;
+end
+$fk$;
+
+notify pgrst, 'reload schema';
+
+-- ---- etiquetas em uso sem varrer a organização; webhook de erro nasce `server` (migration 0292) ----
+--
+-- 0292 — As etiquetas em uso sem passar a RLS em cada conversa, e o webhook de erro só com 5xx por padrão
+--
+-- ─── 1. `fn_tags_de_conversa_em_uso` ────────────────────────────────────────
+--
+-- Produção, 30/10 a 04/11/2026: 10 statement timeouts em
+-- `GET /api/v1/conversation-tags`. A versão da 0244 era INVOKER e fazia
+-- `select distinct t from conversations, unnest(tags)` na organização inteira:
+-- a RLS de `conversations` (`fn_can_view_conversation`, de 4 a 7 buscas) rodava
+-- em CADA conversa com etiqueta, e o `limit 200` só valia depois do `distinct`.
+--
+-- Agora o custo é por ETIQUETA, não por conversa:
+--   (a) as etiquetas distintas da organização saem sem RLS — é só um `unnest`;
+--   (b) cada uma só é devolvida se EXISTIR uma conversa com ela que a pessoa
+--       pode ver, pela MESMA regra da policy `conversations_select`
+--       (`fn_can_view_conversation(organization_id, assigned_to_user_id,
+--       sector_id, handover_from_user_id)`), que é a ÚNICA policy de SELECT da
+--       tabela — as restritivas do suporte são só de escrita. O `exists` para
+--       na primeira conversa visível e usa `idx_conversations_tags_gin`.
+--
+-- O resultado é o mesmo da versão invoker, caso a caso: uma etiqueta aparece se
+-- e só se a pessoa enxerga ao menos uma conversa com ela. Provado em
+-- `tests/invariants/tags-em-uso-aparecem-no-filtro.test.ts`, que compara a
+-- função com a consulta direta sob a RLS para cada papel.
+--
+-- ⛔ Por que DEFINER agora é seguro (a 0244 explica por que não era): a
+-- organização vem por argumento, mas nada sai sem passar por
+-- `fn_can_view_conversation`, que usa `auth.uid()` — quem não é membro de
+-- `p_org` não vê conversa nenhuma dela, logo não recebe etiqueta nenhuma. A
+-- guarda de entrada (`fn_user_role_in_org`) só evita fazer o trabalho (a) para
+-- quem não é membro; a fronteira de segurança é (b). `stable`, sem escrita.
+--
+-- ─── 2. `platform_error_webhook.scope` passa a nascer `server` ──────────────
+--
+-- Com `all`, todo 401/403/404/422 de regra de negócio virava card na central
+-- de chamados (29 dos 40 cards restantes de 04/11). Muda só o PADRÃO de
+-- instalação nova: a linha que já existe guarda a escolha de quem configurou.
+--
+-- Idempotente.
+
+create or replace function public.fn_tags_de_conversa_em_uso(p_org uuid)
+returns table (tag text)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with candidatas as (
+    select distinct t
+      from public.conversations c, unnest(c.tags) as t
+     where c.organization_id = p_org
+       and cardinality(c.tags) > 0
+       -- Uma vez por consulta (InitPlan), não por linha.
+       and (select public.fn_is_platform_admin() or public.fn_user_role_in_org(p_org) is not null)
+  )
+  select k.t as tag
+    from candidatas k
+   where exists (
+     select 1
+       from public.conversations c
+      where c.organization_id = p_org
+        and c.tags @> array[k.t]
+        and public.fn_can_view_conversation(
+              c.organization_id, c.assigned_to_user_id, c.sector_id, c.handover_from_user_id)
+   )
+   order by k.t
+   -- Teto: numa organização bagunçada a união poderia crescer sem limite, e esta
+   -- lista vai para um seletor de tela.
+   limit 200;
+$$;
+
+comment on function public.fn_tags_de_conversa_em_uso(uuid)
+  is 'Etiquetas de conversa em uso na organização que o chamador enxerga em ao menos uma conversa (mesma regra de conversations_select). Definer por desempenho; a fronteira é fn_can_view_conversation (migration 0292).';
+
+revoke execute on function public.fn_tags_de_conversa_em_uso(uuid) from public, anon;
+grant  execute on function public.fn_tags_de_conversa_em_uso(uuid) to authenticated, service_role;
+
+alter table public.platform_error_webhook alter column scope set default 'server';
+
+notify pgrst, 'reload schema';
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria
@@ -30514,108 +30698,6 @@ comment on column public.platform_settings.ai_cost_fx_rate is
   'Reais por dólar, fixa, digitada pelo admin da instalação. Obrigatória quando ai_cost_currency = BRL.';
 comment on column public.platform_settings.ai_cost_markup_pct is
   'Margem (%) aplicada sobre o custo de IA em toda tela de organização; o admin da instalação vê também o custo real. 0 = só converter.';
-
--- ---- a caixa de entrada e a poda diária sob carga (migration 0291) ----
---
--- 0291 — A caixa de entrada e a poda diária sob carga (erros de 03–04/11/2026)
---
--- Em 36 h de produção: 515 statement timeouts na lista de conversas (aba Fila),
--- 460 na contagem das abas e o pool do PostgREST esgotado duas vezes. A RLS de
--- `conversations` é avaliada linha a linha, então o que mais pesa é QUANTAS
--- linhas chegam até ela. Esta migration ataca isso do lado do banco; o código
--- (`comRecorteDoComando`) já manda os predicados que estes índices esperam.
---
--- 1. Índice da Fila. A aba pede `comando_da_conversa in (aguardando[,automatico])`
---    e o código acrescenta o que esse comando já implica: sem dono e não
---    encerrada. O `idx_conversations_open_unassigned` do baseline exige
---    `status = 'open'` e por isso não serve. O predicado abaixo é o MESMO texto
---    que o PostgREST gera a partir de `STATUS_ENCERRADOS`
---    (`lib/inbox/comando-da-conversa.ts`), na mesma ordem: sem isso o planner
---    não prova que a consulta cabe no índice parcial. A coluna de ordem é a da
---    Fila (`ORDEM_DA_ESPERA`: `last_inbound_at` asc, nulls last).
---
--- 2. Índice das conversas vivas ("Todas" e "Minhas" na contagem e na lista):
---    `status not in ('closed','archived')`, que é `CONVERSATION_TERMINAL_STATUSES`.
---    Corta o histórico encerrado antes da RLS.
---
--- 3. `comando_da_conversa(c)`: uma busca em `contacts` por linha, não duas. A
---    regra continua em `fn_comando_da_conversa`, intocada (o espelho com o
---    TypeScript é vigiado por `comando-da-conversa-espelha-o-ts.test.ts`).
---
--- 4. `ai_reply_drafts.send_job_id` passa a ser `on delete set null`. Nasceu na
---    0227 sem `on delete`, então a poda diária (`fn_podar_fila_de_jobs`) falharia
---    por FK assim que um job `approved_reply` terminado passasse da retenção
---    (90 dias, a partir de dez/2026) — e o lote inteiro iria junto. O rascunho
---    não perde nada: o envio já aconteceu e o vínculo com a mensagem fica em
---    `message_id`. Condicional: o baseline é reaplicado a cada deploy, e recriar
---    a FK revalidaria a tabela inteira toda vez.
---
--- Idempotente. Sem `concurrently` porque o runner envolve em transação; o
--- `deploy-nebo.sh` para app/worker/scheduler antes de reaplicar o baseline.
-
-create index if not exists idx_conversations_fila_sem_dono
-  on public.conversations (organization_id, last_inbound_at, id)
-  where assigned_to_user_id is null
-    and status not in ('closed', 'archived', 'resolved');
-
-create index if not exists idx_conversations_vivas
-  on public.conversations (organization_id, assigned_to_user_id)
-  where status not in ('closed', 'archived');
-
-create or replace function public.comando_da_conversa(c public.conversations)
-returns text
-language sql
-stable
-set search_path = public
-as $comando$
-  select public.fn_comando_da_conversa(
-    c.status,
-    c.assigned_to_user_id,
-    c.bot_silenced_until,
-    -- `coalesce` porque `contact_id` é anulável no schema: contato ausente não pode
-    -- virar `null` e derrubar a linha inteira para fora de todo filtro — o efeito
-    -- seria uma conversa invisível em TODAS as abas. O `left join` com `(select 1)`
-    -- garante uma linha mesmo sem contato.
-    coalesce(ct.force_human, false),
-    coalesce(ct.is_blocked, false),
-    now()
-  )
-  from (select 1) as uma_linha
-  left join public.contacts ct on ct.id = c.contact_id;
-$comando$;
-
-comment on function public.comando_da_conversa(public.conversations)
-  is 'Campo calculado exposto pelo PostgREST: ?select=comando_da_conversa e ?comando_da_conversa=in.(...). Resolve o contato (uma busca) e carimba now(); a regra em si é fn_comando_da_conversa.';
-
-revoke execute on function public.comando_da_conversa(public.conversations) from public, anon;
-grant execute on function public.comando_da_conversa(public.conversations) to authenticated, service_role;
-
-do $fk$
-begin
-  if exists (
-    select 1
-      from pg_constraint
-     where conrelid = 'public.ai_reply_drafts'::regclass
-       and contype = 'f'
-       and conname = 'ai_reply_drafts_send_job_id_fkey'
-       and confdeltype <> 'n'
-  ) then
-    alter table public.ai_reply_drafts drop constraint ai_reply_drafts_send_job_id_fkey;
-  end if;
-  if not exists (
-    select 1
-      from pg_constraint
-     where conrelid = 'public.ai_reply_drafts'::regclass
-       and conname = 'ai_reply_drafts_send_job_id_fkey'
-  ) then
-    alter table public.ai_reply_drafts
-      add constraint ai_reply_drafts_send_job_id_fkey
-      foreign key (send_job_id) references public.job_queue(id) on delete set null;
-  end if;
-end
-$fk$;
-
-notify pgrst, 'reload schema';
 
 -- ---- travas do modo somente leitura do suporte, depois de toda tabela (migration 0274) ----
 --

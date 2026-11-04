@@ -1,6 +1,17 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { GOV_ORG, GOV_VIEWER, GOV_CONV_UNASSIGNED, seedGov, sql } from "./gov-helpers";
+import {
+  GOV_ADMIN,
+  GOV_AGENT_A,
+  GOV_AGENT_B,
+  GOV_CONV_AGENT_B,
+  GOV_CONV_UNASSIGNED,
+  GOV_MANAGER,
+  GOV_ORG,
+  GOV_VIEWER,
+  seedGov,
+  sql,
+} from "./gov-helpers";
 
 /**
  * O SELETOR DE ETIQUETA TEM DE OFERECER AS ETIQUETAS QUE EXISTEM.
@@ -36,6 +47,7 @@ const VIZINHA_CONV = "eeeeeeee-4444-4000-8000-000000000001";
 const TAG_DA_CASA = "etiqueta-em-uso-so-na-casa";
 const TAG_DA_VIZINHA = "etiqueta-secreta-da-vizinha";
 const TAG_QUE_NINGUEM_APLICOU = "etiqueta-que-ninguem-aplicou";
+const TAG_SO_DO_B = "etiqueta-so-na-conversa-do-agente-b";
 
 /**
  * Chama a função como um usuário autenticado de verdade, com JWT simulado.
@@ -80,6 +92,9 @@ beforeAll(() => {
     update public.conversations
        set tags = array['${TAG_DA_CASA}']::text[]
      where id = '${GOV_CONV_UNASSIGNED}';
+    update public.conversations
+       set tags = array['${TAG_SO_DO_B}', '${TAG_DA_CASA}']::text[]
+     where id = '${GOV_CONV_AGENT_B}';
   `);
 });
 
@@ -134,5 +149,49 @@ describe("fn_tags_de_conversa_em_uso — as etiquetas em uso, e só as da própr
       );
     `).trim();
     expect(tem, "authenticated perdeu execute — o filtro de tag para de funcionar").toBe("t");
+  });
+});
+
+/**
+ * A MESMA RESPOSTA DA RLS, PAPEL A PAPEL (migration 0292).
+ *
+ * A 0292 trocou a função de INVOKER (a RLS filtrava cada conversa) para DEFINER
+ * com a regra da policy aplicada à mão, por desempenho: 10 statement timeouts em
+ * produção. A troca só é segura se a resposta for idêntica à da RLS para todo
+ * mundo — por isso o gabarito aqui é a consulta DIRETA sob `set role
+ * authenticated`, e não uma lista escrita à mão.
+ */
+function diretoSobARls(userId: string, org: string): string[] {
+  const out = sql(`
+    set role authenticated;
+    select set_config('request.jwt.claims', '{"sub":"${userId}"}', false);
+    select distinct 'TAG:' || t from public.conversations c, unnest(c.tags) t
+     where c.organization_id = '${org}' order by 1;
+  `);
+  return out
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("TAG:"))
+    .map((l) => l.slice("TAG:".length))
+    .sort();
+}
+
+describe("fn_tags_de_conversa_em_uso devolve exatamente o que a RLS deixaria ver", () => {
+  const papeis = { viewer: GOV_VIEWER, agente_a: GOV_AGENT_A, agente_b: GOV_AGENT_B, gerente: GOV_MANAGER, admin: GOV_ADMIN };
+
+  for (const [papel, userId] of Object.entries(papeis)) {
+    it(`${papel}: função === consulta direta sob a RLS`, () => {
+      expect(chamarComo(userId, GOV_ORG).sort()).toEqual(diretoSobARls(userId, GOV_ORG));
+    });
+  }
+
+  it("GUARDA DE VACUIDADE: os papéis NÃO veem todos a mesma coisa (senão a comparação não prova nada)", () => {
+    // O agente B vê a etiqueta da conversa dele; quem tem o escopo mais estreito
+    // não a vê. Se todos vissem o mesmo, a equivalência acima passaria até com a
+    // função ignorando a regra de visibilidade.
+    expect(chamarComo(GOV_AGENT_B, GOV_ORG)).toContain(TAG_SO_DO_B);
+    expect(chamarComo(GOV_VIEWER, GOV_ORG)).toContain(TAG_SO_DO_B);
+    const viramSemB = Object.values(papeis).filter((u) => !chamarComo(u, GOV_ORG).includes(TAG_SO_DO_B));
+    expect(viramSemB.length, "ninguém deixou de ver a etiqueta do agente B").toBeGreaterThan(0);
   });
 });
