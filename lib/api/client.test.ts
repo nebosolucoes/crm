@@ -368,3 +368,95 @@ describe("apiClient — quando a organização some debaixo da tela", () => {
     expect(reload).toHaveBeenCalledTimes(2);
   });
 });
+
+/**
+ * A SESSÃO ACABOU COM A TELA ABERTA.
+ *
+ * Produção, 02/11/2026: 19 "Auth required." em 17 segundos — a caixa de entrada
+ * seguia consultando depois de a sessão morrer. O `proxy.ts` já tenta renovar a
+ * sessão em toda requisição, então 401 `unauthenticated` é sessão morta: vai
+ * para o login, uma vez, voltando para onde a pessoa estava.
+ */
+describe("apiClient — quando a sessão acaba debaixo da tela", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  let assign: ReturnType<typeof vi.fn>;
+  let pathname: string;
+
+  function semSessao(code = "unauthenticated") {
+    return jsonResponse(401, { error: { code, message: "Auth required." } });
+  }
+
+  beforeEach(() => {
+    vi.resetModules();
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    assign = vi.fn();
+    pathname = "/app/inbox";
+    vi.stubGlobal("window", {
+      location: {
+        assign,
+        reload: vi.fn(),
+        get pathname() {
+          return pathname;
+        },
+        search: "?conversa=abc",
+      },
+      sessionStorage: (() => {
+        const caixa = new Map<string, string>();
+        return {
+          getItem: (k: string) => caixa.get(k) ?? null,
+          setItem: (k: string, v: string) => void caixa.set(k, v),
+          removeItem: (k: string) => void caixa.delete(k),
+        };
+      })(),
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("vai para o login com o caminho atual no `next`", async () => {
+    fetchMock.mockResolvedValue(semSessao());
+    const { apiClient: cliente } = await import("@/lib/api/client");
+
+    await expect(cliente.get("/api/v1/conversations")).rejects.toThrow("Auth required.");
+    expect(assign).toHaveBeenCalledWith(`/login?next=${encodeURIComponent("/app/inbox?conversa=abc")}`);
+  });
+
+  it("NÃO vira rajada nem laço: a segunda recusa seguida não manda de novo", async () => {
+    fetchMock.mockResolvedValue(semSessao());
+    const { apiClient: cliente } = await import("@/lib/api/client");
+
+    for (let i = 0; i < 5; i += 1) await expect(cliente.get("/api/v1/conversations")).rejects.toThrow();
+    expect(assign).toHaveBeenCalledTimes(1);
+  });
+
+  it("depois de uma resposta boa, uma nova perda de sessão volta a mandar para o login", async () => {
+    const { apiClient: cliente } = await import("@/lib/api/client");
+    fetchMock.mockResolvedValueOnce(semSessao());
+    await expect(cliente.get("/api/v1/conversations")).rejects.toThrow();
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { data: [] }));
+    await cliente.get("/api/v1/conversations");
+    fetchMock.mockResolvedValueOnce(semSessao());
+    await expect(cliente.get("/api/v1/conversations")).rejects.toThrow();
+    expect(assign).toHaveBeenCalledTimes(2);
+  });
+
+  it("CONTROLE — `unauthorized` (segredo interno host↔app) não mexe na sessão de ninguém", async () => {
+    fetchMock.mockResolvedValue(semSessao("unauthorized"));
+    const { apiClient: cliente } = await import("@/lib/api/client");
+
+    await expect(cliente.get("/api/v1/system/agent")).rejects.toThrow();
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it("CONTROLE — em página pública o 401 é esperado e não expulsa ninguém", async () => {
+    pathname = "/login";
+    fetchMock.mockResolvedValue(semSessao());
+    const { apiClient: cliente } = await import("@/lib/api/client");
+
+    await expect(cliente.get("/api/v1/me")).rejects.toThrow();
+    expect(assign).not.toHaveBeenCalled();
+  });
+});

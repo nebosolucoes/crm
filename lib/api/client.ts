@@ -1,6 +1,7 @@
 import type { ZodSchema } from "zod";
 
 import { ApiError, type ApiErrorBody } from "@/lib/api/types";
+import { isPublicPath } from "@/lib/auth/public-paths";
 import { randomId } from "@/lib/random-id";
 
 type HttpMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
@@ -114,10 +115,10 @@ const MUTATING_METHODS = new Set<HttpMethod>(["POST", "PATCH", "PUT", "DELETE"])
 // por origem (o próprio CRM), então não precisa de prefixo para não colidir.
 const MARCA_DE_RECARGA = "org-ausente:recarga";
 
-function leuMarca(): boolean {
+function leuMarca(chave: string = MARCA_DE_RECARGA): boolean {
   if (typeof window === "undefined") return false;
   try {
-    return window.sessionStorage.getItem(MARCA_DE_RECARGA) !== null;
+    return window.sessionStorage.getItem(chave) !== null;
   } catch {
     // Navegação privada ou armazenamento bloqueado. Sem a marca não há trava
     // contra o laço, então o mais seguro é NÃO recarregar: um erro na tela é
@@ -129,14 +130,58 @@ function leuMarca(): boolean {
 /** Lido uma vez, no nascimento do módulo — que é uma vez por carregamento. */
 let jaTentouRecarregar = leuMarca();
 
-function limparMarcaDeRecarga(): void {
-  if (!jaTentouRecarregar || typeof window === "undefined") return;
-  jaTentouRecarregar = false;
+function apagarMarca(chave: string): void {
   try {
-    window.sessionStorage.removeItem(MARCA_DE_RECARGA);
+    window.sessionStorage.removeItem(chave);
   } catch {
     /* sem armazenamento, a marca já não existia */
   }
+}
+
+/** Resposta boa: as duas travas abaixo voltam a valer para um próximo problema nesta aba. */
+function limparMarcaDeRecarga(): void {
+  if (typeof window === "undefined") return;
+  if (jaTentouRecarregar) {
+    jaTentouRecarregar = false;
+    apagarMarca(MARCA_DE_RECARGA);
+  }
+  if (jaMandouParaOLogin) {
+    jaMandouParaOLogin = false;
+    apagarMarca(MARCA_DO_LOGIN);
+  }
+}
+
+/**
+ * A SESSÃO ACABOU COM A TELA ABERTA (401 `unauthenticated`).
+ *
+ * Produção, 02/11/2026: 19 erros "Auth required." em 17 segundos, sem usuário.
+ * A sessão expirou (ou houve logout em outra aba) e a caixa de entrada seguiu
+ * consultando, cada consulta recusada, até a pessoa recarregar à mão.
+ *
+ * Renovar aqui não adianta: o cookie é HttpOnly e o `proxy.ts` já tenta renovar
+ * a sessão em TODA requisição, `/api` inclusive. Se a resposta ainda é 401, a
+ * sessão morreu de verdade — o lugar certo é o login, voltando para onde a
+ * pessoa estava. Mesma trava contra laço da recarga acima (uma vez por aba, até
+ * a próxima resposta boa), e nunca a partir de página pública: lá o 401 é
+ * esperado e mandar para o login seria expulsar quem nem entrou.
+ *
+ * ⚠️ Só `unauthenticated`. `unauthorized` é o segredo interno das rotas entre
+ * host e app (`lib/api/errors.ts`) e não tem nada a ver com a sessão de alguém.
+ */
+const MARCA_DO_LOGIN = "sessao-perdida:login";
+let jaMandouParaOLogin = leuMarca(MARCA_DO_LOGIN);
+
+function mandarParaOLogin(): void {
+  if (typeof window === "undefined" || jaMandouParaOLogin) return;
+  const { pathname, search } = window.location;
+  if (!pathname || isPublicPath(pathname)) return;
+  jaMandouParaOLogin = true;
+  try {
+    window.sessionStorage.setItem(MARCA_DO_LOGIN, "1");
+  } catch {
+    return; // sem trava, não arrisca o laço
+  }
+  window.location.assign(`/login?next=${encodeURIComponent(pathname + (search ?? ""))}`);
 }
 
 function pedirDecisaoAoServidor(): void {
@@ -312,6 +357,10 @@ async function request<T>(
         // com erro em vez de ficar pendurado esperando uma resposta que não vem.
         if (res.status === 403 && e.code === "no_active_org") {
           pedirDecisaoAoServidor();
+        }
+        // Ver o bloco `MARCA_DO_LOGIN` acima. O `throw` segue pelo mesmo motivo.
+        if (res.status === 401 && e.code === "unauthenticated") {
+          mandarParaOLogin();
         }
         throw new ApiError(
           res.status,
