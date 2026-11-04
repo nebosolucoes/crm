@@ -8,7 +8,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { orgTemAutomatico } from "@/lib/ai/agents/org-tem-automatico";
-import { ORDEM_DA_ESPERA, comandosDaFila } from "@/lib/inbox/comando-da-conversa";
+import { ORDEM_DA_ESPERA, comRecorteDoComando, comandosDaFila } from "@/lib/inbox/comando-da-conversa";
 
 import { loadEligibleAttendants } from "./eligibles";
 
@@ -33,11 +33,14 @@ export async function getQueueStatus(
   now: Date,
 ): Promise<QueueStatus> {
   const naFila = comandosDaFila(await orgTemAutomatico(supabase, organizationId));
-  const { data: queueRows } = await supabase
-    .from("conversations")
-    .select("last_inbound_at")
-    .eq("organization_id", organizationId)
-    .in("comando_da_conversa", naFila);
+  const { data: queueRows } = await comRecorteDoComando(
+    supabase
+      .from("conversations")
+      .select("last_inbound_at")
+      .eq("organization_id", organizationId)
+      .in("comando_da_conversa", naFila),
+    naFila,
+  );
 
   const rows = (queueRows ?? []) as Array<{ last_inbound_at: string | null }>;
   const queueSize = rows.length;
@@ -72,11 +75,14 @@ export async function getQueuePositions(
   organizationId: string,
 ): Promise<Map<string, number>> {
   const naFila = comandosDaFila(await orgTemAutomatico(supabase, organizationId));
-  const { data } = await supabase
-    .from("conversations")
-    .select("id")
-    .eq("organization_id", organizationId)
-    .in("comando_da_conversa", naFila)
+  const { data } = await comRecorteDoComando(
+    supabase
+      .from("conversations")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .in("comando_da_conversa", naFila),
+    naFila,
+  )
     .order(ORDEM_DA_ESPERA.coluna, ORDEM_DA_ESPERA.opcoes)
     .order("id", { ascending: true });
 
@@ -101,11 +107,13 @@ export async function getQueuePosition(
 ): Promise<number> {
   const naFila = comandosDaFila(await orgTemAutomatico(supabase, organizationId));
   const ref = lastInboundAt ?? now.toISOString();
-  const { count } = await supabase
-    .from("conversations")
-    .select("id", { count: "exact", head: true })
-    .eq("organization_id", organizationId)
-    .in("comando_da_conversa", naFila)
-    .lte("last_inbound_at", ref);
+  const { count } = await comRecorteDoComando(
+    supabase
+      .from("conversations")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId)
+      .in("comando_da_conversa", naFila),
+    naFila,
+  ).lte("last_inbound_at", ref);
   return count ?? 1;
 }

@@ -16,7 +16,11 @@ import { loadAuthUser, resolveActiveOrg } from "@/lib/auth/server";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { CONVERSATION_TERMINAL_STATUSES } from "@/lib/schemas";
 import { orgTemAutomatico } from "@/lib/ai/agents/org-tem-automatico";
-import { comandosDaFila } from "@/lib/inbox/comando-da-conversa";
+import {
+  type ComandoDoBanco,
+  comandosDaFila,
+  comRecorteDoComando,
+} from "@/lib/inbox/comando-da-conversa";
 import { createClient } from "@/lib/supabase/server";
 import { recusaPorRecurso } from "@/lib/entitlements/exigir-na-rota";
 
@@ -68,6 +72,49 @@ export function contagemSoNaoLidas(sp: URLSearchParams): boolean {
   return sp.get("unread") === "true";
 }
 
+/** O pedaço da resposta do PostgREST que diz o que deu errado. */
+interface RespostaDeContagem {
+  error: { message?: string; code?: string; hint?: string; details?: string } | null;
+  status: number;
+  statusText: string;
+}
+
+/**
+ * A primeira contagem que falhou, descrita de um jeito que NUNCA sai vazio.
+ *
+ * ─── O defeito ─────────────────────────────────────────────────────────────
+ * Toda contagem daqui é `head: true`: uma requisição HEAD, e resposta de HEAD
+ * não tem corpo. Quando o PostgREST recusa (tempo esgotado, banco sobrecarregado,
+ * conexão caída), o `postgrest-js` monta o erro com `message: body` — isto é,
+ * `""`. A rota repassava esse vazio: o registro de erros guardava um 500 sem
+ * mensagem (ID 67c73e41…, 30/10/2026) e o motivo real se perdia para sempre.
+ * Agora a mensagem nomeia a contagem e o status HTTP, e `details` leva o resto.
+ */
+export function primeiraFalhaDaContagem(
+  contagens: Record<string, RespostaDeContagem>,
+): { message: string; details: Record<string, unknown> } | null {
+  for (const [contagem, resposta] of Object.entries(contagens)) {
+    const erro = resposta.error;
+    if (!erro) continue;
+    const http = `HTTP ${resposta.status}${resposta.statusText ? ` ${resposta.statusText}` : ""}`;
+    const texto = erro.message?.trim();
+    return {
+      message: texto
+        ? `Contagem "${contagem}" falhou (${http}): ${texto}`
+        : `Contagem "${contagem}" falhou (${http}) sem mensagem do banco — resposta HEAD não tem corpo.`,
+      details: {
+        contagem,
+        status: resposta.status,
+        status_text: resposta.statusText || null,
+        pg_code: erro.code ?? null,
+        hint: erro.hint || null,
+        pg_details: erro.details || null,
+      },
+    };
+  }
+  return null;
+}
+
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
   const supabase = await createClient();
@@ -112,6 +159,13 @@ export async function GET(req: NextRequest): Promise<Response> {
     return q;
   };
 
+  // Contagem por COMANDO sempre com o recorte em coluna que ele implica: o
+  // comando é campo calculado, e sem o recorte a contagem varria a org inteira,
+  // histórico incluído, a cada 30 s (statement timeout em produção, 30/10/2026).
+  // Mesmo número, ver `recorteImplicadoPeloComando`.
+  const countPorComando = (comandos: readonly ComandoDoBanco[]) =>
+    comRecorteDoComando(countExact().in("comando_da_conversa", [...comandos]), comandos);
+
   // Espelha tabToFilter (InboxLayout): unassigned = fila aberta sem dono;
   // mine = atribuídas a mim e ainda ABERTAS; all = tudo de VIVO que o usuário vê.
   //
@@ -134,10 +188,10 @@ export async function GET(req: NextRequest): Promise<Response> {
     // `tests/unit/fila-tem-uma-definicao-so.test.ts` e
     // `tests/invariants/gov-5b-inbox-scope-counts.test.ts`, porque um badge que conta o
     // que a aba não mostra manda o atendente procurar trabalho que não existe.
-    countExact().in("comando_da_conversa", comandosDaFila(automaticoDaOrg)),
+    countPorComando(comandosDaFila(automaticoDaOrg)),
     // A aba "Automático". Antes ela pedia `status='ai_handling'`, escrito por UM
     // caminho só em produção — por isso vivia quase vazia.
-    countExact().eq("comando_da_conversa", "automatico"),
+    countPorComando(["automatico"]),
     countExact()
       .eq("assigned_to_user_id", user.id)
       .not("status", "in", `(${CONVERSATION_TERMINAL_STATUSES.join(",")})`),
@@ -164,10 +218,9 @@ export async function GET(req: NextRequest): Promise<Response> {
     countExact().eq("status", "archived"),
   ]);
 
-  const firstErr =
-    fila.error ?? automatico.error ?? mine.error ?? all.error ?? closed.error ?? archived.error;
-  if (firstErr) {
-    return fail("internal_error", firstErr.message, 500, { requestId });
+  const falha = primeiraFalhaDaContagem({ fila, automatico, mine, all, closed, archived });
+  if (falha) {
+    return fail("internal_error", falha.message, 500, { requestId, details: falha.details });
   }
 
   return ok(

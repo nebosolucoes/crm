@@ -49,6 +49,7 @@ function makeSupabase(resolve: Resolver, cap: Captures) {
       },
       eq: () => chain,
       is: () => chain,
+      not: () => chain,
       in: () => chain,
       lte: () => chain,
       order: () => chain,

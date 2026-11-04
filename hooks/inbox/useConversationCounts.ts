@@ -1,5 +1,6 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
+import { useRef } from "react";
 import { apiClient } from "@/lib/api/client";
 
 export interface ConversationCounts {
@@ -31,6 +32,19 @@ export interface FiltrosDaContagem {
   kind?: string;
 }
 
+export const INTERVALO_DA_CONTAGEM_MS = 30_000;
+export const TETO_DO_RECUO_DA_CONTAGEM_MS = 5 * 60_000;
+
+/**
+ * De quanto em quanto tempo recontar, dado quantos erros SEGUIDOS houve. Com o
+ * banco sob statement timeout (03/11/2026: 460 erros em 36 h), recontar a cada
+ * 30 s em toda aba aberta só somava carga: dobra a cada erro, até 5 min. Pura.
+ */
+export function intervaloDaContagem(errosSeguidos: number): number {
+  if (errosSeguidos <= 0) return INTERVALO_DA_CONTAGEM_MS;
+  return Math.min(INTERVALO_DA_CONTAGEM_MS * 2 ** errosSeguidos, TETO_DO_RECUO_DA_CONTAGEM_MS);
+}
+
 /**
  * Contagens por visão do inbox (G4-02). O endpoint usa o client RLS-scoped —
  * um agent em modo own* recebe a contagem do seu escopo, não o total da org.
@@ -46,6 +60,9 @@ export function useConversationCounts(
   if (filtros.sector_id) qs.set("sector_id", filtros.sector_id);
   if (filtros.kind) qs.set("kind", filtros.kind);
   const sufixo = qs.toString();
+  // `errorUpdateCount` só cresce; os erros SEGUIDOS são a diferença para o
+  // valor que ele tinha no último sucesso.
+  const errosNoUltimoSucesso = useRef(0);
 
   return useQuery({
     // ⚠️ OS FILTROS ENTRAM NA CHAVE. Sem isso o react-query devolveria a contagem
@@ -53,7 +70,13 @@ export function useConversationCounts(
     // voltaria a mentir, agora pelo cache. Seria o mesmo defeito por outra porta.
     queryKey: ["conversation-counts", orgId, sufixo],
     enabled: !!orgId,
-    refetchInterval: 30_000,
+    refetchInterval: (query) => {
+      if (query.state.status !== "error") {
+        errosNoUltimoSucesso.current = query.state.errorUpdateCount;
+        return INTERVALO_DA_CONTAGEM_MS;
+      }
+      return intervaloDaContagem(query.state.errorUpdateCount - errosNoUltimoSucesso.current);
+    },
     queryFn: () =>
       apiClient
         .get<{ data: ConversationCounts }>(

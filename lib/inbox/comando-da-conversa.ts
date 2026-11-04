@@ -331,6 +331,60 @@ export function comandosDaFila(automaticoDaOrg?: boolean): ComandoDoBanco[] {
 }
 
 /**
+ * O RECORTE EM COLUNA QUE UM CONJUNTO DE COMANDOS JÁ IMPLICA.
+ *
+ * `comando_da_conversa` é campo CALCULADO: para filtrá-lo, o banco calcula a
+ * regra linha a linha (consultando o contato duas vezes) e nenhum índice ajuda.
+ * Sozinho, `?comando_da_conversa=in.(aguardando)` percorre a organização INTEIRA,
+ * histórico fechado incluído, a cada refetch da aba Fila — e, com a RLS de
+ * `conversations` avaliada também por linha, isso estourou o statement timeout
+ * em produção mais de 2.400 vezes entre 30/10 e 03/11/2026.
+ *
+ * Os predicados abaixo NÃO mudam o resultado: saem da ORDEM da própria regra
+ * (`fn_comando_da_conversa` / `comandoDaConversa`):
+ *   - `humano` é exatamente "tem dono" (é o primeiro caso). Sem `humano` no
+ *     conjunto, toda linha aceita tem `assigned_to_user_id is null`;
+ *   - sem dono, `encerrada` é exatamente "status encerrado". Sem `humano` E sem
+ *     `encerrada`, toda linha aceita tem status fora de `STATUS_ENCERRADOS`.
+ * São colunas comuns, então o banco descarta o histórico por índice ANTES de
+ * calcular o comando. Quem consome: a lista (`_handler.ts`) e as contagens
+ * (`counts/route.ts`); a equivalência é provada em
+ * `tests/unit/recorte-implicado-pelo-comando.test.ts` contra `comandoDaConversa`.
+ */
+export function recorteImplicadoPeloComando(comandos: readonly ComandoDoBanco[]): {
+  semDono: boolean;
+  statusExcluidos: readonly string[];
+} {
+  if (comandos.length === 0) return { semDono: false, statusExcluidos: [] };
+  const semDono = !comandos.includes("humano");
+  const naoEncerrada = semDono && !comandos.includes("encerrada");
+  return { semDono, statusExcluidos: naoEncerrada ? [...STATUS_ENCERRADOS] : [] };
+}
+
+/** O que a consulta precisa saber fazer para receber o recorte (o builder do PostgREST). */
+export interface ConsultaRecortavel<Q> {
+  is(coluna: "assigned_to_user_id", valor: null): Q;
+  not(coluna: "status", operador: "in", valor: string): Q;
+}
+
+/**
+ * Filtra por comando JÁ com o recorte implicado. Use sempre isto em vez de
+ * `.in("comando_da_conversa", …)` solto: é o único lugar onde o par existe.
+ */
+export function comRecorteDoComando<Q extends ConsultaRecortavel<Q>>(
+  consulta: Q,
+  comandos: readonly ComandoDoBanco[],
+): Q {
+  const recorte = recorteImplicadoPeloComando(comandos);
+  let q = consulta;
+  if (recorte.semDono) q = q.is("assigned_to_user_id", null);
+  if (recorte.statusExcluidos.length > 0) {
+    q = q.not("status", "in", `(${recorte.statusExcluidos.join(",")})`);
+  }
+  return q;
+}
+
+/**
  * A ORDEM DA FILA, num lugar só — mais tempo esperando primeiro.
  *
  * `last_inbound_at` é a última mensagem DO CLIENTE, e é a única das três datas

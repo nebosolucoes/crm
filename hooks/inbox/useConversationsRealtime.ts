@@ -1,12 +1,15 @@
 "use client";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useRealtimeChannel } from "@/hooks/realtime/useRealtimeChannel";
 import { useRefetchDeSeguranca } from "@/hooks/realtime/useRefetchDeSeguranca";
 import { apiClient } from "@/lib/api/client";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import type { Conversation } from "@/lib/types/messaging";
 import type { ComandoDoBanco } from "@/lib/inbox/comando-da-conversa";
+
+/** Intervalo mínimo entre duas invalidações da lista disparadas pelo realtime. */
+export const JANELA_DO_REALTIME_MS = 2_000;
 
 export interface ContactSummary {
   id: string;
@@ -160,9 +163,43 @@ export function useConversationsRealtime(
     refetchOnWindowFocus: true,
   });
 
-  const onChange = useCallback(() => {
-    qc.invalidateQueries({ queryKey: ["conversations"] });
+  // NO MÁXIMO UMA invalidação por janela de `JANELA_DO_REALTIME_MS`. Cada
+  // evento de `conversations` refazia TODAS as páginas carregadas da lista; numa
+  // rajada (roteamento, importação, robô respondendo em massa) isso virava
+  // dezenas de listas por segundo contra um banco já sob statement timeout
+  // (03/11/2026). O primeiro evento da janela invalida na hora — a tela continua
+  // viva —, e os seguintes viram UMA invalidação no fim da janela.
+  //
+  // Com a aba escondida, só marca como velho (`refetchType: "none"`): ninguém
+  // está olhando, e o `refetchOnWindowFocus` refaz ao voltar.
+  const ultimaInvalidacao = useRef(0);
+  const pendente = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const invalidar = useCallback(() => {
+    ultimaInvalidacao.current = Date.now();
+    const escondida = typeof document !== "undefined" && document.visibilityState !== "visible";
+    void qc.invalidateQueries({
+      queryKey: ["conversations"],
+      ...(escondida ? { refetchType: "none" as const } : {}),
+    });
   }, [qc]);
+  const onChange = useCallback(() => {
+    if (pendente.current) return;
+    const desde = Date.now() - ultimaInvalidacao.current;
+    if (desde >= JANELA_DO_REALTIME_MS) {
+      invalidar();
+      return;
+    }
+    pendente.current = setTimeout(() => {
+      pendente.current = null;
+      invalidar();
+    }, JANELA_DO_REALTIME_MS - desde);
+  }, [invalidar]);
+  useEffect(
+    () => () => {
+      if (pendente.current) clearTimeout(pendente.current);
+    },
+    [],
+  );
 
   // G4-01 (visibility_mode): a subscription postgres_changes HERDA a RLS de
   // SELECT de `conversations` — o Supabase Realtime avalia as policies do usuário

@@ -57,6 +57,7 @@ function makeSupabaseStub(state: StubState) {
       },
       eq: () => chain,
       is: () => chain,
+      not: () => chain,
       in: () => chain,
       lte: () => chain,
       order: () => chain,

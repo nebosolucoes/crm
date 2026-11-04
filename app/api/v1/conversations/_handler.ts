@@ -17,7 +17,7 @@ import type {
 } from "@/lib/schemas";
 import type { Conversation } from "@/lib/types/messaging";
 import { normalizarTermoDeBusca } from "@/lib/inbox/termo-de-busca";
-import { ORDEM_DA_ESPERA, ehAFila } from "@/lib/inbox/comando-da-conversa";
+import { ORDEM_DA_ESPERA, comRecorteDoComando, ehAFila } from "@/lib/inbox/comando-da-conversa";
 
 /**
  * Prepara o termo digitado para viajar dentro de um `or=` do PostgREST.
@@ -187,7 +187,10 @@ export async function listConversationsHandler(
   // o cursor de paginação continuar valendo: filtrar depois de paginar devolveria
   // páginas curtas e um "carregar mais" que às vezes não traz nada.
   if (q.comando && q.comando.length > 0) {
-    query = query.in("comando_da_conversa", q.comando);
+    // Com o recorte em coluna que o comando implica: mesmo resultado, mas o banco
+    // corta o histórico por índice antes de calcular o comando linha a linha —
+    // sem isto a aba Fila varria a org inteira e estourava o statement timeout.
+    query = comRecorteDoComando(query.in("comando_da_conversa", q.comando), q.comando);
   }
   // Depois do `status` de propósito: pedir um status terminal E `exclude_finished`
   // é contradição, e a resposta certa para uma contradição é lista vazia — não

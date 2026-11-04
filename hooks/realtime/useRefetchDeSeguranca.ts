@@ -65,6 +65,9 @@ interface Opts<T> {
  * Curar sem detectar seria pior que o estado atual — a falha vira invisível
  * em vez de visível-tarde, e ninguém consertaria a causa.
  */
+/** O maior intervalo entre conferências depois de erros seguidos. */
+export const TETO_DO_RECUO_MS = 5 * 60_000;
+
 export function useRefetchDeSeguranca<T>({
   queryKey,
   assinatura,
@@ -90,7 +93,8 @@ export function useRefetchDeSeguranca<T>({
     assinaturaRef.current = assinatura;
   }, [assinatura]);
 
-  const verificar = useCallback(async () => {
+  /** Devolve `false` quando o refetch deu erro — é o que alimenta o recuo. */
+  const verificar = useCallback(async (): Promise<boolean> => {
     const antes = assinaturaRef.current(qc.getQueryData<T>(queryKey));
 
     await qc.refetchQueries({ queryKey, exact: true });
@@ -120,13 +124,36 @@ export function useRefetchDeSeguranca<T>({
         ultimaVerificacao: Date.now(),
       };
     });
+    return qc.getQueryState(queryKey)?.status !== "error";
     // `ultimaEntrega` é ref (identidade estável): entra na lista por higiene,
     // sem recriar o callback nem reiniciar o intervalo.
   }, [qc, queryKey, ultimaEntrega]);
 
   useEffect(() => {
     if (!enabled) return;
-    const timer = setInterval(() => void verificar(), intervaloMs);
+    // Timer encadeado, não `setInterval`, por dois motivos medidos em produção
+    // (03/11/2026, rajadas de timeout de madrugada):
+    //   - ABA ESCONDIDA NÃO CONFERE. Uma aba esquecida aberta seguia refazendo
+    //     a lista inteira a cada 45 s para ninguém ver. Ao voltar, o
+    //     `visibilitychange` abaixo confere na hora — a cura não se perde;
+    //   - ERRO RECUA. Com o banco sob timeout, conferir de novo no mesmo ritmo
+    //     só soma carga: dobra a cada falha seguida, até `TETO_DO_RECUO_MS`.
+    let vivo = true;
+    let falhasSeguidas = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const agendar = () => {
+      const atraso =
+        falhasSeguidas === 0 ? intervaloMs : Math.min(intervaloMs * 2 ** falhasSeguidas, TETO_DO_RECUO_MS);
+      timer = setTimeout(() => void rodar(), atraso);
+    };
+    const rodar = async () => {
+      if (document.visibilityState === "visible") {
+        const ok = await verificar();
+        falhasSeguidas = ok ? 0 : falhasSeguidas + 1;
+      }
+      if (vivo) agendar();
+    };
+    agendar();
 
     // AO VOLTAR PARA A ABA, imediatamente: é o momento em que o usuário mais
     // acredita no que vê, e é justamente quando a tela pode estar mais velha —
@@ -136,7 +163,8 @@ export function useRefetchDeSeguranca<T>({
     };
     document.addEventListener("visibilitychange", aoVoltar);
     return () => {
-      clearInterval(timer);
+      vivo = false;
+      clearTimeout(timer);
       document.removeEventListener("visibilitychange", aoVoltar);
     };
   }, [enabled, intervaloMs, verificar]);
